@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -6,6 +6,7 @@ import {
     ScrollView,
     TouchableOpacity,
     Image,
+    ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -69,159 +70,15 @@ type EventItem = {
     updatedAt: string;
 };
 
-const mockEvents: EventItem[] = [
-    {
-        _id: "69a158e3e1f567fb19638f02",
-        title: "FIDE Candidates Tournament 2026 (Open) — Cyprus",
-        slug: "fide-candidates-2026-open-cyprus",
-        type: "tournament",
-        location: "Cap St Georges Hotel & Resort, Peyia (Paphos), Cyprus",
-        start_at: "2026-03-28T00:00:00.000Z",
-        end_at: "2026-04-16T23:59:59.000Z",
-        timezone: "Europe/Nicosia",
-        cover_image_url:
-            "https://www.fide.com/wp-content/uploads/Candidates-2026-Open-1.jpg",
-        official_url: "https://candidates2026.fide.com/",
-        tags: [
-            "FIDE",
-            "Candidates",
-            "World Championship cycle",
-            "Open",
-            "Cyprus",
-            "Classical",
-            "Double round-robin (8 players, 14 rounds)",
-        ],
-        is_published: true,
-        is_featured: true,
-        featured_priority: 100,
-        sort_boost: 50,
-        status: "scheduled",
-        live_mode: "manual",
-        current_day: null,
-        current_round: null,
-        round_label: null,
-        status_note:
-            "Open Candidates (8 players): Hikaru Nakamura (rating spot), Fabiano Caruana (2024 FIDE Circuit), Anish Giri (2025 Grand Swiss 1st), Praggnanandhaa R (2025 FIDE Circuit), Wei Yi (2025 World Cup finalist), Javokhir Sindarov (2025 World Cup winner), Andrey Esipenko (2025 World Cup 3rd), Matthias Bluebaum (2025 Grand Swiss 2nd). Venue: Cap St Georges Hotel & Resort, Cyprus.",
-        last_status_update_at: null,
-        main_broadcaster: {
-            name: "FIDE (Official)",
-            platform: "YouTube",
-            url: "https://www.youtube.com/@FIDE_chess",
-            broadcast_start_at: "2026-03-29T12:00:00.000Z",
-        },
-        other_broadcasters: [
-            {
-                name: "FIDE (Official Website)",
-                platform: "Web",
-                url: "https://candidates2026.fide.com/",
-                broadcast_start_at: "2026-03-29T12:00:00.000Z",
-            },
-        ],
-        game_platforms: [
-            {
-                name: "Chess.com Events (watch live games)",
-                url: "https://www.chess.com/events",
-                is_official: false,
-                notes: "Chess.com typically lists major events under Events.",
-            },
-            {
-                name: "Lichess Broadcasts (watch live games)",
-                url: "https://lichess.org/broadcast",
-                is_official: false,
-                notes:
-                    "Lichess broadcasts page for live tournament boards; exact Candidates page may appear closer to event.",
-            },
-        ],
-        rounds: [
-            {
-                round_number: 1,
-                label: "Round 1",
-                start_at: "2026-03-29T12:30:00.000Z",
-                end_at: null,
-                broadcast_start_at: "2026-03-29T12:00:00.000Z",
-                is_rest_day: false,
-                status: "scheduled",
-                notes: "Scheduled start listed as 15:30 on official schedule.",
-            },
-        ],
-        createdAt: "2026-02-27T08:42:11.025Z",
-        updatedAt: "2026-02-27T08:42:11.025Z",
-    },
-    {
-        _id: "69a602a896ba721033a80594",
-        title: "grenke Chess Open 2026 — Karlsruhe",
-        slug: "grenke-chess-open-2026-karlsruhe-test",
-        summary:
-            "The grenke Chess Open is one of the world’s largest open chess festivals, held in Karlsruhe during Easter. The main event is a 9-round Swiss classical tournament with multiple rounds per day and extensive live coverage links.",
-        type: "tournament",
-        standingsUrl: "https://www.grenkechessopen.de/en/",
-        location:
-            "Congress Center Karlsruhe (Schwarzwaldhalle), Festplatz 5, 76137 Karlsruhe, Germany",
-        start_at: "2026-04-02T16:30:00.000Z",
-        end_at: "2026-04-06T23:59:59.000Z",
-        timezone: "Europe/Berlin",
-        cover_image_url:
-            "https://www.freestyle-chess.com/wp-content/uploads/FC_Grenke_Thumbnail_v172.webp",
-        card_image_url:
-            "https://www.freestyle-chess.com/wp-content/uploads/FC_Grenke_Thumbnail_v172.webp",
-        official_url: "https://www.grenkechessopen.de/en/",
-        tags: [
-            "grenke Chess Open",
-            "Karlsruhe",
-            "Open tournament",
-            "9-round Swiss",
-            "Easter",
-            "Classical (Open)",
-        ],
-        is_published: true,
-        is_featured: false,
-        featured_priority: 120,
-        sort_boost: 60,
-        status: "scheduled",
-        live_mode: "manual",
-        current_day: null,
-        current_round: null,
-        round_label: null,
-        status_note:
-            "World’s largest open chess festival window (Apr 2–6, 2026). Timetable: Round 1 on Thu evening, then two rounds per day Fri–Mon (10:00 & 16:00 local). Venue: Congress Center Karlsruhe (Schwarzwaldhalle).",
-        last_status_update_at: null,
-        main_broadcaster: {
-            name: "grenke Chess Open (Official Site)",
-            platform: "Web",
-            url: "https://www.grenkechessopen.de/en/",
-            broadcast_start_at: "2026-04-02T16:00:00.000Z",
-        },
-        other_broadcasters: [],
-        game_platforms: [
-            {
-                name: "Lichess Broadcasts (watch live games)",
-                url: "https://lichess.org/broadcast",
-                is_official: false,
-                notes: "Broadcast pages typically appear near event time.",
-            },
-            {
-                name: "Chess.com Events (watch live games)",
-                url: "https://www.chess.com/events",
-                is_official: false,
-                notes: "Major events often appear under the Events directory.",
-            },
-        ],
-        rounds: [
-            {
-                round_number: 1,
-                label: "Round 1",
-                start_at: "2026-04-02T16:30:00.000Z",
-                end_at: null,
-                broadcast_start_at: "2026-04-02T16:00:00.000Z",
-                is_rest_day: false,
-                status: "scheduled",
-                notes: "Opening + Round 1 (approx. 18:30 local).",
-            },
-        ],
-        createdAt: "2026-03-02T21:35:36.868Z",
-        updatedAt: "2026-03-02T21:35:36.868Z",
-    },
-];
+type EventsApiResponse = {
+    success: boolean;
+    page: number;
+    limit: number;
+    total: number;
+    data: EventItem[];
+};
+
+const API_BASE_URL = "http://localhost:5002/api";
 
 function formatMonthYear(dateString: string) {
     return new Date(dateString).toLocaleString("en-US", {
@@ -269,30 +126,84 @@ function getCountdownParts(targetDateString: string) {
 function groupEventsByMonth(events: EventItem[]) {
     return events.reduce((acc: Record<string, EventItem[]>, event) => {
         const key = formatMonthYear(event.start_at);
-        if (!acc[key]) {
-            acc[key] = [];
-        }
+        if (!acc[key]) acc[key] = [];
         acc[key].push(event);
         return acc;
     }, {});
 }
 
 export default function EventsScreen({ navigation }: any) {
-    const sortedEvents = useMemo(() => {
-        return [...mockEvents].sort(
-            (a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
-        );
+    const [events, setEvents] = useState<EventItem[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [countdownTick, setCountdownTick] = useState(Date.now());
+
+    useEffect(() => {
+        const fetchEvents = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/events`);
+                const json: EventsApiResponse = await response.json();
+
+                const fetchedEvents = (json.data || [])
+                    .filter((event) => event.is_published)
+                    .sort(
+                        (a, b) =>
+                            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+                    );
+
+                setEvents(fetchedEvents);
+            } catch (error) {
+                console.log("Error fetching events:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchEvents();
     }, []);
 
-    const heroEvent = sortedEvents[0];
-    const remainingEvents = sortedEvents.slice(1);
-    const groupedEvents = groupEventsByMonth(remainingEvents);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCountdownTick(Date.now());
+        }, 1000);
 
-    const groupedEntries = Object.entries(groupedEvents).sort(
-        ([, eventsA], [, eventsB]) =>
-            new Date(eventsA[0].start_at).getTime() -
-            new Date(eventsB[0].start_at).getTime()
-    );
+        return () => clearInterval(interval);
+    }, []);
+
+    const { heroEvent, remainingEvents } = useMemo(() => {
+        const now = Date.now();
+
+        const upcomingEvents = events.filter(
+            (event) => new Date(event.start_at).getTime() >= now
+        );
+
+        const sortedUpcoming = [...upcomingEvents].sort(
+            (a, b) =>
+                new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+        );
+
+        const hero = sortedUpcoming[0] || events[0] || null;
+
+        const rest = hero
+            ? events.filter((event) => event._id !== hero._id)
+            : [];
+
+        return {
+            heroEvent: hero,
+            remainingEvents: rest,
+        };
+    }, [events, countdownTick]);
+
+    const groupedEvents = useMemo(() => {
+        return groupEventsByMonth(remainingEvents);
+    }, [remainingEvents]);
+
+    const groupedEntries = useMemo(() => {
+        return Object.entries(groupedEvents).sort(
+            ([, eventsA], [, eventsB]) =>
+                new Date(eventsA[0].start_at).getTime() -
+                new Date(eventsB[0].start_at).getTime()
+        );
+    }, [groupedEvents]);
 
     const countdown = heroEvent
         ? getCountdownParts(heroEvent.start_at)
@@ -301,6 +212,17 @@ export default function EventsScreen({ navigation }: any) {
     const openEvent = (event: EventItem) => {
         navigation.navigate("EventDetailScreen", { event });
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <AppHeader />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#2EE7FF" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.safeArea}>
@@ -311,10 +233,7 @@ export default function EventsScreen({ navigation }: any) {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.headerRow}>
-
                     <Text style={styles.headerTitle}>Events</Text>
-
-
                 </View>
 
                 {heroEvent ? (
@@ -331,6 +250,9 @@ export default function EventsScreen({ navigation }: any) {
                                     source={{ uri: heroEvent.cover_image_url }}
                                     style={styles.heroImage}
                                     resizeMode="cover"
+                                    onError={() =>
+                                        console.log("Hero event image failed:", heroEvent.cover_image_url)
+                                    }
                                 />
 
                                 <View style={styles.heroInfoBox}>
@@ -354,16 +276,12 @@ export default function EventsScreen({ navigation }: any) {
                                         </View>
 
                                         <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>
-                                                {countdown.minutes}
-                                            </Text>
+                                            <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
                                             <Text style={styles.countdownLabel}>Minutes</Text>
                                         </View>
 
                                         <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>
-                                                {countdown.seconds}
-                                            </Text>
+                                            <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
                                             <Text style={styles.countdownLabel}>Seconds</Text>
                                         </View>
                                     </View>
@@ -373,11 +291,11 @@ export default function EventsScreen({ navigation }: any) {
                     </>
                 ) : null}
 
-                {groupedEntries.map(([monthLabel, events]) => (
+                {groupedEntries.map(([monthLabel, monthEvents]) => (
                     <View key={monthLabel} style={styles.monthSection}>
                         <Text style={styles.monthTitle}>{monthLabel}</Text>
 
-                        {events.map((event) => (
+                        {monthEvents.map((event) => (
                             <TouchableOpacity
                                 key={event._id}
                                 style={styles.eventRow}
@@ -389,6 +307,13 @@ export default function EventsScreen({ navigation }: any) {
                                         uri: event.card_image_url || event.cover_image_url,
                                     }}
                                     style={styles.eventImage}
+                                    resizeMode="cover"
+                                    onError={() =>
+                                        console.log(
+                                            "Event row image failed:",
+                                            event.card_image_url || event.cover_image_url
+                                        )
+                                    }
                                 />
 
                                 <View style={styles.eventContent}>
@@ -426,6 +351,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 40,
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
     headerRow: {
         marginTop: 6,
         marginBottom: 18,
@@ -433,21 +363,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
     },
-    headerIcon: {
-        color: "#F4D03F",
-        fontSize: 28,
-        fontWeight: "800",
-        width: 34,
-        textAlign: "center",
-    },
     headerTitle: {
         color: "#FFFFFF",
         fontSize: 25,
         fontWeight: "900",
-        textAlign: "center"
-    },
-    headerSpacer: {
-        width: 34,
+        textAlign: "center",
     },
     sectionTitle: {
         color: "#F4D03F",
@@ -520,47 +440,48 @@ const styles = StyleSheet.create({
         fontWeight: "700",
     },
     monthSection: {
-        marginBottom: 26,
+        marginBottom: 22,
     },
     monthTitle: {
         color: "#F4D03F",
         fontSize: 24,
         fontWeight: "900",
-        marginBottom: 14,
+        marginBottom: 12,
     },
     eventRow: {
         flexDirection: "row",
         alignItems: "flex-start",
-        marginBottom: 18,
+        marginBottom: 14,
     },
     eventImage: {
-        width: 108,
-        height: 108,
-        borderRadius: 18,
-        marginRight: 14,
+        width: 92,
+        height: 92,
+        borderRadius: 16,
+        marginRight: 12,
         backgroundColor: "#1A1A1A",
     },
     eventContent: {
         flex: 1,
-        minHeight: 108,
+        minHeight: 92,
         justifyContent: "space-between",
+        paddingVertical: 2,
     },
     eventTitle: {
         color: "#FFFFFF",
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: "900",
-        lineHeight: 24,
-        marginBottom: 8,
+        lineHeight: 21,
+        marginBottom: 6,
     },
     eventDate: {
         color: "#F4D03F",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "800",
-        marginBottom: 8,
+        marginBottom: 6,
     },
     eventLocation: {
         color: "#CFCFCF",
-        fontSize: 14,
-        lineHeight: 19,
+        fontSize: 13,
+        lineHeight: 17,
     },
 });

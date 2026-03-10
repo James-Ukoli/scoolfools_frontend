@@ -1,85 +1,124 @@
-import { FlatList, Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
 import { s, vs, ms } from "react-native-size-matters";
 
-const posts = [
-    {
-        id: "1",
-        title: "Gukesh Triumphs in Chennai Blitz Showdown",
-        summary:
-            "Indian prodigy defeats five time world champion in a wild finish that had fans reacting all over social media.",
-        image:
-            "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80",
-        time: "3 hrs ago",
-    },
-    {
-        id: "2",
-        title: "Nepomniachtchi Defends Title Against Firouzja",
-        summary:
-            "Thrilling final round secures the crown after a tense finish and a memorable closing sequence.",
-        image:
-            "https://images.unsplash.com/photo-1511884642898-4c92249e20b6?auto=format&fit=crop&w=800&q=80",
-        time: "4 hrs ago",
-    },
-    {
-        id: "3",
-        title: "Nodirbek Keeps Climbing the Rankings",
-        summary:
-            "Another strong event pushes him further into the spotlight as more fans start paying attention.",
-        image:
-            "https://images.unsplash.com/photo-1528819622765-d6bcf132f793?auto=format&fit=crop&w=800&q=80",
-        time: "5 hrs ago",
-    },
-    {
-        id: "4",
-        title: "Carlsen Talks Format Changes Again",
-        summary:
-            "Freestyle ideas continue to stir debate around elite chess and the future of the sport.",
-        image:
-            "https://images.unsplash.com/photo-1580541832626-2a7131ee809f?auto=format&fit=crop&w=800&q=80",
-        time: "7 hrs ago",
-    },
-    {
-        id: "5",
-        title: "Hikaru Returns to the Spotlight",
-        summary:
-            "Fans are watching closely after a string of appearances and public reactions around his schedule.",
-        image:
-            "https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?auto=format&fit=crop&w=800&q=80",
-        time: "9 hrs ago",
-    },
-    {
-        id: "6",
-        title: "Candidates Race Starts Heating Up",
-        summary:
-            "Every result now feels like it matters more as players fight for major qualification spots.",
-        image:
-            "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=800&q=80",
-        time: "11 hrs ago",
-    },
-    {
-        id: "7",
-        title: "Could Rapid Events Grow Even Bigger",
-        summary:
-            "Organizers are thinking more creatively about how to package fast chess for wider audiences.",
-        image:
-            "https://images.unsplash.com/photo-1523875194681-bedd468c58bf?auto=format&fit=crop&w=800&q=80",
-        time: "13 hrs ago",
-    },
-];
+type Post = {
+    _id: string;
+    title: string;
+    summary: string;
+    cover_image_url: string;
+    slug: string;
+    is_featured: boolean;
+    created_at: string;
+    published_at: string | null;
+    author?: string;
+    category?: string;
+    content_type?: string;
+};
+
+type ApiResponse = {
+    data: Post[];
+    meta?: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+};
+
+const API_BASE_URL = "http://localhost:5002/api";
 
 export default function HorizontalPostsRow() {
+    const navigation = useNavigation<any>();
+
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPosts = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/posts`);
+                const json: ApiResponse = await response.json();
+                const featuredPosts = (json.data || [])
+                    .filter((post) => post.is_featured === true)
+                    .sort((a, b) => {
+                        const dateA = new Date(a.published_at || a.created_at).getTime();
+                        const dateB = new Date(b.published_at || b.created_at).getTime();
+                        return dateB - dateA;
+                    })
+                    .slice(3, 10);
+
+                setPosts(featuredPosts);
+            } catch (error) {
+                console.log("Error fetching horizontal row posts:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchPosts();
+    }, []);
+
+    const getTimeAgo = (dateString: string) => {
+        const now = new Date().getTime();
+        const postTime = new Date(dateString).getTime();
+        const diffMs = now - postTime;
+
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffHours < 1) return "Just now";
+        if (diffHours < 24) {
+            return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+        }
+        return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#3CF2FF" />
+            </View>
+        );
+    }
+
+    if (!posts.length) {
+        return null;
+    }
+
     return (
         <FlatList
             data={posts}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item._id}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
             renderItem={({ item }) => (
-                <View style={styles.card}>
+                <Pressable
+                    style={styles.card}
+                    onPress={() =>
+                        navigation.navigate("ArticleScreen", {
+                            slug: item.slug,
+                        })
+                    }
+                >
                     <View style={styles.imageSection}>
-                        <Image source={{ uri: item.image }} style={styles.image} />
+                        <Image
+                            source={{ uri: item.cover_image_url }}
+                            style={styles.image}
+                            onError={() =>
+                                console.log("Horizontal row image failed:", item.cover_image_url)
+                            }
+                        />
 
                         <LinearGradient
                             colors={["transparent", "rgba(0,0,0,0.82)"]}
@@ -102,15 +141,22 @@ export default function HorizontalPostsRow() {
                             {item.summary}
                         </Text>
 
-                        <Text style={styles.time}>{item.time}</Text>
+                        <Text style={styles.time}>
+                            {getTimeAgo(item.published_at || item.created_at)}
+                        </Text>
                     </View>
-                </View>
+                </Pressable>
             )}
         />
     );
 }
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        height: vs(220),
+        justifyContent: "center",
+        alignItems: "center",
+    },
     listContent: {
         paddingRight: s(8),
     },
