@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     Image,
     ActivityIndicator,
+    RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -135,31 +136,32 @@ function groupEventsByMonth(events: EventItem[]) {
 export default function EventsScreen({ navigation }: any) {
     const [events, setEvents] = useState<EventItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [countdownTick, setCountdownTick] = useState(Date.now());
 
-    useEffect(() => {
-        const fetchEvents = async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/events`);
-                const json: EventsApiResponse = await response.json();
+    const fetchEvents = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/events`);
+            const json: EventsApiResponse = await response.json();
 
-                const fetchedEvents = (json.data || [])
-                    .filter((event) => event.is_published)
-                    .sort(
-                        (a, b) =>
-                            new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
-                    );
+            const fetchedEvents = (json.data || [])
+                .filter((event) => event.is_published)
+                .sort(
+                    (a, b) =>
+                        new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+                );
 
-                setEvents(fetchedEvents);
-            } catch (error) {
-                console.log("Error fetching events:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchEvents();
+            setEvents(fetchedEvents);
+        } catch (error) {
+            console.log("Error fetching events:", error);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchEvents();
+    }, [fetchEvents]);
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -168,6 +170,17 @@ export default function EventsScreen({ navigation }: any) {
 
         return () => clearInterval(interval);
     }, []);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+
+        try {
+            await fetchEvents();
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchEvents]);
 
     const { heroEvent, remainingEvents } = useMemo(() => {
         const now = Date.now();
@@ -227,68 +240,83 @@ export default function EventsScreen({ navigation }: any) {
     return (
         <SafeAreaView style={styles.safeArea}>
             <AppHeader />
+
+            {refreshing && (
+                <View style={styles.refreshIndicator}>
+                    <ActivityIndicator size="small" color="#2EE7FF" />
+                </View>
+            )}
+
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#2EE7FF"
+                        colors={["#2EE7FF"]}
+                        progressBackgroundColor="#0B1224"
+                    />
+                }
             >
                 <View style={styles.headerRow}>
                     <Text style={styles.headerTitle}>Events</Text>
                 </View>
 
                 {heroEvent ? (
-                    <>
-                        <Text style={styles.sectionTitle}>Next Major Event</Text>
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={() => openEvent(heroEvent)}
+                        style={styles.heroWrapper}
+                    >
+                        <View style={styles.heroCard}>
+                            <Image
+                                source={{ uri: heroEvent.cover_image_url }}
+                                style={styles.heroImage}
+                                resizeMode="cover"
+                                onError={() =>
+                                    console.log(
+                                        "Hero event image failed:",
+                                        heroEvent.cover_image_url
+                                    )
+                                }
+                            />
 
-                        <TouchableOpacity
-                            activeOpacity={0.9}
-                            onPress={() => openEvent(heroEvent)}
-                            style={styles.heroWrapper}
-                        >
-                            <View style={styles.heroCard}>
-                                <Image
-                                    source={{ uri: heroEvent.cover_image_url }}
-                                    style={styles.heroImage}
-                                    resizeMode="cover"
-                                    onError={() =>
-                                        console.log("Hero event image failed:", heroEvent.cover_image_url)
-                                    }
-                                />
+                            <View style={styles.heroInfoBox}>
+                                <Text style={styles.heroTitle} numberOfLines={2}>
+                                    {heroEvent.title}
+                                </Text>
 
-                                <View style={styles.heroInfoBox}>
-                                    <Text style={styles.heroTitle} numberOfLines={2}>
-                                        {heroEvent.title}
-                                    </Text>
+                                <Text style={styles.heroDateRange}>
+                                    {formatDateRange(heroEvent.start_at, heroEvent.end_at)}
+                                </Text>
 
-                                    <Text style={styles.heroDateRange}>
-                                        {formatDateRange(heroEvent.start_at, heroEvent.end_at)}
-                                    </Text>
+                                <View style={styles.countdownRow}>
+                                    <View style={styles.countdownBox}>
+                                        <Text style={styles.countdownNumber}>{countdown.days}</Text>
+                                        <Text style={styles.countdownLabel}>Days</Text>
+                                    </View>
 
-                                    <View style={styles.countdownRow}>
-                                        <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>{countdown.days}</Text>
-                                            <Text style={styles.countdownLabel}>Days</Text>
-                                        </View>
+                                    <View style={styles.countdownBox}>
+                                        <Text style={styles.countdownNumber}>{countdown.hours}</Text>
+                                        <Text style={styles.countdownLabel}>Hours</Text>
+                                    </View>
 
-                                        <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>{countdown.hours}</Text>
-                                            <Text style={styles.countdownLabel}>Hours</Text>
-                                        </View>
+                                    <View style={styles.countdownBox}>
+                                        <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
+                                        <Text style={styles.countdownLabel}>Minutes</Text>
+                                    </View>
 
-                                        <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
-                                            <Text style={styles.countdownLabel}>Minutes</Text>
-                                        </View>
-
-                                        <View style={styles.countdownBox}>
-                                            <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
-                                            <Text style={styles.countdownLabel}>Seconds</Text>
-                                        </View>
+                                    <View style={styles.countdownBox}>
+                                        <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
+                                        <Text style={styles.countdownLabel}>Seconds</Text>
                                     </View>
                                 </View>
                             </View>
-                        </TouchableOpacity>
-                    </>
+                        </View>
+                    </TouchableOpacity>
                 ) : null}
 
                 {groupedEntries.map(([monthLabel, monthEvents]) => (
@@ -356,6 +384,10 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    refreshIndicator: {
+        alignItems: "center",
+        paddingVertical: 6,
+    },
     headerRow: {
         marginTop: 6,
         marginBottom: 18,
@@ -368,12 +400,6 @@ const styles = StyleSheet.create({
         fontSize: 25,
         fontWeight: "900",
         textAlign: "center",
-    },
-    sectionTitle: {
-        color: "#F4D03F",
-        fontSize: 28,
-        fontWeight: "900",
-        marginBottom: 16,
     },
     heroWrapper: {
         marginBottom: 28,

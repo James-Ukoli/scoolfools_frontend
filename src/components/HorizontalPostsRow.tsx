@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
     ActivityIndicator,
     FlatList,
@@ -26,47 +26,16 @@ type Post = {
     content_type?: string;
 };
 
-type ApiResponse = {
-    data: Post[];
-    meta?: {
-        page: number;
-        limit: number;
-        total: number;
-    };
+type HorizontalPostsRowProps = {
+    posts: Post[];
+    loading?: boolean;
 };
 
-const API_BASE_URL = "http://localhost:5002/api";
-
-export default function HorizontalPostsRow() {
+export default function HorizontalPostsRow({
+    posts,
+    loading = false,
+}: HorizontalPostsRowProps) {
     const navigation = useNavigation<any>();
-
-    const [posts, setPosts] = useState<Post[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchPosts = async () => {
-            try {
-                const response = await fetch(`${API_BASE_URL}/posts`);
-                const json: ApiResponse = await response.json();
-                const featuredPosts = (json.data || [])
-                    .filter((post) => post.is_featured === true)
-                    .sort((a, b) => {
-                        const dateA = new Date(a.published_at || a.created_at).getTime();
-                        const dateB = new Date(b.published_at || b.created_at).getTime();
-                        return dateB - dateA;
-                    })
-                    .slice(3, 10);
-
-                setPosts(featuredPosts);
-            } catch (error) {
-                console.log("Error fetching horizontal row posts:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchPosts();
-    }, []);
 
     const getTimeAgo = (dateString: string) => {
         const now = new Date().getTime();
@@ -141,9 +110,7 @@ export default function HorizontalPostsRow() {
                             {item.summary}
                         </Text>
 
-                        <Text style={styles.time}>
-                            {getTimeAgo(item.published_at || item.created_at)}
-                        </Text>
+                        <Text style={styles.time}>{getTimeAgo(item.created_at)}</Text>
                     </View>
                 </Pressable>
             )}

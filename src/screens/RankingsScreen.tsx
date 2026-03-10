@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -7,8 +7,10 @@ import {
     ScrollView,
     ActivityIndicator,
     Image,
+    RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AppHeader from "../components/AppHeader";
 
 type MonthlyDivision = "pro" | "women";
 type QuarterlyCategory = "countries" | "colleges" | "influencers";
@@ -73,6 +75,7 @@ type DisplayRow = {
 };
 
 const API_BASE = "http://localhost:5002/api";
+const REFRESH_COLOR = "#FF4FD8";
 
 const MONTH_OPTIONS = [
     { label: "Jan", value: 1 },
@@ -184,16 +187,22 @@ function getFlagUrl(countryCode?: string) {
     return `https://flagcdn.com/w40/${code}.png`;
 }
 
-export default function PowerRankingsScreen({ navigation }: any) {
+export default function PowerRankingsScreen() {
     const [monthlyDivision, setMonthlyDivision] =
         useState<MonthlyDivision>("pro");
-    const [monthlyYear, setMonthlyYear] = useState(2026);
-    const [monthlyMonth, setMonthlyMonth] = useState(3);
+
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
+    const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1;
+
+    const [monthlyYear, setMonthlyYear] = useState(currentYear);
+    const [monthlyMonth, setMonthlyMonth] = useState(currentMonth);
 
     const [quarterlyCategory, setQuarterlyCategory] =
         useState<QuarterlyCategory>("countries");
-    const [quarterlyYear, setQuarterlyYear] = useState(2026);
-    const [quarterlyQuarter, setQuarterlyQuarter] = useState(1);
+    const [quarterlyYear, setQuarterlyYear] = useState(currentYear);
+    const [quarterlyQuarter, setQuarterlyQuarter] = useState(currentQuarter);
 
     const [monthlyRows, setMonthlyRows] = useState<DisplayRow[]>([]);
     const [quarterlyRows, setQuarterlyRows] = useState<DisplayRow[]>([]);
@@ -204,138 +213,155 @@ export default function PowerRankingsScreen({ navigation }: any) {
     const [monthlyError, setMonthlyError] = useState("");
     const [quarterlyError, setQuarterlyError] = useState("");
 
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
     const monthlyTitle = useMemo(() => {
         const monthLabel =
             MONTH_OPTIONS.find((m) => m.value === monthlyMonth)?.label ?? "";
-        return `${monthLabel} ${monthlyYear}`;
-    }, [monthlyMonth, monthlyYear]);
+        return `${titleCase(monthlyDivision)} • ${monthLabel} ${monthlyYear}`;
+    }, [monthlyDivision, monthlyMonth, monthlyYear]);
 
     const quarterlyTitle = useMemo(() => {
-        return `Q${quarterlyQuarter} ${quarterlyYear}`;
-    }, [quarterlyQuarter, quarterlyYear]);
+        return `${titleCase(quarterlyCategory)} • Q${quarterlyQuarter} ${quarterlyYear}`;
+    }, [quarterlyCategory, quarterlyQuarter, quarterlyYear]);
 
-    useEffect(() => {
-        const fetchMonthly = async () => {
-            try {
-                setMonthlyLoading(true);
-                setMonthlyError("");
+    const fetchMonthly = useCallback(async () => {
+        try {
+            setMonthlyLoading(true);
+            setMonthlyError("");
 
-                const currentMonthParam = formatMonthParam(monthlyYear, monthlyMonth);
-                const prev = getPreviousMonth(monthlyYear, monthlyMonth);
-                const previousMonthParam = formatMonthParam(prev.year, prev.month);
+            const currentMonthParam = formatMonthParam(monthlyYear, monthlyMonth);
+            const prev = getPreviousMonth(monthlyYear, monthlyMonth);
+            const previousMonthParam = formatMonthParam(prev.year, prev.month);
 
-                const currentUrl = `${API_BASE}/power-rankings/month/${currentMonthParam}?division=${monthlyDivision}`;
-                const previousUrl = `${API_BASE}/power-rankings/month/${previousMonthParam}?division=${monthlyDivision}`;
+            const currentUrl = `${API_BASE}/power-rankings/month/${currentMonthParam}?division=${monthlyDivision}`;
+            const previousUrl = `${API_BASE}/power-rankings/month/${previousMonthParam}?division=${monthlyDivision}`;
 
-                const [currentRes, previousRes] = await Promise.all([
-                    fetch(currentUrl),
-                    fetch(previousUrl),
-                ]);
+            const [currentRes, previousRes] = await Promise.all([
+                fetch(currentUrl),
+                fetch(previousUrl),
+            ]);
 
-                const currentJson: MonthlyRankingResponse = await currentRes.json();
+            const currentJson: MonthlyRankingResponse = await currentRes.json();
 
-                let previousJson: MonthlyRankingResponse | null = null;
-                if (previousRes.ok) {
-                    previousJson = await previousRes.json();
-                }
-
-                const currentItems = currentJson?.ranking?.items ?? [];
-                const previousItems = previousJson?.ranking?.items ?? [];
-
-                const previousList = previousItems.map((item) => ({
-                    name: item.player_name,
-                    rank: item.rank,
-                }));
-
-                const normalizedRows: DisplayRow[] = currentItems.map((item) => {
-                    const movement = getMovementBadgeData(
-                        item.player_name,
-                        item.rank,
-                        previousList
-                    );
-
-                    return {
-                        rank: item.rank,
-                        name: item.player_name,
-                        rightLabel: item.country_code,
-                        movementType: movement.movementType,
-                        movementValue: movement.movementValue,
-                    };
-                });
-
-                setMonthlyRows(normalizedRows);
-            } catch {
-                setMonthlyRows([]);
-                setMonthlyError("Could not load monthly rankings.");
-            } finally {
-                setMonthlyLoading(false);
+            let previousJson: MonthlyRankingResponse | null = null;
+            if (previousRes.ok) {
+                previousJson = await previousRes.json();
             }
-        };
 
-        fetchMonthly();
+            const currentItems = currentJson?.ranking?.items ?? [];
+            const previousItems = previousJson?.ranking?.items ?? [];
+
+            const previousList = previousItems.map((item) => ({
+                name: item.player_name,
+                rank: item.rank,
+            }));
+
+            const normalizedRows: DisplayRow[] = currentItems.map((item) => {
+                const movement = getMovementBadgeData(
+                    item.player_name,
+                    item.rank,
+                    previousList
+                );
+
+                return {
+                    rank: item.rank,
+                    name: item.player_name,
+                    rightLabel: item.country_code,
+                    movementType: movement.movementType,
+                    movementValue: movement.movementValue,
+                };
+            });
+
+            setMonthlyRows(normalizedRows);
+        } catch {
+            setMonthlyRows([]);
+            setMonthlyError("Could not load monthly rankings.");
+        } finally {
+            setMonthlyLoading(false);
+        }
     }, [monthlyDivision, monthlyYear, monthlyMonth]);
 
-    useEffect(() => {
-        const fetchQuarterly = async () => {
-            try {
-                setQuarterlyLoading(true);
-                setQuarterlyError("");
+    const fetchQuarterly = useCallback(async () => {
+        try {
+            setQuarterlyLoading(true);
+            setQuarterlyError("");
 
-                const res = await fetch(`${API_BASE}/power-rankings/quarterly`);
-                const json: QuarterlyRankingResponse = await res.json();
-                const allItems = json?.items ?? [];
+            const res = await fetch(`${API_BASE}/power-rankings/quarterly`);
+            const json: QuarterlyRankingResponse = await res.json();
+            const allItems = json?.items ?? [];
 
-                const selected = allItems.find(
-                    (item) =>
-                        item.category === quarterlyCategory &&
-                        item.year === quarterlyYear &&
-                        item.quarter === quarterlyQuarter
+            const selected = allItems.find(
+                (item) =>
+                    item.category === quarterlyCategory &&
+                    item.year === quarterlyYear &&
+                    item.quarter === quarterlyQuarter
+            );
+
+            const prev = getPreviousQuarter(quarterlyYear, quarterlyQuarter);
+
+            const previous = allItems.find(
+                (item) =>
+                    item.category === quarterlyCategory &&
+                    item.year === prev.year &&
+                    item.quarter === prev.quarter
+            );
+
+            const currentEntries = selected?.entries ?? [];
+            const previousEntries = previous?.entries ?? [];
+
+            const previousList = previousEntries.map((entry) => ({
+                name: entry.name,
+                rank: entry.rank,
+            }));
+
+            const normalizedRows: DisplayRow[] = currentEntries.map((entry) => {
+                const movement = getMovementBadgeData(
+                    entry.name,
+                    entry.rank,
+                    previousList
                 );
 
-                const prev = getPreviousQuarter(quarterlyYear, quarterlyQuarter);
-
-                const previous = allItems.find(
-                    (item) =>
-                        item.category === quarterlyCategory &&
-                        item.year === prev.year &&
-                        item.quarter === prev.quarter
-                );
-
-                const currentEntries = selected?.entries ?? [];
-                const previousEntries = previous?.entries ?? [];
-
-                const previousList = previousEntries.map((entry) => ({
-                    name: entry.name,
+                return {
                     rank: entry.rank,
-                }));
+                    name: entry.name,
+                    rightLabel: entry.meta?.country_code,
+                    movementType: movement.movementType,
+                    movementValue: movement.movementValue,
+                };
+            });
 
-                const normalizedRows: DisplayRow[] = currentEntries.map((entry) => {
-                    const movement = getMovementBadgeData(
-                        entry.name,
-                        entry.rank,
-                        previousList
-                    );
-
-                    return {
-                        rank: entry.rank,
-                        name: entry.name,
-                        rightLabel: entry.meta?.country_code,
-                        movementType: movement.movementType,
-                        movementValue: movement.movementValue,
-                    };
-                });
-
-                setQuarterlyRows(normalizedRows);
-            } catch {
-                setQuarterlyRows([]);
-                setQuarterlyError("Could not load quarterly rankings.");
-            } finally {
-                setQuarterlyLoading(false);
-            }
-        };
-
-        fetchQuarterly();
+            setQuarterlyRows(normalizedRows);
+        } catch {
+            setQuarterlyRows([]);
+            setQuarterlyError("Could not load quarterly rankings.");
+        } finally {
+            setQuarterlyLoading(false);
+        }
     }, [quarterlyCategory, quarterlyYear, quarterlyQuarter]);
+
+    const fetchAllRankings = useCallback(async () => {
+        await Promise.all([fetchMonthly(), fetchQuarterly()]);
+    }, [fetchMonthly, fetchQuarterly]);
+
+    useEffect(() => {
+        const run = async () => {
+            await fetchAllRankings();
+            setInitialLoading(false);
+        };
+        run();
+    }, [fetchAllRankings]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            await fetchAllRankings();
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchAllRankings]);
 
     const goMonthlyBack = () => {
         const prev = getPreviousMonth(monthlyYear, monthlyMonth);
@@ -369,7 +395,7 @@ export default function PowerRankingsScreen({ navigation }: any) {
         if (loading) {
             return (
                 <View style={styles.centerState}>
-                    <ActivityIndicator size="small" color="#2EE7FF" />
+                    <ActivityIndicator size="small" color={REFRESH_COLOR} />
                     <Text style={styles.stateText}>Loading...</Text>
                 </View>
             );
@@ -436,25 +462,47 @@ export default function PowerRankingsScreen({ navigation }: any) {
         );
     };
 
+    if (initialLoading) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <AppHeader />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={REFRESH_COLOR} />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.safeArea}>
+            <AppHeader />
+
+            {refreshing && (
+                <View style={styles.refreshIndicator}>
+                    <ActivityIndicator size="small" color={REFRESH_COLOR} />
+                </View>
+            )}
+
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={REFRESH_COLOR}
+                        colors={[REFRESH_COLOR]}
+                        progressBackgroundColor="#111111"
+                    />
+                }
             >
                 <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Text style={styles.headerIcon}>←</Text>
-                    </TouchableOpacity>
-
                     <Text style={styles.headerTitle}>Power Rankings</Text>
-
-                    <View style={styles.headerSpacer} />
                 </View>
 
                 <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>Monthly Rankings</Text>
+                    <Text style={styles.sectionTitle}>{monthlyTitle}</Text>
 
                     <View style={styles.topControlRow}>
                         <View style={styles.divisionCompact}>
@@ -463,7 +511,10 @@ export default function PowerRankingsScreen({ navigation }: any) {
                                 return (
                                     <TouchableOpacity
                                         key={division}
-                                        style={[styles.compactPill, active && styles.compactPillActive]}
+                                        style={[
+                                            styles.compactPill,
+                                            active && styles.compactPillActive,
+                                        ]}
                                         onPress={() => setMonthlyDivision(division)}
                                     >
                                         <Text
@@ -485,7 +536,10 @@ export default function PowerRankingsScreen({ navigation }: any) {
                             </TouchableOpacity>
 
                             <View style={styles.periodValueBox}>
-                                <Text style={styles.periodValueText}>{monthlyTitle}</Text>
+                                <Text style={styles.periodValueText}>
+                                    {MONTH_OPTIONS.find((m) => m.value === monthlyMonth)?.label}{" "}
+                                    {monthlyYear}
+                                </Text>
                             </View>
 
                             <TouchableOpacity
@@ -500,8 +554,15 @@ export default function PowerRankingsScreen({ navigation }: any) {
                     {renderRows(monthlyRows, monthlyLoading, monthlyError)}
                 </View>
 
+                <View style={styles.sponsorBlock}>
+                    <Text style={styles.sponsorLabel}>Sponsored by Alphabreaths</Text>
+                    <Text style={styles.sponsorSubtext}>
+                        The #1 Meditation App for Men
+                    </Text>
+                </View>
+
                 <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>Quarterly Rankings</Text>
+                    <Text style={styles.sectionTitle}>{quarterlyTitle}</Text>
 
                     <View style={styles.topControlRowQuarterly}>
                         <View style={styles.categoryCompact}>
@@ -512,7 +573,10 @@ export default function PowerRankingsScreen({ navigation }: any) {
                                 return (
                                     <TouchableOpacity
                                         key={category}
-                                        style={[styles.compactPill, active && styles.compactPillActive]}
+                                        style={[
+                                            styles.compactPill,
+                                            active && styles.compactPillActive,
+                                        ]}
                                         onPress={() => setQuarterlyCategory(category)}
                                     >
                                         <Text
@@ -537,7 +601,9 @@ export default function PowerRankingsScreen({ navigation }: any) {
                             </TouchableOpacity>
 
                             <View style={styles.periodValueBox}>
-                                <Text style={styles.periodValueText}>{quarterlyTitle}</Text>
+                                <Text style={styles.periodValueText}>
+                                    Q{quarterlyQuarter} {quarterlyYear}
+                                </Text>
                             </View>
 
                             <TouchableOpacity
@@ -567,63 +633,64 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 36,
+        paddingBottom: 42,
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    refreshIndicator: {
+        alignItems: "center",
+        paddingVertical: 6,
     },
     headerRow: {
         marginTop: 4,
-        marginBottom: 14,
+        marginBottom: 12,
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-    },
-    headerIcon: {
-        color: "#F4D03F",
-        fontSize: 24,
-        fontWeight: "800",
-        width: 30,
-        textAlign: "center",
+        justifyContent: "center",
     },
     headerTitle: {
         color: "#FFFFFF",
-        fontSize: 21,
+        fontSize: 22,
         fontWeight: "900",
-    },
-    headerSpacer: {
-        width: 30,
+        textAlign: "center",
     },
     sectionBlock: {
-        marginBottom: 24,
+        marginBottom: 12,
     },
     sectionTitle: {
         color: "#FFFFFF",
-        fontSize: 20,
+        fontSize: 17,
         fontWeight: "900",
-        marginBottom: 10,
+        marginBottom: 8,
+        textAlign: "center",
     },
     topControlRow: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 10,
-        gap: 8,
+        marginBottom: 8,
+        gap: 6,
     },
     topControlRowQuarterly: {
         flexDirection: "column",
-        marginBottom: 10,
-        gap: 8,
+        marginBottom: 8,
+        gap: 6,
     },
     divisionCompact: {
         flexDirection: "row",
-        gap: 6,
+        gap: 5,
     },
     categoryCompact: {
         flexDirection: "row",
         flexWrap: "wrap",
-        gap: 6,
+        gap: 5,
     },
     compactPill: {
-        paddingHorizontal: 11,
-        paddingVertical: 7,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
         borderRadius: 999,
         backgroundColor: "#151515",
         borderWidth: 1,
@@ -635,7 +702,7 @@ const styles = StyleSheet.create({
     },
     compactPillText: {
         color: "#F1F1F1",
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: "800",
     },
     compactPillTextActive: {
@@ -648,9 +715,9 @@ const styles = StyleSheet.create({
         justifyContent: "flex-end",
     },
     arrowButton: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: "#121212",
         borderWidth: 1,
         borderColor: "#262626",
@@ -659,16 +726,16 @@ const styles = StyleSheet.create({
     },
     arrowText: {
         color: "#F4D03F",
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: "900",
-        lineHeight: 18,
+        lineHeight: 16,
     },
     periodValueBox: {
-        minWidth: 116,
+        minWidth: 100,
         marginHorizontal: 6,
-        paddingVertical: 7,
-        paddingHorizontal: 10,
-        borderRadius: 12,
+        paddingVertical: 5,
+        paddingHorizontal: 9,
+        borderRadius: 10,
         backgroundColor: "#101010",
         borderWidth: 1,
         borderColor: "#1E1E1E",
@@ -676,11 +743,32 @@ const styles = StyleSheet.create({
     },
     periodValueText: {
         color: "#FFFFFF",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "800",
     },
+    sponsorBlock: {
+        alignItems: "center",
+        justifyContent: "center",
+        marginTop: 2,
+        marginBottom: 14,
+        paddingVertical: 6,
+    },
+    sponsorLabel: {
+        color: "#2EE7FF",
+        fontSize: 12,
+        fontWeight: "800",
+        textAlign: "center",
+        letterSpacing: 0.3,
+        marginBottom: 3,
+    },
+    sponsorSubtext: {
+        color: "#CFCFCF",
+        fontSize: 11,
+        fontWeight: "700",
+        textAlign: "center",
+    },
     centerState: {
-        paddingVertical: 18,
+        paddingVertical: 16,
         alignItems: "center",
     },
     stateText: {
@@ -698,24 +786,24 @@ const styles = StyleSheet.create({
     rankingsCard: {
         backgroundColor: "#0C0C0C",
         borderRadius: 16,
-        paddingVertical: 2,
+        paddingVertical: 1,
         paddingHorizontal: 8,
         borderWidth: 1,
         borderColor: "#171717",
     },
     rankRow: {
-        minHeight: 38,
+        minHeight: 32,
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 2,
-        paddingVertical: 5,
+        paddingVertical: 4,
         borderBottomWidth: 1,
         borderBottomColor: "#141414",
     },
     rankNumber: {
-        width: 22,
+        width: 20,
         color: "#F4D03F",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "900",
         marginRight: 8,
     },
@@ -728,31 +816,31 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     flagImage: {
-        width: 16,
-        height: 12,
+        width: 14,
+        height: 10,
         borderRadius: 2,
         marginRight: 6,
         backgroundColor: "#1A1A1A",
     },
     rankName: {
         color: "#FFFFFF",
-        fontSize: 11.5,
+        fontSize: 11,
         fontWeight: "800",
-        lineHeight: 14,
+        lineHeight: 13,
         flexShrink: 1,
     },
     rankMeta: {
         color: "#9B9B9B",
-        fontSize: 9.5,
+        fontSize: 9,
         fontWeight: "700",
         marginTop: 1,
         letterSpacing: 0.3,
-        marginLeft: 22,
+        marginLeft: 20,
     },
     movementBadge: {
-        minWidth: 42,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
+        minWidth: 38,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
         borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
@@ -776,7 +864,7 @@ const styles = StyleSheet.create({
     },
     movementText: {
         color: "#FFFFFF",
-        fontSize: 10,
+        fontSize: 9.5,
         fontWeight: "900",
     },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
     ActivityIndicator,
     Dimensions,
@@ -30,21 +30,17 @@ type Post = {
     content_type?: string;
 };
 
-type ApiResponse = {
-    data: Post[];
-    meta: {
-        page: number;
-        limit: number;
-        total: number;
-    };
+type FeaturedCarouselProps = {
+    posts: Post[];
+    loading?: boolean;
 };
 
-export default function FeaturedCarousel() {
+export default function FeaturedCarousel({
+    posts,
+    loading = false,
+}: FeaturedCarouselProps) {
     const navigation = useNavigation<any>();
-
     const [activeIndex, setActiveIndex] = useState(0);
-    const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
-    const [loading, setLoading] = useState(true);
 
     const handleScroll = (event: any) => {
         const slideIndex = Math.round(
@@ -52,32 +48,6 @@ export default function FeaturedCarousel() {
         );
         setActiveIndex(slideIndex);
     };
-
-    useEffect(() => {
-        const fetchFeaturedPosts = async () => {
-            try {
-                const response = await fetch("http://localhost:5002/api/posts/");
-                const json: ApiResponse = await response.json();
-
-                const filteredPosts = json.data
-                    .filter((post) => post.is_featured === true)
-                    .sort((a, b) => {
-                        const dateA = new Date(a.published_at || a.created_at).getTime();
-                        const dateB = new Date(b.published_at || b.created_at).getTime();
-                        return dateB - dateA;
-                    })
-                    .slice(0, 3);
-
-                setFeaturedPosts(filteredPosts);
-            } catch (error) {
-                console.log("Error fetching featured posts:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchFeaturedPosts();
-    }, []);
 
     const getTimeAgo = (dateString: string) => {
         const now = new Date().getTime();
@@ -100,14 +70,14 @@ export default function FeaturedCarousel() {
         );
     }
 
-    if (!featuredPosts.length) {
+    if (!posts.length) {
         return null;
     }
 
     return (
         <View style={styles.wrapper}>
             <FlatList
-                data={featuredPosts}
+                data={posts}
                 keyExtractor={(item) => item._id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -124,9 +94,7 @@ export default function FeaturedCarousel() {
                             style={styles.card}
                             onPress={() =>
                                 navigation.navigate("ArticleScreen", {
-
                                     slug: item.slug,
-
                                 })
                             }
                         >
@@ -158,7 +126,7 @@ export default function FeaturedCarousel() {
                                 </Text>
 
                                 <Text style={styles.timeText}>
-                                    {getTimeAgo(item.published_at || item.created_at)}
+                                    {getTimeAgo(item.created_at)}
                                 </Text>
                             </View>
                         </Pressable>
@@ -167,7 +135,7 @@ export default function FeaturedCarousel() {
             />
 
             <View style={styles.dotsContainer}>
-                {featuredPosts.map((_, index) => (
+                {posts.map((_, index) => (
                     <View
                         key={index}
                         style={[styles.dot, activeIndex === index && styles.activeDot]}
@@ -193,7 +161,7 @@ const styles = StyleSheet.create({
     card: {
         borderRadius: s(24),
         overflow: "hidden",
-        backgroundColor: "#10182B",
+        backgroundColor: "#000000",
     },
     imageSection: {
         height: vs(180),
@@ -219,7 +187,7 @@ const styles = StyleSheet.create({
         lineHeight: ms(22),
     },
     bottomSection: {
-        backgroundColor: "#11192C",
+        backgroundColor: "#000000",
         paddingHorizontal: s(16),
         paddingTop: vs(10),
         paddingBottom: vs(10),

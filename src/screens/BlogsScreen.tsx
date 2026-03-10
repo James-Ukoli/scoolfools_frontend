@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     ImageBackground,
     Image,
+    ActivityIndicator,
+    RefreshControl,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -15,72 +17,33 @@ type Post = {
     _id: string;
     title: string;
     summary: string;
-    image: string;
-    createdAt: string;
-    category_type: string;
+    cover_image_url: string;
+    created_at: string;
+    published_at?: string | null;
+    category: string;
+    content_type: string;
+    slug: string;
 };
 
-const TRENDING_CATEGORIES = [
+type PostsApiResponse = {
+    data: Post[];
+    meta?: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+};
+
+const BLOG_CATEGORIES = [
     "All",
-    "Tournaments",
-    "Drama",
-    "Pros",
-    "Online",
-    "Rising Stars",
+    "Culture",
+    "Entertainment",
+    "Future of Chess",
+    "Community",
+    "Education",
 ];
 
-const mockTrendingPosts: Post[] = [
-    {
-        _id: "1",
-        title: "Caruana Wins Dramatic FIDE Candidates Opener",
-        summary:
-            "Fabiano Caruana defeats Ding Liren in a tense round one battle and sets the tone early.",
-        image:
-            "https://images.unsplash.com/photo-1580541832626-2a7131ee809f?q=80&w=1200&auto=format&fit=crop",
-        createdAt: "2026-03-09T10:00:00.000Z",
-        category_type: "Tournaments",
-    },
-    {
-        _id: "2",
-        title: "Praggnanandhaa Stuns Nakamura in Online Showdown",
-        summary:
-            "The young star delivers a sharp performance in a fast paced online match.",
-        image:
-            "https://images.unsplash.com/photo-1529699211952-734e80c4d42b?q=80&w=1200&auto=format&fit=crop",
-        createdAt: "2026-03-09T08:30:00.000Z",
-        category_type: "Online",
-    },
-    {
-        _id: "3",
-        title: "Chess Scandal Rocks Vienna Open",
-        summary:
-            "A controversy at the event sparks debate across the chess world and online community.",
-        image:
-            "https://images.unsplash.com/photo-1611195974226-a6a9be9dd763?q=80&w=1200&auto=format&fit=crop",
-        createdAt: "2026-03-09T07:00:00.000Z",
-        category_type: "Drama",
-    },
-    {
-        _id: "4",
-        title: "Nodirbek Keeps Rising After Another Strong Event",
-        summary:
-            "Another convincing performance adds fuel to the growing belief that he is ready for the biggest stage.",
-        image:
-            "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop",
-        createdAt: "2026-03-09T06:15:00.000Z",
-        category_type: "Rising Stars",
-    },
-    {
-        _id: "5",
-        title: "Hikaru Talks Form, Focus, and the State of Classical Chess",
-        summary:
-            "The chess star gives fresh thoughts on competition, schedule balance, and preparation.",
-        image:
-            "https://images.unsplash.com/photo-1517466787929-bc90951d0974?q=80&w=1200&auto=format&fit=crop",
-        createdAt: "2026-03-09T05:30:00.000Z",
-        category_type: "Pros",
-    },
-];
+const API_BASE_URL = "http://localhost:5002/api";
 
 function formatTimeAgo(dateString: string) {
     const now = new Date().getTime();
@@ -91,37 +54,37 @@ function formatTimeAgo(dateString: string) {
     const hours = Math.floor(diffMs / 1000 / 60 / 60);
     const days = Math.floor(diffMs / 1000 / 60 / 60 / 24);
 
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 60) return `${Math.max(minutes, 1)}m ago`;
     if (hours < 24) return `${hours}h ago`;
     return `${days}d ago`;
 }
 
 function getCategoryBadgeStyle(category: string) {
     switch (category) {
-        case "Drama":
+        case "Culture":
             return {
-                backgroundColor: "#6F102B",
-                borderColor: "#A61B44",
+                backgroundColor: "#4A1F5E",
+                borderColor: "#9B5DE5",
             };
-        case "Tournaments":
+        case "Entertainment":
             return {
-                backgroundColor: "#7A6500",
-                borderColor: "#CFAF1A",
+                backgroundColor: "#6A1B2E",
+                borderColor: "#FF5C8A",
             };
-        case "Online":
+        case "Future of Chess":
             return {
-                backgroundColor: "#0F5B3A",
-                borderColor: "#23C16B",
+                backgroundColor: "#0E3C4D",
+                borderColor: "#39C0ED",
             };
-        case "Pros":
+        case "Community":
             return {
-                backgroundColor: "#183A63",
-                borderColor: "#4D9BFF",
+                backgroundColor: "#165B36",
+                borderColor: "#35D07F",
             };
-        case "Rising Stars":
+        case "Education":
             return {
-                backgroundColor: "#5D2475",
-                borderColor: "#B86EF2",
+                backgroundColor: "#6A5200",
+                borderColor: "#F4D03F",
             };
         default:
             return {
@@ -133,47 +96,95 @@ function getCategoryBadgeStyle(category: string) {
 
 export default function BlogsScreen({ navigation }: any) {
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const [posts, setPosts] = useState<Post[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const fetchBlogPosts = useCallback(async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/posts`);
+            const json: PostsApiResponse = await response.json();
+
+            const blogPosts = (json.data || [])
+                .filter((post) => post.content_type === "blog")
+                .sort((a, b) => {
+                    const dateA = new Date(a.created_at).getTime();
+                    const dateB = new Date(b.created_at).getTime();
+                    return dateB - dateA;
+                });
+
+            setPosts(blogPosts);
+        } catch (error) {
+            console.log("Error fetching blog posts:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchBlogPosts();
+    }, [fetchBlogPosts]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+
+        try {
+            await fetchBlogPosts();
+            await new Promise((resolve) => setTimeout(resolve, 700));
+        } finally {
+            setRefreshing(false);
+        }
+    }, [fetchBlogPosts]);
 
     const filteredPosts = useMemo(() => {
-        const sortedPosts = [...mockTrendingPosts].sort(
-            (a, b) =>
-                new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-
-        if (selectedCategory === "All") return sortedPosts;
-
-        return sortedPosts.filter(
-            (post) => post.category_type === selectedCategory
-        );
-    }, [selectedCategory]);
+        if (selectedCategory === "All") return posts;
+        return posts.filter((post) => post.category === selectedCategory);
+    }, [posts, selectedCategory]);
 
     const featuredPost = filteredPosts[0];
     const topStories = filteredPosts.slice(1);
 
     const handleOpenPost = (post: Post) => {
-        if (navigation?.navigate) {
-            navigation.navigate("PostScreen", { postId: post._id });
-        }
+        navigation.navigate("ArticleScreen", { slug: post.slug });
     };
+
+    if (loading) {
+        return (
+            <SafeAreaView style={styles.safeArea}>
+                <AppHeader />
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#39C0ED" />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView style={styles.safeArea}>
             <AppHeader />
+
+            {refreshing && (
+                <View style={styles.refreshIndicator}>
+                    <ActivityIndicator size="small" color="#39C0ED" />
+                </View>
+            )}
+
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor="#39C0ED"
+                        colors={["#39C0ED"]}
+                        progressBackgroundColor="#111111"
+                    />
+                }
             >
                 <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Text style={styles.headerIcon}>←</Text>
-                    </TouchableOpacity>
-
                     <Text style={styles.headerTitle}>Blogs</Text>
-
-                    <TouchableOpacity onPress={() => { }}>
-                        <Text style={styles.headerIcon}>⌕</Text>
-                    </TouchableOpacity>
                 </View>
 
                 <ScrollView
@@ -181,7 +192,7 @@ export default function BlogsScreen({ navigation }: any) {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.tabsContainer}
                 >
-                    {TRENDING_CATEGORIES.map((category) => {
+                    {BLOG_CATEGORIES.map((category) => {
                         const active = selectedCategory === category;
 
                         return (
@@ -208,40 +219,43 @@ export default function BlogsScreen({ navigation }: any) {
                         >
                             <View style={styles.featuredCard}>
                                 <ImageBackground
-                                    source={{ uri: featuredPost.image }}
+                                    source={{ uri: featuredPost.cover_image_url }}
                                     style={styles.featuredImageArea}
                                     imageStyle={styles.featuredImage}
                                     resizeMode="cover"
-                                />
+                                >
+                                    <View style={styles.featuredBadgeOverlay}>
+                                        <View
+                                            style={[
+                                                styles.categoryBadge,
+                                                getCategoryBadgeStyle(featuredPost.category),
+                                            ]}
+                                        >
+                                            <Text style={styles.categoryBadgeText}>
+                                                {featuredPost.category}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </ImageBackground>
 
                                 <View style={styles.featuredInfoBox}>
-                                    <View
-                                        style={[
-                                            styles.categoryBadge,
-                                            getCategoryBadgeStyle(featuredPost.category_type),
-                                        ]}
-                                    >
-                                        <Text style={styles.categoryBadgeText}>
-                                            {featuredPost.category_type}
-                                        </Text>
-                                    </View>
-
                                     <Text style={styles.featuredTitle} numberOfLines={2}>
                                         {featuredPost.title}
                                     </Text>
 
-                                    <Text style={styles.featuredSummary} numberOfLines={2}>
+                                    <Text style={styles.featuredSummary} numberOfLines={1}>
                                         {featuredPost.summary}
                                     </Text>
 
                                     <Text style={styles.featuredMeta}>
-                                        {formatTimeAgo(featuredPost.createdAt)}
+                                        {formatTimeAgo(featuredPost.created_at)}
                                     </Text>
                                 </View>
                             </View>
                         </TouchableOpacity>
+
                         {topStories.length > 0 && (
-                            <Text style={styles.sectionTitle}>Top Stories</Text>
+                            <Text style={styles.sectionTitle}>Latest Blogs</Text>
                         )}
 
                         {topStories.map((post) => (
@@ -251,7 +265,10 @@ export default function BlogsScreen({ navigation }: any) {
                                 activeOpacity={0.85}
                                 onPress={() => handleOpenPost(post)}
                             >
-                                <Image source={{ uri: post.image }} style={styles.storyImage} />
+                                <Image
+                                    source={{ uri: post.cover_image_url }}
+                                    style={styles.storyImage}
+                                />
 
                                 <View style={styles.storyContent}>
                                     <Text style={styles.storyTitle} numberOfLines={2}>
@@ -266,16 +283,16 @@ export default function BlogsScreen({ navigation }: any) {
                                         <View
                                             style={[
                                                 styles.categoryBadgeSmall,
-                                                getCategoryBadgeStyle(post.category_type),
+                                                getCategoryBadgeStyle(post.category),
                                             ]}
                                         >
                                             <Text style={styles.categoryBadgeSmallText}>
-                                                {post.category_type}
+                                                {post.category}
                                             </Text>
                                         </View>
 
                                         <Text style={styles.storyMetaText}>
-                                            {formatTimeAgo(post.createdAt)}
+                                            {formatTimeAgo(post.created_at)}
                                         </Text>
                                     </View>
                                 </View>
@@ -285,7 +302,7 @@ export default function BlogsScreen({ navigation }: any) {
                 ) : (
                     <View style={styles.emptyState}>
                         <Text style={styles.emptyStateText}>
-                            No trending posts in this category yet.
+                            No blog posts in this category yet.
                         </Text>
                     </View>
                 )}
@@ -307,180 +324,174 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingBottom: 40,
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    refreshIndicator: {
+        alignItems: "center",
+        paddingVertical: 6,
+    },
     headerRow: {
         marginTop: 6,
-        marginBottom: 18,
+        marginBottom: 14,
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
-    },
-    headerIcon: {
-        color: "#F4D03F",
-        fontSize: 28,
-        fontWeight: "800",
-        width: 34,
-        textAlign: "center",
+        justifyContent: "center",
     },
     headerTitle: {
         color: "#FFFFFF",
-        fontSize: 30,
+        fontSize: 28,
         fontWeight: "900",
     },
     tabsContainer: {
-        paddingBottom: 18,
-        paddingRight: 12,
+        paddingBottom: 14,
+        paddingRight: 10,
     },
     tabPill: {
-        paddingHorizontal: 22,
-        paddingVertical: 14,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
         borderRadius: 999,
         backgroundColor: "#171717",
-        borderWidth: 1.4,
+        borderWidth: 1.2,
         borderColor: "#2B2B2B",
-        marginRight: 12,
+        marginRight: 8,
     },
     activeTabPill: {
-        backgroundColor: "#97D81E",
-        borderColor: "#B7F03A",
+        backgroundColor: "#39C0ED",
+        borderColor: "#7FDBFF",
     },
     tabText: {
         color: "#EAEAEA",
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: "800",
     },
     activeTabText: {
         color: "#111111",
     },
     featuredWrapper: {
-        marginBottom: 28,
+        marginBottom: 20,
     },
     featuredCard: {
-        height: 360,
-        justifyContent: "space-between",
-        borderRadius: 28,
+        borderRadius: 24,
         overflow: "hidden",
-        backgroundColor: "#171717",
+        backgroundColor: "#111111",
+        borderWidth: 0.8,
+        borderColor: "rgba(57,192,237,0.28)",
+        shadowColor: "#39C0ED",
+        shadowOpacity: 0.14,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6,
     },
     featuredImage: {
-        borderRadius: 28,
+        borderRadius: 24,
     },
     featuredImageArea: {
-        height: 170,
+        height: 182,
         backgroundColor: "#1A1A1A",
+        justifyContent: "flex-end",
+    },
+    featuredBadgeOverlay: {
+        position: "absolute",
+        left: 14,
+        bottom: 12,
     },
     featuredInfoBox: {
-        paddingHorizontal: 16,
-        paddingTop: 14,
-        paddingBottom: 14,
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 10,
         backgroundColor: "#111111",
-    },
-    featuredTopFade: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.16)",
-    },
-    featuredContent: {
-        backgroundColor: "rgba(0,0,0,0.62)",
-        paddingHorizontal: 18,
-        paddingTop: 16,
-        paddingBottom: 18,
     },
     featuredTitle: {
         color: "#FFFFFF",
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: "900",
-        lineHeight: 24,
-        marginTop: 10,
+        lineHeight: 21,
+        marginTop: 2,
     },
     featuredSummary: {
-        color: "#DDDDDD",
-        fontSize: 14,
-        lineHeight: 20,
-        marginTop: 10,
+        color: "#D6D6D6",
+        fontSize: 13,
+        lineHeight: 17,
+        marginTop: 6,
     },
     featuredMeta: {
-        color: "#D0D0D0",
-        fontSize: 13,
+        color: "#BFC7D4",
+        fontSize: 12,
         fontWeight: "700",
-        marginTop: 14,
+        marginTop: 8,
     },
     sectionTitle: {
-        color: "#F4D03F",
-        fontSize: 28,
+        color: "#39C0ED",
+        fontSize: 24,
         fontWeight: "900",
-        marginBottom: 16,
+        marginBottom: 14,
     },
     storyRow: {
         flexDirection: "row",
         alignItems: "flex-start",
-        marginBottom: 22,
+        marginBottom: 16,
     },
     storyImage: {
-        width: 112,
-        height: 112,
-        borderRadius: 20,
-        marginRight: 14,
+        width: 96,
+        height: 96,
+        borderRadius: 16,
+        marginRight: 12,
         backgroundColor: "#1F1F1F",
     },
     storyContent: {
         flex: 1,
-        minHeight: 112,
+        minHeight: 96,
         justifyContent: "space-between",
+        paddingVertical: 1,
     },
     storyTitle: {
         color: "#FFFFFF",
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: "900",
-        lineHeight: 24,
-        marginBottom: 6,
+        lineHeight: 21,
+        marginBottom: 5,
     },
     storySummary: {
         color: "#C8C8C8",
-        fontSize: 14,
-        lineHeight: 19,
-        marginBottom: 10,
+        fontSize: 13,
+        lineHeight: 17,
+        marginBottom: 8,
     },
     storyMetaRow: {
         flexDirection: "row",
         alignItems: "center",
         flexWrap: "wrap",
-        gap: 10,
+        gap: 8,
     },
     storyMetaText: {
         color: "#CFCFCF",
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: "700",
     },
     categoryBadge: {
         alignSelf: "flex-start",
-        paddingHorizontal: 14,
-        paddingVertical: 7,
-        borderRadius: 999,
-        borderWidth: 1.5,
-        shadowColor: "#000",
-        shadowOpacity: 0.32,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 3 },
-        elevation: 4,
-    },
-    categoryBadgeText: {
-        color: "#FFFFFF",
-        fontSize: 13,
-        fontWeight: "900",
-    },
-    categoryBadgeSmall: {
         paddingHorizontal: 10,
         paddingVertical: 5,
         borderRadius: 999,
         borderWidth: 1.2,
-        shadowColor: "#000",
-        shadowOpacity: 0.22,
-        shadowRadius: 4,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 3,
+    },
+    categoryBadgeText: {
+        color: "#FFFFFF",
+        fontSize: 11,
+        fontWeight: "900",
+    },
+    categoryBadgeSmall: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 999,
+        borderWidth: 1,
     },
     categoryBadgeSmallText: {
         color: "#FFFFFF",
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: "900",
     },
     emptyState: {

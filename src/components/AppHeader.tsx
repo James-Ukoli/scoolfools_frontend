@@ -58,7 +58,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     logo: {
-        width: 220,
-        height: 52,
+        width: 250,
+        height: 100,
+        marginTop: 80
     },
 });
