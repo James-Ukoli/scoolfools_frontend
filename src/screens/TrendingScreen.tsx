@@ -9,6 +9,7 @@ import {
     Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AppHeader from "../components/AppHeader";
 
 type Post = {
     _id: string;
@@ -157,6 +158,7 @@ export default function TrendingScreen({ navigation }: any) {
 
     return (
         <SafeAreaView style={styles.safeArea}>
+            <AppHeader />
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}

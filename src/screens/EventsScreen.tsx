@@ -8,6 +8,7 @@ import {
     Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AppHeader from "../components/AppHeader";
 
 type Broadcaster = {
     name: string;
@@ -303,19 +304,17 @@ export default function EventsScreen({ navigation }: any) {
 
     return (
         <SafeAreaView style={styles.safeArea}>
+            <AppHeader />
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.headerRow}>
-                    <TouchableOpacity onPress={() => navigation.goBack()}>
-                        <Text style={styles.headerIcon}>←</Text>
-                    </TouchableOpacity>
 
                     <Text style={styles.headerTitle}>Events</Text>
 
-                    <View style={styles.headerSpacer} />
+
                 </View>
 
                 {heroEvent ? (
@@ -432,7 +431,7 @@ const styles = StyleSheet.create({
         marginBottom: 18,
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center",
     },
     headerIcon: {
         color: "#F4D03F",
@@ -443,8 +442,9 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         color: "#FFFFFF",
-        fontSize: 30,
+        fontSize: 25,
         fontWeight: "900",
+        textAlign: "center"
     },
     headerSpacer: {
         width: 34,

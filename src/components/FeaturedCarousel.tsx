@@ -1,43 +1,50 @@
-import { Dimensions, FlatList, Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import {
+    ActivityIndicator,
+    Dimensions,
+    FlatList,
+    Image,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { s, vs, ms } from "react-native-size-matters";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = width - 32;
 
-const featuredPosts = [
-    {
-        id: "1",
-        title: "Why Freestyle Chess Needs a Breakthrough Moment",
-        summary:
-            "Magnus Carlsen aims to revolutionize the game with a new format that could bring more excitement and attention to elite chess.",
-        image:
-            "https://fox8.com/wp-content/uploads/sites/12/2024/10/671b45de881517.14135711.jpeg?w=2560&h=1440&crop=1",
-        time: "2 hours ago",
-    },
-    {
-        id: "2",
-        title: "Nodirbek Keeps Rising in the Biggest Classical Events",
-        summary:
-            "His recent form is making the chess world pay attention as he continues to look stronger against top opposition.",
-        image:
-            "https://www.fide.com/wp-content/uploads/Abdusattorov-Navara.jpg",
-        time: "4 hours ago",
-    },
-    {
-        id: "3",
-        title: "Can Gukesh Respond After a Rough Stretch",
-        summary:
-            "The young world champion still has time to answer the noise and remind everyone why he reached the top.",
-        image:
-            "https://c.ndtvimg.com/2024-11/etfsdleo_d-gukesh-x-fidechess_625x300_28_November_24.jpg?im=FeatureCrop,algorithm=dnn,width=806,height=605",
-        time: "6 hours ago",
-    },
-];
+type Post = {
+    _id: string;
+    title: string;
+    summary: string;
+    cover_image_url: string;
+    is_featured: boolean;
+    created_at: string;
+    published_at: string | null;
+    slug: string;
+    author?: string;
+    category?: string;
+    content_type?: string;
+};
+
+type ApiResponse = {
+    data: Post[];
+    meta: {
+        page: number;
+        limit: number;
+        total: number;
+    };
+};
 
 export default function FeaturedCarousel() {
+    const navigation = useNavigation<any>();
+
     const [activeIndex, setActiveIndex] = useState(0);
+    const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
+    const [loading, setLoading] = useState(true);
 
     const handleScroll = (event: any) => {
         const slideIndex = Math.round(
@@ -46,11 +53,62 @@ export default function FeaturedCarousel() {
         setActiveIndex(slideIndex);
     };
 
+    useEffect(() => {
+        const fetchFeaturedPosts = async () => {
+            try {
+                const response = await fetch("http://localhost:5002/api/posts/");
+                const json: ApiResponse = await response.json();
+
+                const filteredPosts = json.data
+                    .filter((post) => post.is_featured === true)
+                    .sort((a, b) => {
+                        const dateA = new Date(a.published_at || a.created_at).getTime();
+                        const dateB = new Date(b.published_at || b.created_at).getTime();
+                        return dateB - dateA;
+                    })
+                    .slice(0, 3);
+
+                setFeaturedPosts(filteredPosts);
+            } catch (error) {
+                console.log("Error fetching featured posts:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchFeaturedPosts();
+    }, []);
+
+    const getTimeAgo = (dateString: string) => {
+        const now = new Date().getTime();
+        const postTime = new Date(dateString).getTime();
+        const diffMs = now - postTime;
+
+        const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffHours < 1) return "Just now";
+        if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+        return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    };
+
+    if (loading) {
+        return (
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#3CF2FF" />
+            </View>
+        );
+    }
+
+    if (!featuredPosts.length) {
+        return null;
+    }
+
     return (
         <View style={styles.wrapper}>
             <FlatList
                 data={featuredPosts}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item) => item._id}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 decelerationRate="fast"
@@ -62,9 +120,21 @@ export default function FeaturedCarousel() {
                 onMomentumScrollEnd={handleScroll}
                 renderItem={({ item }) => (
                     <View style={styles.cardContainer}>
-                        <View style={styles.card}>
+                        <Pressable
+                            style={styles.card}
+                            onPress={() =>
+                                navigation.navigate("ArticleScreen", {
+
+                                    slug: item.slug,
+
+                                })
+                            }
+                        >
                             <View style={styles.imageSection}>
-                                <Image source={{ uri: item.image }} style={styles.image} />
+                                <Image
+                                    source={{ uri: item.cover_image_url }}
+                                    style={styles.image}
+                                />
 
                                 <LinearGradient
                                     colors={["transparent", "rgba(0,0,0,0.82)"]}
@@ -87,9 +157,11 @@ export default function FeaturedCarousel() {
                                     {item.summary}
                                 </Text>
 
-                                <Text style={styles.timeText}>{item.time}</Text>
+                                <Text style={styles.timeText}>
+                                    {getTimeAgo(item.published_at || item.created_at)}
+                                </Text>
                             </View>
-                        </View>
+                        </Pressable>
                     </View>
                 )}
             />
@@ -98,10 +170,7 @@ export default function FeaturedCarousel() {
                 {featuredPosts.map((_, index) => (
                     <View
                         key={index}
-                        style={[
-                            styles.dot,
-                            activeIndex === index && styles.activeDot,
-                        ]}
+                        style={[styles.dot, activeIndex === index && styles.activeDot]}
                     />
                 ))}
             </View>
@@ -112,6 +181,11 @@ export default function FeaturedCarousel() {
 const styles = StyleSheet.create({
     wrapper: {
         marginBottom: vs(18),
+    },
+    loadingContainer: {
+        height: vs(240),
+        justifyContent: "center",
+        alignItems: "center",
     },
     cardContainer: {
         width: CARD_WIDTH,

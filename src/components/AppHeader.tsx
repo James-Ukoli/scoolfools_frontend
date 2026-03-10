@@ -29,11 +29,11 @@ export default function AppHeader() {
 
 const styles = StyleSheet.create({
     safeArea: {
-        backgroundColor: "#050816",
+        backgroundColor: "#000000",
     },
     container: {
-        height: 56,
-        backgroundColor: "#050816",
+        height: 45,
+        backgroundColor: "#000000",
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
@@ -42,8 +42,8 @@ const styles = StyleSheet.create({
         borderBottomColor: "#12203A",
     },
     iconButton: {
-        width: 38,
-        height: 38,
+        width: 30,
+        height: 30,
         borderRadius: 12,
         alignItems: "center",
         justifyContent: "center",
