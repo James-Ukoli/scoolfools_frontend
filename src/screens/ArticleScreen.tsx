@@ -70,6 +70,7 @@ export default function ArticleScreen() {
     const [post, setPost] = useState<Post | null>(null);
     const [blocks, setBlocks] = useState<PostBlock[]>([]);
     const [loading, setLoading] = useState(true);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
     useEffect(() => {
         const fetchArticle = async () => {
@@ -158,6 +159,26 @@ export default function ArticleScreen() {
         }
     };
 
+    const getYoutubeId = (url: string) => {
+        try {
+            if (url.includes("youtube.com/shorts/")) {
+                return url.split("shorts/")[1]?.split("?")[0] || null;
+            }
+
+            if (url.includes("youtube.com/watch?v=")) {
+                return url.split("v=")[1]?.split("&")[0] || null;
+            }
+
+            if (url.includes("youtu.be/")) {
+                return url.split("youtu.be/")[1]?.split("?")[0] || null;
+            }
+
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
             case "header":
@@ -183,13 +204,18 @@ export default function ArticleScreen() {
 
             case "image":
                 return (
-                    <View key={block._id} style={styles.mediaBlock}>
+                    <Pressable
+                        key={block._id}
+                        style={styles.mediaBlock}
+                        onPress={() => setPreviewImage(block.input)}
+                    >
                         <Image
                             source={{ uri: block.input }}
                             style={styles.blockImage}
+                            resizeMode="contain"
                             onError={() => console.log("Block image failed:", block.input)}
                         />
-                    </View>
+                    </Pressable>
                 );
 
             case "caption":
@@ -232,32 +258,32 @@ export default function ArticleScreen() {
                 );
 
             case "video": {
-                const youtubeEmbedUrl = getYoutubeEmbedUrl(block.input);
-
-                if (youtubeEmbedUrl) {
-                    return (
-                        <View key={block._id} style={styles.videoContainer}>
-                            <WebView
-                                source={{ uri: youtubeEmbedUrl }}
-                                style={styles.webview}
-                                javaScriptEnabled
-                                domStorageEnabled
-                                allowsFullscreenVideo
-                            />
-                        </View>
-                    );
-                }
+                const youtubeId = getYoutubeId(block.input);
+                const thumbnailUrl = youtubeId
+                    ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
+                    : null;
 
                 return (
                     <Pressable
                         key={block._id}
-                        style={styles.linkCard}
+                        style={styles.videoPreviewCard}
                         onPress={() => openExternalLink(block.input)}
                     >
-                        <Ionicons name="play-circle-outline" size={18} color="#3CF2FF" />
-                        <Text style={styles.linkText} numberOfLines={1}>
-                            Open Video
-                        </Text>
+                        {thumbnailUrl ? (
+                            <Image
+                                source={{ uri: thumbnailUrl }}
+                                style={styles.videoPreviewImage}
+                                resizeMode="cover"
+                            />
+                        ) : (
+                            <View style={styles.videoFallback}>
+                                <Ionicons name="play-circle-outline" size={42} color="#FFFFFF" />
+                            </View>
+                        )}
+
+                        <View style={styles.videoOverlay}>
+                            <Ionicons name="play-circle" size={56} color="#FFFFFF" />
+                        </View>
                     </Pressable>
                 );
             }
@@ -345,6 +371,30 @@ export default function ArticleScreen() {
 
                 <View style={styles.articleBody}>{blocks.map(renderBlock)}</View>
             </ScrollView>
+            {previewImage && (
+                <View style={styles.imagePreviewOverlay}>
+                    <Pressable
+                        style={styles.closePreview}
+                        onPress={() => setPreviewImage(null)}
+                    >
+                        <Ionicons name="close" size={30} color="#fff" />
+                    </Pressable>
+
+                    <ScrollView
+                        style={{ flex: 1, width: "100%" }}
+                        contentContainerStyle={styles.zoomContainer}
+                        maximumZoomScale={3}
+                        minimumZoomScale={1}
+                        centerContent
+                    >
+                        <Image
+                            source={{ uri: previewImage }}
+                            style={styles.previewImage}
+                            resizeMode="contain"
+                        />
+                    </ScrollView>
+                </View>
+            )}
         </SafeAreaView>
     );
 }
@@ -496,7 +546,7 @@ const styles = StyleSheet.create({
     },
     blockImage: {
         width: "100%",
-        height: vs(210),
+        height: vs(240),
         borderRadius: s(18),
         backgroundColor: "#10182B",
     },
@@ -580,5 +630,60 @@ const styles = StyleSheet.create({
     webview: {
         flex: 1,
         backgroundColor: "#000000",
+    },
+    imagePreviewOverlay: {
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "#000",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,
+    },
+
+    previewImage: {
+        width: "100%",
+        height: vs(500),
+    },
+    zoomContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
+    closePreview: {
+        position: "absolute",
+        top: 60,
+        right: 20,
+        zIndex: 10,
+    },
+    videoPreviewCard: {
+        height: vs(220),
+        borderRadius: s(18),
+        overflow: "hidden",
+        marginVertical: vs(12),
+        backgroundColor: "#11192C",
+        position: "relative",
+    },
+
+    videoPreviewImage: {
+        width: "100%",
+        height: "100%",
+    },
+
+    videoOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.18)",
+    },
+
+    videoFallback: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#11192C",
     },
 });
