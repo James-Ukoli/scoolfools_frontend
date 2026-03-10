@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     View,
     Text,
@@ -8,6 +8,8 @@ import {
     ActivityIndicator,
     Image,
     RefreshControl,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -72,6 +74,9 @@ type DisplayRow = {
     rightLabel?: string;
     movementType: MovementType;
     movementValue?: number;
+    imageUrl?: string | null;
+    metaText?: string;
+    isInfluencer?: boolean;
 };
 
 const API_BASE = "http://localhost:5002/api";
@@ -126,6 +131,16 @@ function getNextQuarter(year: number, quarter: number) {
 
 function titleCase(value: string) {
     return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function sanitizeHandle(handle?: string) {
+    if (!handle) return "";
+    return handle.replace(/^@+/, "").trim();
+}
+
+function getQuarterlyIdentity(entry: QuarterlyEntry) {
+    const cleanHandle = sanitizeHandle(entry.meta?.handle);
+    return cleanHandle || entry.name;
 }
 
 function getMovementBadgeData(
@@ -187,7 +202,29 @@ function getFlagUrl(countryCode?: string) {
     return `https://flagcdn.com/w40/${code}.png`;
 }
 
+function getPlatformLogoUrl(platform?: string) {
+    if (!platform) return null;
+
+    const normalized = platform.trim().toLowerCase();
+
+    const map: Record<string, string> = {
+        youtube: "https://img.icons8.com/color/48/youtube-play.png",
+        twitch: "https://img.icons8.com/color/48/twitch--v1.png",
+        instagram: "https://img.icons8.com/fluency/48/instagram-new.png",
+        x: "https://img.icons8.com/ios-filled/50/ffffff/twitterx--v1.png",
+        twitter: "https://img.icons8.com/ios-filled/50/ffffff/twitterx--v1.png",
+        tiktok: "https://img.icons8.com/color/48/tiktok--v1.png",
+        kick: "https://img.icons8.com/fluency/48/video-call.png",
+    };
+
+    return map[normalized] ?? null;
+}
+
 export default function PowerRankingsScreen() {
+    const scrollRef = useRef<ScrollView>(null);
+    const scrollYRef = useRef(0);
+    const pendingRestoreScrollRef = useRef<number | null>(null);
+
     const [monthlyDivision, setMonthlyDivision] =
         useState<MonthlyDivision>("pro");
 
@@ -271,6 +308,9 @@ export default function PowerRankingsScreen() {
                     rightLabel: item.country_code,
                     movementType: movement.movementType,
                     movementValue: movement.movementValue,
+                    imageUrl: getFlagUrl(item.country_code),
+                    metaText: item.country_code,
+                    isInfluencer: false,
                 };
             });
 
@@ -312,23 +352,34 @@ export default function PowerRankingsScreen() {
             const previousEntries = previous?.entries ?? [];
 
             const previousList = previousEntries.map((entry) => ({
-                name: entry.name,
+                name: getQuarterlyIdentity(entry),
                 rank: entry.rank,
             }));
 
             const normalizedRows: DisplayRow[] = currentEntries.map((entry) => {
+                const identity = getQuarterlyIdentity(entry);
+                const cleanHandle = sanitizeHandle(entry.meta?.handle);
+                const isInfluencer = quarterlyCategory === "influencers";
+                const flagUrl = getFlagUrl(entry.meta?.country_code);
+                const platformLogo = getPlatformLogoUrl(entry.meta?.platform);
+
                 const movement = getMovementBadgeData(
-                    entry.name,
+                    identity,
                     entry.rank,
                     previousList
                 );
 
                 return {
                     rank: entry.rank,
-                    name: entry.name,
-                    rightLabel: entry.meta?.country_code,
+                    name: isInfluencer ? (cleanHandle || entry.name) : entry.name,
+                    rightLabel: isInfluencer ? undefined : entry.meta?.country_code,
                     movementType: movement.movementType,
                     movementValue: movement.movementValue,
+                    imageUrl: isInfluencer ? platformLogo : flagUrl,
+                    metaText: isInfluencer
+                        ? (entry.meta?.platform ? titleCase(entry.meta.platform) : undefined)
+                        : entry.meta?.country_code,
+                    isInfluencer,
                 };
             });
 
@@ -353,6 +404,16 @@ export default function PowerRankingsScreen() {
         run();
     }, [fetchAllRankings]);
 
+    useEffect(() => {
+        if (!quarterlyLoading && pendingRestoreScrollRef.current != null) {
+            const y = pendingRestoreScrollRef.current;
+            requestAnimationFrame(() => {
+                scrollRef.current?.scrollTo({ y, animated: false });
+                pendingRestoreScrollRef.current = null;
+            });
+        }
+    }, [quarterlyLoading, quarterlyRows]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
@@ -363,28 +424,40 @@ export default function PowerRankingsScreen() {
         }
     }, [fetchAllRankings]);
 
+    const preserveScroll = () => {
+        pendingRestoreScrollRef.current = scrollYRef.current;
+    };
+
     const goMonthlyBack = () => {
+        preserveScroll();
         const prev = getPreviousMonth(monthlyYear, monthlyMonth);
         setMonthlyYear(prev.year);
         setMonthlyMonth(prev.month);
     };
 
     const goMonthlyForward = () => {
+        preserveScroll();
         const next = getNextMonth(monthlyYear, monthlyMonth);
         setMonthlyYear(next.year);
         setMonthlyMonth(next.month);
     };
 
     const goQuarterlyBack = () => {
+        preserveScroll();
         const prev = getPreviousQuarter(quarterlyYear, quarterlyQuarter);
         setQuarterlyYear(prev.year);
         setQuarterlyQuarter(prev.quarter);
     };
 
     const goQuarterlyForward = () => {
+        preserveScroll();
         const next = getNextQuarter(quarterlyYear, quarterlyQuarter);
         setQuarterlyYear(next.year);
         setQuarterlyQuarter(next.quarter);
+    };
+
+    const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+        scrollYRef.current = e.nativeEvent.contentOffset.y;
     };
 
     const renderRows = (
@@ -420,16 +493,17 @@ export default function PowerRankingsScreen() {
         return (
             <View style={styles.rankingsCard}>
                 {rows.map((row) => {
-                    const flagUrl = getFlagUrl(row.rightLabel);
-
                     return (
                         <View key={`${row.rank}-${row.name}`} style={styles.rankRow}>
                             <Text style={styles.rankNumber}>{row.rank}</Text>
 
                             <View style={styles.rankMain}>
                                 <View style={styles.nameLine}>
-                                    {flagUrl ? (
-                                        <Image source={{ uri: flagUrl }} style={styles.flagImage} />
+                                    {row.imageUrl ? (
+                                        <Image
+                                            source={{ uri: row.imageUrl }}
+                                            style={row.isInfluencer ? styles.platformImage : styles.flagImage}
+                                        />
                                     ) : null}
 
                                     <Text style={styles.rankName} numberOfLines={1}>
@@ -437,8 +511,15 @@ export default function PowerRankingsScreen() {
                                     </Text>
                                 </View>
 
-                                {!!row.rightLabel && (
-                                    <Text style={styles.rankMeta}>{row.rightLabel}</Text>
+                                {!!row.metaText && (
+                                    <Text
+                                        style={[
+                                            styles.rankMeta,
+                                            row.isInfluencer && styles.rankMetaInfluencer,
+                                        ]}
+                                    >
+                                        {row.metaText}
+                                    </Text>
                                 )}
                             </View>
 
@@ -484,9 +565,12 @@ export default function PowerRankingsScreen() {
             )}
 
             <ScrollView
+                ref={scrollRef}
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
+                onScroll={onScroll}
+                scrollEventThrottle={16}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -515,7 +599,10 @@ export default function PowerRankingsScreen() {
                                             styles.compactPill,
                                             active && styles.compactPillActive,
                                         ]}
-                                        onPress={() => setMonthlyDivision(division)}
+                                        onPress={() => {
+                                            preserveScroll();
+                                            setMonthlyDivision(division);
+                                        }}
                                     >
                                         <Text
                                             style={[
@@ -577,7 +664,10 @@ export default function PowerRankingsScreen() {
                                             styles.compactPill,
                                             active && styles.compactPillActive,
                                         ]}
-                                        onPress={() => setQuarterlyCategory(category)}
+                                        onPress={() => {
+                                            preserveScroll();
+                                            setQuarterlyCategory(category);
+                                        }}
                                     >
                                         <Text
                                             style={[
@@ -822,6 +912,13 @@ const styles = StyleSheet.create({
         marginRight: 6,
         backgroundColor: "#1A1A1A",
     },
+    platformImage: {
+        width: 14,
+        height: 14,
+        borderRadius: 3,
+        marginRight: 6,
+        backgroundColor: "#1A1A1A",
+    },
     rankName: {
         color: "#FFFFFF",
         fontSize: 11,
@@ -835,6 +932,9 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         marginTop: 1,
         letterSpacing: 0.3,
+        marginLeft: 20,
+    },
+    rankMetaInfluencer: {
         marginLeft: 20,
     },
     movementBadge: {
