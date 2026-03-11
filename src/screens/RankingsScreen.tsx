@@ -376,9 +376,7 @@ export default function PowerRankingsScreen() {
                     movementType: movement.movementType,
                     movementValue: movement.movementValue,
                     imageUrl: isInfluencer ? platformLogo : flagUrl,
-                    metaText: isInfluencer
-                        ? (entry.meta?.platform ? titleCase(entry.meta.platform) : undefined)
-                        : entry.meta?.country_code,
+                    metaText: isInfluencer ? undefined : entry.meta?.country_code,
                     isInfluencer,
                 };
             });
