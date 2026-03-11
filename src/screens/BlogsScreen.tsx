@@ -106,7 +106,7 @@ export default function BlogsScreen({ navigation }: any) {
 
     const fetchBlogPosts = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/posts`);
+            const response = await fetch(`${API_BASE_URL}/api/posts`);
             const json: PostsApiResponse = await response.json();
 
             const blogPosts = (json.data || [])
