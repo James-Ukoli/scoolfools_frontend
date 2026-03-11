@@ -6,6 +6,7 @@ import {
     View,
     RefreshControl,
     ActivityIndicator,
+    Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -87,7 +88,10 @@ type EventItem = {
     updatedAt: string;
 };
 
-const API_BASE_URL = "http://localhost:5002/api";
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function HomeScreen() {
     const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);

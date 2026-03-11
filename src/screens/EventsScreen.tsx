@@ -8,6 +8,7 @@ import {
     Image,
     ActivityIndicator,
     RefreshControl,
+    Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -79,7 +80,10 @@ type EventsApiResponse = {
     data: EventItem[];
 };
 
-const API_BASE_URL = "http://localhost:5002/api";
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 function formatMonthYear(dateString: string) {
     return new Date(dateString).toLocaleString("en-US", {

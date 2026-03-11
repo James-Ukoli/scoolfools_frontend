@@ -10,6 +10,7 @@ import {
     StyleSheet,
     Text,
     View,
+    Platform
 } from "react-native";
 import {
     RouteProp,
@@ -60,7 +61,10 @@ type ArticleRouteParams = {
     };
 };
 
-const API_BASE_URL = "http://localhost:5002/api";
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function ArticleScreen() {
     const route = useRoute<RouteProp<ArticleRouteParams, "ArticleScreen">>();

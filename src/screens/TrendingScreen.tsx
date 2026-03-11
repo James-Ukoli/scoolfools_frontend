@@ -9,6 +9,7 @@ import {
     Image,
     ActivityIndicator,
     RefreshControl,
+    Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -43,7 +44,10 @@ const TRENDING_CATEGORIES = [
     "Rising Stars",
 ];
 
-const API_BASE_URL = "http://localhost:5002/api";
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 function formatTimeAgo(dateString: string) {
     const now = new Date().getTime();

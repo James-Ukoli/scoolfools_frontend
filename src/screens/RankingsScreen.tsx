@@ -10,6 +10,7 @@ import {
     RefreshControl,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Platform
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -79,7 +80,12 @@ type DisplayRow = {
     isInfluencer?: boolean;
 };
 
-const API_BASE = "http://localhost:5002/api";
+const API_BASE =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
+
+
 const REFRESH_COLOR = "#FF4FD8";
 
 const MONTH_OPTIONS = [
