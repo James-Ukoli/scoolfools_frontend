@@ -2,6 +2,7 @@ import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AppHeader from "../components/AppHeader";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -34,6 +35,37 @@ export default function MenuScreen() {
         );
     };
 
+    const handleLogout = () => {
+        Alert.alert(
+            "Logout",
+            "Are you sure you want to log out?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Logout",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            try {
+                                await GoogleSignin.signOut();
+                            } catch (error) {
+                                console.log("Google sign out warning:", error);
+                            }
+
+                            await AsyncStorage.removeItem("token");
+                            await AsyncStorage.removeItem("user");
+
+                            navigation.replace("GoogleSignIn");
+                        } catch (error) {
+                            console.log("Logout error:", error);
+                            Alert.alert("Error", "Failed to log out.");
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     const handleDeleteAccount = () => {
         Alert.alert(
             "Delete Account",
@@ -45,8 +77,12 @@ export default function MenuScreen() {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            // Replace this with your real auth token later
                             const token = await AsyncStorage.getItem("token");
+
+                            if (!token) {
+                                throw new Error("No auth token found.");
+                            }
+
                             const res = await fetch(`${API_BASE_URL}/auth/me`, {
                                 method: "DELETE",
                                 headers: {
@@ -62,11 +98,20 @@ export default function MenuScreen() {
                                 throw new Error(data?.message || "Failed to delete account");
                             }
 
+                            try {
+                                await GoogleSignin.signOut();
+                            } catch (error) {
+                                console.log("Google sign out warning:", error);
+                            }
+
+                            await AsyncStorage.removeItem("token");
+                            await AsyncStorage.removeItem("user");
+
                             Alert.alert("Account deleted");
-                            navigation.navigate("GoogleSignIn");
-                        } catch (error) {
+                            navigation.replace("GoogleSignIn");
+                        } catch (error: any) {
                             console.log("Delete account error:", error);
-                            Alert.alert("Error", "Failed to delete account.");
+                            Alert.alert("Error", error?.message || "Failed to delete account.");
                         }
                     },
                 },
@@ -124,6 +169,18 @@ export default function MenuScreen() {
                         <View style={styles.menuLeft}>
                             <Ionicons name="heart-outline" size={22} color="#3CF2FF" />
                             <Text style={styles.menuText}>Donate</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        activeOpacity={0.85}
+                        onPress={handleLogout}
+                    >
+                        <View style={styles.menuLeft}>
+                            <Ionicons name="log-out-outline" size={22} color="#FFD166" />
+                            <Text style={styles.menuText}>Logout</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
                     </TouchableOpacity>
