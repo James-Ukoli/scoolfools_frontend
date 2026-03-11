@@ -81,7 +81,7 @@ export default function ArticleScreen() {
             try {
                 setLoading(true);
 
-                const postResponse = await fetch(`${API_BASE_URL}/posts/slug/${slug}`);
+                const postResponse = await fetch(`${API_BASE_URL}/api/posts/slug/${slug}`);
                 const postJson = await postResponse.json();
 
                 console.log("POST JSON RESPONSE:", postJson);

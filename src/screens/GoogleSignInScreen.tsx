@@ -22,6 +22,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
 
     const handleGoogleSignIn = async () => {
+        console.log("API_BASE_URL:", API_BASE_URL);
         try {
             setLoading(true);
 
@@ -43,7 +44,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 avatar: googleUser.photo,
             };
 
-            const res = await fetch(`${API_BASE_URL}/auth/google`, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

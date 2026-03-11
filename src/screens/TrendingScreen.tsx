@@ -106,7 +106,7 @@ export default function TrendingScreen({ navigation }: any) {
 
     const fetchTrendingPosts = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/posts`);
+            const response = await fetch(`${API_BASE_URL}/api/posts`);
             const json: PostsApiResponse = await response.json();
 
             const trendingPosts = (json.data || [])

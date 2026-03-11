@@ -63,7 +63,7 @@ export default function SearchScreen() {
         try {
             setLoading(true);
 
-            const url = `${API_BASE_URL}/posts/search?q=${encodeURIComponent(text)}`;
+            const url = `${API_BASE_URL}/api/posts/search?q=${encodeURIComponent(text)}`;
             console.log("SEARCH URL:", url);
 
             const res = await fetch(url);

@@ -278,8 +278,8 @@ export default function PowerRankingsScreen() {
             const prev = getPreviousMonth(monthlyYear, monthlyMonth);
             const previousMonthParam = formatMonthParam(prev.year, prev.month);
 
-            const currentUrl = `${API_BASE}/power-rankings/month/${currentMonthParam}?division=${monthlyDivision}`;
-            const previousUrl = `${API_BASE}/power-rankings/month/${previousMonthParam}?division=${monthlyDivision}`;
+            const currentUrl = `${API_BASE}/api/power-rankings/month/${currentMonthParam}?division=${monthlyDivision}`;
+            const previousUrl = `${API_BASE}/api/power-rankings/month/${previousMonthParam}?division=${monthlyDivision}`;
 
             const [currentRes, previousRes] = await Promise.all([
                 fetch(currentUrl),
@@ -334,7 +334,7 @@ export default function PowerRankingsScreen() {
             setQuarterlyLoading(true);
             setQuarterlyError("");
 
-            const res = await fetch(`${API_BASE}/power-rankings/quarterly`);
+            const res = await fetch(`${API_BASE}/api/power-rankings/quarterly`);
             const json: QuarterlyRankingResponse = await res.json();
             const allItems = json?.items ?? [];
 

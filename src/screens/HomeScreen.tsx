@@ -104,10 +104,9 @@ export default function HomeScreen() {
     const fetchHomeData = useCallback(async () => {
         try {
             const [postsRes, eventsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/posts`),
-                fetch(`${API_BASE_URL}/events`),
+                fetch(`${API_BASE_URL}/api/posts`),
+                fetch(`${API_BASE_URL}/api/events`),
             ]);
-
             const postsJson = await postsRes.json();
             const eventsJson = await eventsRes.json();
 
