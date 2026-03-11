@@ -7,9 +7,16 @@ import {
     Image,
     Alert,
     ActivityIndicator,
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function GoogleSignInScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
@@ -18,22 +25,55 @@ export default function GoogleSignInScreen({ navigation }: any) {
         try {
             setLoading(true);
 
+            await GoogleSignin.hasPlayServices();
             const response: any = await GoogleSignin.signIn();
 
-            const user = response?.data?.user || response?.user || response;
+            const googleUser = response?.data?.user || response?.user || response;
 
             console.log("Google sign in response:", response);
 
-            // temporary direct navigation test
-            navigation.replace("MainTabs");
+            if (!googleUser?.email || !googleUser?.id) {
+                throw new Error("Missing Google user data");
+            }
 
+            const payload = {
+                email: googleUser.email,
+                username: googleUser.name,
+                googleId: googleUser.id,
+                avatar: googleUser.photo,
+            };
+
+            const res = await fetch(`${API_BASE_URL}/auth/google`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await res.json();
+
+            console.log("BACKEND GOOGLE AUTH RESPONSE:", data);
+
+            if (!res.ok || !data?.token) {
+                throw new Error(data?.message || "Backend Google auth failed");
+            }
+
+            await AsyncStorage.setItem("token", data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(data.user));
+
+            navigation.replace("MainTabs");
         } catch (error: any) {
             console.log("Google sign in error:", error);
-            Alert.alert("Google Sign In Failed", error?.message || "Something went wrong.");
+            Alert.alert(
+                "Google Sign In Failed",
+                error?.message || "Something went wrong."
+            );
         } finally {
             setLoading(false);
         }
     };
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
@@ -65,7 +105,9 @@ export default function GoogleSignInScreen({ navigation }: any) {
                                     source={require("../../assets/images/googlelogo.png")}
                                     style={styles.googleIcon}
                                 />
-                                <Text style={styles.googleButtonText}>Sign in with Google</Text>
+                                <Text style={styles.googleButtonText}>
+                                    Sign in with Google
+                                </Text>
                             </>
                         )}
                     </TouchableOpacity>

@@ -2,12 +2,18 @@ import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
+import { useNavigation } from "@react-navigation/native";
 
 export default function AppHeader() {
+    const navigation = useNavigation<any>();
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <View style={styles.container}>
-                <TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
+                <TouchableOpacity
+                    style={styles.iconButton}
+                    activeOpacity={0.8}
+                    onPress={() => navigation.navigate("Menu")}
+                >
                     <Feather name="menu" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
 
@@ -19,9 +25,23 @@ export default function AppHeader() {
                     />
                 </View>
 
-                <TouchableOpacity style={styles.iconButton} activeOpacity={0.8}>
-                    <FontAwesome6 name="bell" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
+                <View style={styles.rightIcons}>
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate("Search")}
+                    >
+                        <Feather name="search" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.iconButton}
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate("Notifications")}
+                    >
+                        <FontAwesome6 name="bell" size={20} color="#FFFFFF" />
+                    </TouchableOpacity>
+                </View>
             </View>
         </SafeAreaView>
     );
@@ -61,5 +81,9 @@ const styles = StyleSheet.create({
         width: 250,
         height: 100,
         marginTop: 80
+    },
+    rightIcons: {
+        flexDirection: "row",
+        gap: 8,
     },
 });

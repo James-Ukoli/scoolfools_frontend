@@ -5,6 +5,8 @@ import ArticleScreen from "./src/screens/ArticleScreen";
 import { StatusBar } from "expo-status-bar";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
+import SearchScreen from "./src/screens/SearchScreen";
+import MenuScreen from "./src/screens/MenuScreen";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useEffect } from "react";
 
@@ -35,6 +37,16 @@ export default function App() {
                 <Stack.Screen
                     name="EventDetailScreen"
                     component={EventDetailScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="Search"
+                    component={SearchScreen}
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="Menu"
+                    component={MenuScreen}
                     options={{ headerShown: false }}
                 />
             </Stack.Navigator>
