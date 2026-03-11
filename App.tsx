@@ -4,13 +4,32 @@ import BottomTabs from "./src/navigation/BottomTabs";
 import ArticleScreen from "./src/screens/ArticleScreen";
 import { StatusBar } from "expo-status-bar";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
+import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import { useEffect } from "react";
+
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+    useEffect(() => {
+        GoogleSignin.configure({
+            iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+            webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+            profileImageSize: 150,
+        });
+    }, []);
+
     return (
         <NavigationContainer>
             <StatusBar style="light" />
-            <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Navigator
+                initialRouteName="GoogleSignIn"
+                screenOptions={{ headerShown: false }}
+            >
+                <Stack.Screen
+                    name="GoogleSignIn"
+                    component={GoogleSignInScreen}
+                />
                 <Stack.Screen name="MainTabs" component={BottomTabs} />
                 <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
                 <Stack.Screen

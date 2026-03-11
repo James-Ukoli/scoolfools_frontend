@@ -1,5 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 
 import HomeScreen from "../screens/HomeScreen";
@@ -13,11 +13,11 @@ const Tab = createBottomTabNavigator();
 export default function BottomTabs() {
     return (
         <Tab.Navigator
+            initialRouteName="Home"
             screenOptions={({ route }) => ({
                 headerShown: false,
                 tabBarActiveTintColor: "#3CF2FF",
                 tabBarInactiveTintColor: "#8A8F98",
-
                 tabBarStyle: {
                     backgroundColor: "#050816",
                     borderTopColor: "#12203A",
@@ -26,13 +26,11 @@ export default function BottomTabs() {
                     paddingTop: 8,
                     paddingBottom: 10,
                 },
-
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: "600",
                     marginTop: 2,
                 },
-
                 tabBarIcon: ({ color, focused }) => {
                     if (route.name === "Events") {
                         return (
@@ -83,6 +81,8 @@ export default function BottomTabs() {
                             />
                         );
                     }
+
+                    return null;
                 },
             })}
         >
