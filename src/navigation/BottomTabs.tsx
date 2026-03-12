@@ -22,9 +22,9 @@ export default function BottomTabs() {
                     backgroundColor: "#050816",
                     borderTopColor: "#12203A",
                     borderTopWidth: 1,
-                    height: 78,
-                    paddingTop: 8,
-                    paddingBottom: 10,
+                    height: 60,
+                    paddingTop: 6,
+                    paddingBottom: 4,
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,

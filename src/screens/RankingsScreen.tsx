@@ -549,7 +549,7 @@ export default function PowerRankingsScreen() {
 
     if (initialLoading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={REFRESH_COLOR} />
@@ -559,7 +559,7 @@ export default function PowerRankingsScreen() {
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
             {refreshing && (

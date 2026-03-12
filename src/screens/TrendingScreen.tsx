@@ -154,7 +154,7 @@ export default function TrendingScreen({ navigation }: any) {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color="#97D81E" />
@@ -164,7 +164,7 @@ export default function TrendingScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
             {refreshing && (

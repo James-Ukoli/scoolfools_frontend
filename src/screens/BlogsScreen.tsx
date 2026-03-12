@@ -154,7 +154,7 @@ export default function BlogsScreen({ navigation }: any) {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color="#39C0ED" />
@@ -164,7 +164,7 @@ export default function BlogsScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
             {refreshing && (

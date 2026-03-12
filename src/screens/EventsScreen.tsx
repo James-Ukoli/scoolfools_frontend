@@ -232,7 +232,7 @@ export default function EventsScreen({ navigation }: any) {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color="#2EE7FF" />
@@ -242,7 +242,7 @@ export default function EventsScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
             {refreshing && (

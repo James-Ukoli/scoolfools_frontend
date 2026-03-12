@@ -176,7 +176,7 @@ export default function HomeScreen() {
         }
     }, [fetchHomeData]);
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <View style={styles.container}>
                 <AppHeader />
                 {refreshing && (
