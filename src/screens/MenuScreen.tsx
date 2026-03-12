@@ -1,4 +1,16 @@
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import {
+    Alert,
+    Linking,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -11,28 +23,40 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
+// Replace these with your real public URLs when ready
+const PRIVACY_POLICY_URL = "https://yourwebsite.com/privacy";
+const TERMS_URL = "https://yourwebsite.com/terms";
+
 export default function MenuScreen() {
     const navigation = useNavigation<any>();
+    const [aboutVisible, setAboutVisible] = useState(false);
 
-    const handleAbout = () => {
-        Alert.alert(
-            "About Just Move",
-            "Just Move is a home for casual chess fans to follow trending stories, blogs, events, and power rankings."
-        );
+    const handleOpenLink = async (url: string, label: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+
+            if (!supported) {
+                Alert.alert("Link unavailable", `Unable to open ${label} right now.`);
+                return;
+            }
+
+            await Linking.openURL(url);
+        } catch (error) {
+            console.log(`Open ${label} error:`, error);
+            Alert.alert("Error", `Failed to open ${label}.`);
+        }
     };
 
     const handleNotifications = () => {
-        Alert.alert(
-            "Notifications",
-            "Push notification settings will live here. For MVP, users will be notified only for featured posts."
-        );
+        navigation.navigate("Notifications");
     };
 
-    const handleDonate = () => {
-        Alert.alert(
-            "Donate",
-            "Add your donation link here later, such as Buy Me a Coffee, Stripe, or your website donation page."
-        );
+    const handlePrivacyPolicy = () => {
+        handleOpenLink(PRIVACY_POLICY_URL, "Privacy Policy");
+    };
+
+    const handleTerms = () => {
+        handleOpenLink(TERMS_URL, "Terms & Conditions");
     };
 
     const handleLogout = () => {
@@ -140,7 +164,7 @@ export default function MenuScreen() {
                     <TouchableOpacity
                         style={styles.menuItem}
                         activeOpacity={0.85}
-                        onPress={handleAbout}
+                        onPress={() => setAboutVisible(true)}
                     >
                         <View style={styles.menuLeft}>
                             <Ionicons name="information-circle-outline" size={22} color="#3CF2FF" />
@@ -164,11 +188,23 @@ export default function MenuScreen() {
                     <TouchableOpacity
                         style={styles.menuItem}
                         activeOpacity={0.85}
-                        onPress={handleDonate}
+                        onPress={handlePrivacyPolicy}
                     >
                         <View style={styles.menuLeft}>
-                            <Ionicons name="heart-outline" size={22} color="#3CF2FF" />
-                            <Text style={styles.menuText}>Donate</Text>
+                            <Ionicons name="document-text-outline" size={22} color="#3CF2FF" />
+                            <Text style={styles.menuText}>Privacy Policy</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        activeOpacity={0.85}
+                        onPress={handleTerms}
+                    >
+                        <View style={styles.menuLeft}>
+                            <Ionicons name="shield-checkmark-outline" size={22} color="#3CF2FF" />
+                            <Text style={styles.menuText}>Terms & Conditions</Text>
                         </View>
                         <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
                     </TouchableOpacity>
@@ -208,6 +244,48 @@ export default function MenuScreen() {
 
                 <Text style={styles.footerText}>Just Move MVP</Text>
             </View>
+
+            <Modal
+                visible={aboutVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setAboutVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>About Just Move</Text>
+                            <Pressable
+                                onPress={() => setAboutVisible(false)}
+                                style={styles.closeButton}
+                            >
+                                <Ionicons name="close" size={22} color="#FFFFFF" />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.modalScrollContent}
+                        >
+                            <Text style={styles.modalBody}>
+                                Just Move is a home for casual chess fans to follow trending
+                                stories, blogs, major events, and power rankings in one place.
+                            </Text>
+
+                            <Text style={styles.modalBody}>
+                                The app is built to make chess feel easier to follow, more modern,
+                                and more connected to the culture around the game.
+                            </Text>
+
+                            <Text style={styles.modalBody}>
+                                Whether you want quick updates, event countdowns, or fresh opinions
+                                around the chess world, Just Move is designed to keep things simple
+                                and fun.
+                            </Text>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -296,5 +374,52 @@ const styles = StyleSheet.create({
         backgroundColor: "#12203A",
         borderWidth: 1,
         borderColor: "#24406F",
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.65)",
+        justifyContent: "center",
+        paddingHorizontal: 20,
+    },
+    modalCard: {
+        backgroundColor: "#050816",
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: "#12203A",
+        maxHeight: "75%",
+        overflow: "hidden",
+    },
+    modalHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: "#12203A",
+    },
+    modalTitle: {
+        color: "#FFFFFF",
+        fontSize: 20,
+        fontWeight: "700",
+    },
+    closeButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B1224",
+        borderWidth: 1,
+        borderColor: "#1B2A4A",
+    },
+    modalScrollContent: {
+        padding: 16,
+    },
+    modalBody: {
+        color: "#D7E1F5",
+        fontSize: 15,
+        lineHeight: 24,
+        marginBottom: 14,
     },
 });
