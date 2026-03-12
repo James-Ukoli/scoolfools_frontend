@@ -3,9 +3,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
+import { useNotifications } from "../context/NotificationsContext";
 
 export default function AppHeader() {
     const navigation = useNavigation<any>();
+    const { enabled } = useNotifications();
+
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <View style={styles.container}>
@@ -35,11 +38,18 @@ export default function AppHeader() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.iconButton}
+                        style={[
+                            styles.iconButton,
+                            enabled && styles.iconButtonActive,
+                        ]}
                         activeOpacity={0.8}
                         onPress={() => navigation.navigate("Notifications")}
                     >
-                        <FontAwesome6 name="bell" size={20} color="#FFFFFF" />
+                        <FontAwesome6
+                            name="bell"
+                            size={20}
+                            color={enabled ? "#4DA3FF" : "#FFFFFF"}
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -71,6 +81,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: "#1B2A4A",
     },
+    iconButtonActive: {
+        backgroundColor: "#13203D",
+        borderColor: "#4DA3FF",
+    },
     logoWrapper: {
         flex: 1,
         alignItems: "center",
@@ -80,7 +94,7 @@ const styles = StyleSheet.create({
     logo: {
         width: 250,
         height: 100,
-        marginTop: 80
+        marginTop: 80,
     },
     rightIcons: {
         flexDirection: "row",

@@ -7,8 +7,10 @@ import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import MenuScreen from "./src/screens/MenuScreen";
+import NotificationsScreen from "./src/screens/NotificationsScreen";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { useEffect } from "react";
+import { NotificationsProvider } from "./src/context/NotificationsContext";
 
 const Stack = createNativeStackNavigator();
 
@@ -22,34 +24,41 @@ export default function App() {
     }, []);
 
     return (
-        <NavigationContainer>
-            <StatusBar style="light" />
-            <Stack.Navigator
-                initialRouteName="GoogleSignIn"
-                screenOptions={{ headerShown: false }}
-            >
-                <Stack.Screen
-                    name="GoogleSignIn"
-                    component={GoogleSignInScreen}
-                />
-                <Stack.Screen name="MainTabs" component={BottomTabs} />
-                <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
-                <Stack.Screen
-                    name="EventDetailScreen"
-                    component={EventDetailScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Search"
-                    component={SearchScreen}
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="Menu"
-                    component={MenuScreen}
-                    options={{ headerShown: false }}
-                />
-            </Stack.Navigator>
-        </NavigationContainer>
+        <NotificationsProvider>
+            <NavigationContainer>
+                <StatusBar style="light" />
+                <Stack.Navigator
+                    initialRouteName="GoogleSignIn"
+                    screenOptions={{ headerShown: false }}
+                >
+                    <Stack.Screen
+                        name="GoogleSignIn"
+                        component={GoogleSignInScreen}
+                    />
+                    <Stack.Screen name="MainTabs" component={BottomTabs} />
+                    <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
+                    <Stack.Screen
+                        name="EventDetailScreen"
+                        component={EventDetailScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="Search"
+                        component={SearchScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="Menu"
+                        component={MenuScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="Notifications"
+                        component={NotificationsScreen}
+                        options={{ headerShown: false }}
+                    />
+                </Stack.Navigator>
+            </NavigationContainer>
+        </NotificationsProvider>
     );
 }
