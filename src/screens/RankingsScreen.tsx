@@ -646,9 +646,9 @@ export default function PowerRankingsScreen() {
                 </View>
 
                 <View style={styles.sponsorBlock}>
-                    <Text style={styles.sponsorLabel}>Sponsored by Alphabreaths</Text>
+                    <Text style={styles.sponsorLabel}>Sponsored by CyberGlobe, LLC</Text>
                     <Text style={styles.sponsorSubtext}>
-                        The #1 Meditation App for Men
+                        "Lets Build Helpful Software Applications, TOGETHER"
                     </Text>
                 </View>
 

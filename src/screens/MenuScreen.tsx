@@ -24,8 +24,8 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 // Replace these with your real public URLs when ready
-const PRIVACY_POLICY_URL = "https://yourwebsite.com/privacy";
-const TERMS_URL = "https://yourwebsite.com/terms";
+const PRIVACY_POLICY_URL = "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
+const TERMS_URL = "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
 
 export default function MenuScreen() {
     const navigation = useNavigation<any>();
