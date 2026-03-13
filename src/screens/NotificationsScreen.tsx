@@ -69,12 +69,12 @@ export default function NotificationsScreen() {
                     </View>
                 </View>
 
-                <View style={styles.debugBox}>
+                {/* <View style={styles.debugBox}>
                     <Text style={styles.debugTitle}>Debug token</Text>
                     <Text style={styles.debugText}>
                         {expoPushToken ?? "No push token yet"}
                     </Text>
-                </View>
+                </View> */}
             </View>
 
             <TouchableOpacity
