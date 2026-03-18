@@ -27,7 +27,7 @@ const TERMS_URL =
     "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
 
 export default function GoogleSignInScreen({ navigation }: any) {
-    const [loading, setLoading] = useState(false);
+    const [loadingProvider, setLoadingProvider] = useState<"google" | "apple" | null>(null);
 
     const openLink = async (url: string) => {
         try {
@@ -44,7 +44,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
     const handleGoogleSignIn = async () => {
         try {
-            setLoading(true);
+            setLoadingProvider("google");
 
             console.log("API_BASE_URL EXACT:", JSON.stringify(API_BASE_URL));
 
@@ -110,13 +110,20 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 error?.message || "Something went wrong."
             );
         } finally {
-            setLoading(false);
+            setLoadingProvider(null);
         }
     };
 
     const handleAppleSignIn = async () => {
         try {
-            setLoading(true);
+            setLoadingProvider("apple");
+
+            const available = await AppleAuthentication.isAvailableAsync();
+            console.log("APPLE AUTH AVAILABLE:", available);
+
+            if (!available) {
+                throw new Error("Apple Sign In is not available on this device");
+            }
 
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [
@@ -129,6 +136,10 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             if (!credential?.user) {
                 throw new Error("Missing Apple user data");
+            }
+
+            if (!credential?.identityToken) {
+                throw new Error("Missing Apple identity token");
             }
 
             const email =
@@ -148,10 +159,6 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 identityToken: credential.identityToken,
                 avatar: "",
             };
-
-            if (!credential?.identityToken) {
-                throw new Error("Missing Apple identity token");
-            }
 
             const url = `${API_BASE_URL}/api/auth/apple`;
 
@@ -200,7 +207,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 );
             }
         } finally {
-            setLoading(false);
+            setLoadingProvider(null);
         }
     };
 
@@ -235,30 +242,49 @@ export default function GoogleSignInScreen({ navigation }: any) {
                     </Text>
 
                     {Platform.OS === "ios" && (
-                        <AppleAuthentication.AppleAuthenticationButton
-                            buttonType={
-                                AppleAuthentication
-                                    .AppleAuthenticationButtonType.SIGN_IN
+                        <View
+                            style={
+                                loadingProvider !== null
+                                    ? styles.disabledAppleWrapper
+                                    : undefined
                             }
-                            buttonStyle={
-                                AppleAuthentication
-                                    .AppleAuthenticationButtonStyle.WHITE_OUTLINE
-                            }
-                            cornerRadius={16}
-                            style={styles.appleButton}
-                            onPress={handleAppleSignIn}
-                        />
+                        >
+                            <AppleAuthentication.AppleAuthenticationButton
+                                buttonType={
+                                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                                }
+                                buttonStyle={
+                                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
+                                }
+                                cornerRadius={16}
+                                style={styles.appleButton}
+                                onPress={() => {
+                                    if (loadingProvider !== null) return;
+                                    handleAppleSignIn();
+                                }}
+                            />
+                        </View>
+                    )}
+
+                    {loadingProvider === "apple" && (
+                        <View style={styles.appleLoadingWrapper}>
+                            <ActivityIndicator color="#FFFFFF" />
+                            <Text style={styles.appleLoadingText}>
+                                Signing in with Apple...
+                            </Text>
+                        </View>
                     )}
 
                     <TouchableOpacity
                         style={[
                             styles.googleButton,
                             Platform.OS === "ios" && styles.googleButtonWithMargin,
+                            loadingProvider !== null && styles.disabledButton,
                         ]}
                         onPress={handleGoogleSignIn}
-                        disabled={loading}
+                        disabled={loadingProvider !== null}
                     >
-                        {loading ? (
+                        {loadingProvider === "google" ? (
                             <ActivityIndicator color="#000" />
                         ) : (
                             <>
@@ -317,6 +343,20 @@ const styles = StyleSheet.create({
         height: 56,
         marginBottom: 12,
     },
+    disabledAppleWrapper: {
+        opacity: 0.7,
+    },
+    appleLoadingWrapper: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 12,
+    },
+    appleLoadingText: {
+        color: "#FFFFFF",
+        fontSize: 14,
+        marginLeft: 8,
+    },
     googleButton: {
         height: 56,
         borderRadius: 16,
@@ -327,6 +367,9 @@ const styles = StyleSheet.create({
     },
     googleButtonWithMargin: {
         marginTop: 0,
+    },
+    disabledButton: {
+        opacity: 0.7,
     },
     googleIcon: {
         width: 20,
