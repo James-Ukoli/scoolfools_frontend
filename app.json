@@ -9,6 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+        "buildNumber": "2",
+        "usesAppleSignIn": true,
       "supportsTablet": true,
       "bundleIdentifier": "com.justmovechess.app",
       "infoPlist": {
@@ -32,6 +34,7 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
+        "expo-apple-authentication",
       [
         "expo-splash-screen",
         {

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as AppleAuthentication from "expo-apple-authentication";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -61,9 +62,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             const payload = {
                 email: googleUser.email,
-                username:
-                    googleUser.name ||
-                    googleUser.email.split("@")[0],
+                username: googleUser.name || googleUser.email.split("@")[0],
                 googleId: googleUser.id,
                 avatar: googleUser.photo || "",
             };
@@ -115,6 +114,96 @@ export default function GoogleSignInScreen({ navigation }: any) {
         }
     };
 
+    const handleAppleSignIn = async () => {
+        try {
+            setLoading(true);
+
+            const credential = await AppleAuthentication.signInAsync({
+                requestedScopes: [
+                    AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+                    AppleAuthentication.AppleAuthenticationScope.EMAIL,
+                ],
+            });
+
+            console.log("APPLE CREDENTIAL:", credential);
+
+            if (!credential?.user) {
+                throw new Error("Missing Apple user data");
+            }
+
+            const email =
+                credential.email ||
+                `appleuser_${credential.user}@privaterelay.appleid.com`;
+
+            const fullName =
+                [credential.fullName?.givenName, credential.fullName?.familyName]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() || email.split("@")[0];
+
+            const payload = {
+                email,
+                username: fullName,
+                appleId: credential.user,
+                identityToken: credential.identityToken,
+                avatar: "",
+            };
+
+            if (!credential?.identityToken) {
+                throw new Error("Missing Apple identity token");
+            }
+
+            const url = `${API_BASE_URL}/api/auth/apple`;
+
+            console.log("APPLE URL EXACT:", JSON.stringify(url));
+            console.log("APPLE PAYLOAD EXACT:", JSON.stringify(payload));
+
+            const res = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            console.log("APPLE RESPONSE STATUS:", res.status);
+
+            const rawText = await res.text();
+            console.log("APPLE RAW RESPONSE TEXT:", rawText);
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch {
+                throw new Error(`Non-JSON response: ${rawText}`);
+            }
+
+            console.log("BACKEND APPLE AUTH RESPONSE:", data);
+
+            if (!res.ok || !data?.token) {
+                throw new Error(data?.message || "Backend Apple auth failed");
+            }
+
+            await AsyncStorage.setItem("token", data.token);
+            await AsyncStorage.setItem("user", JSON.stringify(data.user));
+
+            navigation.replace("MainTabs");
+        } catch (error: any) {
+            console.log("FETCH/APPLE_AUTH FULL ERROR:", error);
+
+            if (error?.code === "ERR_REQUEST_CANCELED") {
+                Alert.alert("Apple Sign In Cancelled", "You cancelled sign in.");
+            } else {
+                Alert.alert(
+                    "Apple Sign In Failed",
+                    error?.message || "Something went wrong."
+                );
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
@@ -145,8 +234,27 @@ export default function GoogleSignInScreen({ navigation }: any) {
                         .
                     </Text>
 
+                    {Platform.OS === "ios" && (
+                        <AppleAuthentication.AppleAuthenticationButton
+                            buttonType={
+                                AppleAuthentication
+                                    .AppleAuthenticationButtonType.SIGN_IN
+                            }
+                            buttonStyle={
+                                AppleAuthentication
+                                    .AppleAuthenticationButtonStyle.WHITE_OUTLINE
+                            }
+                            cornerRadius={16}
+                            style={styles.appleButton}
+                            onPress={handleAppleSignIn}
+                        />
+                    )}
+
                     <TouchableOpacity
-                        style={styles.googleButton}
+                        style={[
+                            styles.googleButton,
+                            Platform.OS === "ios" && styles.googleButtonWithMargin,
+                        ]}
                         onPress={handleGoogleSignIn}
                         disabled={loading}
                     >
@@ -204,6 +312,11 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
         fontWeight: "600",
     },
+    appleButton: {
+        width: "100%",
+        height: 56,
+        marginBottom: 12,
+    },
     googleButton: {
         height: 56,
         borderRadius: 16,
@@ -211,6 +324,9 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         flexDirection: "row",
+    },
+    googleButtonWithMargin: {
+        marginTop: 0,
     },
     googleIcon: {
         width: 20,
