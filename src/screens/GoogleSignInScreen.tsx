@@ -8,6 +8,7 @@ import {
     Alert,
     ActivityIndicator,
     Platform,
+    Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
@@ -18,8 +19,27 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
+const PRIVACY_POLICY_URL =
+    "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
+
+const TERMS_URL =
+    "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
+
 export default function GoogleSignInScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
+
+    const openLink = async (url: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert("Error", "Cannot open this link.");
+            }
+        } catch (err) {
+            Alert.alert("Error", "Something went wrong opening the link.");
+        }
+    };
 
     const handleGoogleSignIn = async () => {
         try {
@@ -109,8 +129,20 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 <View style={styles.bottomSection}>
                     <Text style={styles.legalText}>
                         By continuing, you agree to our{" "}
-                        <Text style={styles.linkText}>Terms and Conditions</Text> and{" "}
-                        <Text style={styles.linkText}>Privacy Policy</Text>.
+                        <Text
+                            style={styles.linkText}
+                            onPress={() => openLink(TERMS_URL)}
+                        >
+                            Terms and Conditions
+                        </Text>{" "}
+                        and{" "}
+                        <Text
+                            style={styles.linkText}
+                            onPress={() => openLink(PRIVACY_POLICY_URL)}
+                        >
+                            Privacy Policy
+                        </Text>
+                        .
                     </Text>
 
                     <TouchableOpacity
