@@ -22,14 +22,16 @@ export default function GoogleSignInScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
 
     const handleGoogleSignIn = async () => {
-        console.log("API_BASE_URL:", API_BASE_URL);
         try {
             setLoading(true);
+
+            console.log("API_BASE_URL EXACT:", JSON.stringify(API_BASE_URL));
 
             await GoogleSignin.hasPlayServices();
             const response: any = await GoogleSignin.signIn();
 
-            const googleUser = response?.data?.user || response?.user || response;
+            const googleUser =
+                response?.data?.user || response?.user || response;
 
             console.log("Google sign in response:", response);
 
@@ -39,12 +41,19 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             const payload = {
                 email: googleUser.email,
-                username: googleUser.name,
+                username:
+                    googleUser.name ||
+                    googleUser.email.split("@")[0],
                 googleId: googleUser.id,
-                avatar: googleUser.photo,
+                avatar: googleUser.photo || "",
             };
 
-            const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
+            const url = `${API_BASE_URL}/api/auth/google`;
+
+            console.log("FINAL URL EXACT:", JSON.stringify(url));
+            console.log("PAYLOAD EXACT:", JSON.stringify(payload));
+
+            const res = await fetch(url, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -52,7 +61,17 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 body: JSON.stringify(payload),
             });
 
-            const data = await res.json();
+            console.log("RESPONSE STATUS:", res.status);
+
+            const rawText = await res.text();
+            console.log("RAW RESPONSE TEXT:", rawText);
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch {
+                throw new Error(`Non-JSON response: ${rawText}`);
+            }
 
             console.log("BACKEND GOOGLE AUTH RESPONSE:", data);
 
@@ -65,7 +84,8 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             navigation.replace("MainTabs");
         } catch (error: any) {
-            console.log("Google sign in error:", error);
+            console.log("FETCH/G_AUTH FULL ERROR:", error);
+
             Alert.alert(
                 "Google Sign In Failed",
                 error?.message || "Something went wrong."

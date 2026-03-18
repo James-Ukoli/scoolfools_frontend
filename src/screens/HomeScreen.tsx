@@ -104,19 +104,18 @@ export default function HomeScreen() {
     const fetchHomeData = useCallback(async () => {
         try {
             const [postsRes, eventsRes] = await Promise.all([
-                fetch(`${API_BASE_URL}/api/posts`),
+                fetch(`${API_BASE_URL}/api/posts?is_featured=true&limit=10`),
                 fetch(`${API_BASE_URL}/api/events`),
             ]);
+
             const postsJson = await postsRes.json();
             const eventsJson = await eventsRes.json();
 
-            const allFeaturedPosts = (postsJson.data || [])
-                .filter((post: Post) => post.is_featured === true)
-                .sort((a: Post, b: Post) => {
-                    const dateA = new Date(a.created_at).getTime();
-                    const dateB = new Date(b.created_at).getTime();
-                    return dateB - dateA;
-                });
+            const allFeaturedPosts = (postsJson.data || []).sort((a: Post, b: Post) => {
+                const dateA = new Date(a.created_at).getTime();
+                const dateB = new Date(b.created_at).getTime();
+                return dateB - dateA;
+            });
 
             setFeaturedPosts(allFeaturedPosts.slice(0, 3));
             setFeaturedStories(allFeaturedPosts.slice(3, 10));
@@ -141,9 +140,7 @@ export default function HomeScreen() {
 
                     if (priorityA !== priorityB) return priorityB - priorityA;
 
-                    return (
-                        new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
-                    );
+                    return new Date(a.start_at).getTime() - new Date(b.start_at).getTime();
                 });
 
             setCountdownEvent(
@@ -166,7 +163,6 @@ export default function HomeScreen() {
 
         try {
             await fetchHomeData();
-
             await new Promise((resolve) => setTimeout(resolve, 900));
         } catch (error) {
             console.log("HOME REFRESH ERROR:", error);
@@ -175,15 +171,18 @@ export default function HomeScreen() {
             console.log("HOME REFRESH FINISHED");
         }
     }, [fetchHomeData]);
+
     return (
         <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <View style={styles.container}>
                 <AppHeader />
+
                 {refreshing && (
                     <View style={styles.refreshIndicator}>
                         <ActivityIndicator size="small" color="#2EE7FF" />
                     </View>
                 )}
+
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}
@@ -203,10 +202,6 @@ export default function HomeScreen() {
                     </View>
 
                     <FeaturedCarousel posts={featuredPosts} loading={loadingHome} />
-                    {/* 
-                    <View style={styles.eventHeaderWrap}>
-                        <Text style={styles.sectionLabel}>Next Major Event</Text>
-                    </View> */}
 
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
