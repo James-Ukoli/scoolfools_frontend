@@ -15,10 +15,7 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as AppleAuthentication from "expo-apple-authentication";
 
-const API_BASE_URL =
-    Platform.OS === "android"
-        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
-        : process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const PRIVACY_POLICY_URL =
     "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
