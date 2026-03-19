@@ -16,9 +16,20 @@ const Stack = createNativeStackNavigator();
 
 export default function App() {
     useEffect(() => {
+        const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+        console.log("IOS CLIENT ID:", iosClientId);
+        console.log("WEB CLIENT ID:", webClientId);
+
+        if (!iosClientId) {
+            console.log("Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID");
+            return;
+        }
+
         GoogleSignin.configure({
-            iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
-            webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+            iosClientId,
+            webClientId,
             profileImageSize: 150,
         });
     }, []);

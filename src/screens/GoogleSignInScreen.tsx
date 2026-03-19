@@ -80,10 +80,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 body: JSON.stringify(payload),
             });
 
-            console.log("RESPONSE STATUS:", res.status);
-
             const rawText = await res.text();
-            console.log("RAW RESPONSE TEXT:", rawText);
 
             let data;
             try {
@@ -91,7 +88,6 @@ export default function GoogleSignInScreen({ navigation }: any) {
             } catch {
                 throw new Error(`Non-JSON response: ${rawText}`);
             }
-
             console.log("BACKEND GOOGLE AUTH RESPONSE:", data);
 
             if (!res.ok || !data?.token) {
@@ -118,21 +114,12 @@ export default function GoogleSignInScreen({ navigation }: any) {
         try {
             setLoadingProvider("apple");
 
-            const available = await AppleAuthentication.isAvailableAsync();
-            console.log("APPLE AUTH AVAILABLE:", available);
-
-            if (!available) {
-                throw new Error("Apple Sign In is not available on this device");
-            }
-
             const credential = await AppleAuthentication.signInAsync({
                 requestedScopes: [
                     AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
                     AppleAuthentication.AppleAuthenticationScope.EMAIL,
                 ],
             });
-
-            console.log("APPLE CREDENTIAL:", credential);
 
             if (!credential?.user) {
                 throw new Error("Missing Apple user data");
@@ -142,28 +129,19 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 throw new Error("Missing Apple identity token");
             }
 
-            const email =
-                credential.email ||
-                `appleuser_${credential.user}@privaterelay.appleid.com`;
-
-            const fullName =
-                [credential.fullName?.givenName, credential.fullName?.familyName]
-                    .filter(Boolean)
-                    .join(" ")
-                    .trim() || email.split("@")[0];
-
             const payload = {
-                email,
-                username: fullName,
                 appleId: credential.user,
                 identityToken: credential.identityToken,
+                email: credential.email || null,
+                username:
+                    [credential.fullName?.givenName, credential.fullName?.familyName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() || null,
                 avatar: "",
             };
 
             const url = `${API_BASE_URL}/api/auth/apple`;
-
-            console.log("APPLE URL EXACT:", JSON.stringify(url));
-            console.log("APPLE PAYLOAD EXACT:", JSON.stringify(payload));
 
             const res = await fetch(url, {
                 method: "POST",
@@ -173,19 +151,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 body: JSON.stringify(payload),
             });
 
-            console.log("APPLE RESPONSE STATUS:", res.status);
-
-            const rawText = await res.text();
-            console.log("APPLE RAW RESPONSE TEXT:", rawText);
-
-            let data;
-            try {
-                data = JSON.parse(rawText);
-            } catch {
-                throw new Error(`Non-JSON response: ${rawText}`);
-            }
-
-            console.log("BACKEND APPLE AUTH RESPONSE:", data);
+            const data = await res.json();
 
             if (!res.ok || !data?.token) {
                 throw new Error(data?.message || "Backend Apple auth failed");
@@ -196,8 +162,6 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             navigation.replace("MainTabs");
         } catch (error: any) {
-            console.log("FETCH/APPLE_AUTH FULL ERROR:", error);
-
             if (error?.code === "ERR_REQUEST_CANCELED") {
                 Alert.alert("Apple Sign In Cancelled", "You cancelled sign in.");
             } else {
