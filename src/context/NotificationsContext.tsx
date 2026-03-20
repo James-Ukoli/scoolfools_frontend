@@ -28,10 +28,7 @@ type NotificationsContextType = {
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
-const API_BASE_URL =
-    Platform.OS === "android"
-        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
-        : process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
     if (!Device.isDevice) {

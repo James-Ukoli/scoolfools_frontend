@@ -24,6 +24,7 @@
     "backgroundColor": "#000000"
   },
       "package": "com.justmove.app",
+          "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
