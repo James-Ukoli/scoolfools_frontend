@@ -23,9 +23,10 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-// Replace these with your real public URLs when ready
-const PRIVACY_POLICY_URL = "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
-const TERMS_URL = "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
+const PRIVACY_POLICY_URL =
+    "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
+const TERMS_URL =
+    "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
 
 export default function MenuScreen() {
     const navigation = useNavigation<any>();
@@ -51,6 +52,10 @@ export default function MenuScreen() {
         navigation.navigate("Notifications");
     };
 
+    const handleContactUs = () => {
+        navigation.navigate("ContactUs");
+    };
+
     const handlePrivacyPolicy = () => {
         handleOpenLink(PRIVACY_POLICY_URL, "Privacy Policy");
     };
@@ -60,34 +65,30 @@ export default function MenuScreen() {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            "Logout",
-            "Are you sure you want to log out?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Logout",
-                    style: "destructive",
-                    onPress: async () => {
+        Alert.alert("Logout", "Are you sure you want to log out?", [
+            { text: "Cancel", style: "cancel" },
+            {
+                text: "Logout",
+                style: "destructive",
+                onPress: async () => {
+                    try {
                         try {
-                            try {
-                                await GoogleSignin.signOut();
-                            } catch (error) {
-                                console.log("Google sign out warning:", error);
-                            }
-
-                            await AsyncStorage.removeItem("token");
-                            await AsyncStorage.removeItem("user");
-
-                            navigation.replace("GoogleSignIn");
+                            await GoogleSignin.signOut();
                         } catch (error) {
-                            console.log("Logout error:", error);
-                            Alert.alert("Error", "Failed to log out.");
+                            console.log("Google sign out warning:", error);
                         }
-                    },
+
+                        await AsyncStorage.removeItem("token");
+                        await AsyncStorage.removeItem("user");
+
+                        navigation.replace("GoogleSignIn");
+                    } catch (error) {
+                        console.log("Logout error:", error);
+                        Alert.alert("Error", "Failed to log out.");
+                    }
                 },
-            ]
-        );
+            },
+        ]);
     };
 
     const handleDeleteAccount = () => {
@@ -148,101 +149,131 @@ export default function MenuScreen() {
             <AppHeader />
 
             <View style={styles.content}>
-                <View style={styles.topRow}>
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        style={styles.backButton}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
+                <View>
+                    <View style={styles.topRow}>
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.backButton}
+                            activeOpacity={0.8}
+                        >
+                            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                        </TouchableOpacity>
 
-                    <Text style={styles.screenTitle}>Menu</Text>
+                        <Text style={styles.screenTitle}>Menu</Text>
+                    </View>
+
+                    <View style={styles.card}>
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={() => setAboutVisible(true)}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="information-circle-outline"
+                                    size={22}
+                                    color="#3CF2FF"
+                                />
+                                <Text style={styles.menuText}>About Just Move</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handleContactUs}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons name="mail-outline" size={22} color="#3CF2FF" />
+                                <Text style={styles.menuText}>Contact Us</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handleNotifications}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="notifications-outline"
+                                    size={22}
+                                    color="#3CF2FF"
+                                />
+                                <Text style={styles.menuText}>Notifications</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handlePrivacyPolicy}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="document-text-outline"
+                                    size={22}
+                                    color="#3CF2FF"
+                                />
+                                <Text style={styles.menuText}>Privacy Policy</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handleTerms}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="shield-checkmark-outline"
+                                    size={22}
+                                    color="#3CF2FF"
+                                />
+                                <Text style={styles.menuText}>Terms & Conditions</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handleLogout}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons name="log-out-outline" size={22} color="#FFD166" />
+                                <Text style={styles.menuText}>Logout</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[styles.menuItem, styles.lastMenuItem]}
+                            activeOpacity={0.85}
+                            onPress={handleDeleteAccount}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
+                                <Text style={styles.deleteText}>Delete Account</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                <View style={styles.card}>
+                <View style={styles.bottomButtonWrap}>
                     <TouchableOpacity
-                        style={styles.menuItem}
+                        style={styles.homeButton}
                         activeOpacity={0.85}
-                        onPress={() => setAboutVisible(true)}
+                        onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
                     >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="information-circle-outline" size={22} color="#3CF2FF" />
-                            <Text style={styles.menuText}>About Just Move</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        activeOpacity={0.85}
-                        onPress={handleNotifications}
-                    >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="notifications-outline" size={22} color="#3CF2FF" />
-                            <Text style={styles.menuText}>Notifications</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        activeOpacity={0.85}
-                        onPress={handlePrivacyPolicy}
-                    >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="document-text-outline" size={22} color="#3CF2FF" />
-                            <Text style={styles.menuText}>Privacy Policy</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        activeOpacity={0.85}
-                        onPress={handleTerms}
-                    >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="shield-checkmark-outline" size={22} color="#3CF2FF" />
-                            <Text style={styles.menuText}>Terms & Conditions</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.menuItem}
-                        activeOpacity={0.85}
-                        onPress={handleLogout}
-                    >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="log-out-outline" size={22} color="#FFD166" />
-                            <Text style={styles.menuText}>Logout</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[styles.menuItem, styles.lastMenuItem]}
-                        activeOpacity={0.85}
-                        onPress={handleDeleteAccount}
-                    >
-                        <View style={styles.menuLeft}>
-                            <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
-                            <Text style={styles.deleteText}>Delete Account</Text>
-                        </View>
-                        <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        <Ionicons name="home" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
-
-                <TouchableOpacity
-                    style={styles.homeButton}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
-                >
-                    <Ionicons name="home" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-
-                {/* <Text style={styles.footerText}>Just Move MVP</Text> */}
             </View>
 
             <Modal
@@ -299,6 +330,8 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 16,
         paddingTop: 12,
+        paddingBottom: 20,
+        justifyContent: "space-between",
     },
     topRow: {
         flexDirection: "row",
@@ -329,7 +362,7 @@ const styles = StyleSheet.create({
         overflow: "hidden",
     },
     menuItem: {
-        minHeight: 64,
+        minHeight: 50,
         paddingHorizontal: 16,
         flexDirection: "row",
         alignItems: "center",
@@ -356,28 +389,23 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         marginLeft: 12,
     },
-    footerText: {
-        marginTop: 18,
-        textAlign: "center",
-        color: "#6F7A8A",
-        fontSize: 13,
+    bottomButtonWrap: {
+        alignItems: "center",
+        paddingTop: 16,
     },
     homeButton: {
-        position: "absolute",
-        right: 18,
-        bottom: 24,
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: "#101A33",
+        borderWidth: 1,
+        borderColor: "#1B2A4A",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#12203A",
-        borderWidth: 1,
-        borderColor: "#24406F",
     },
     modalOverlay: {
         flex: 1,
-        backgroundColor: "rgba(0,0,0,0.65)",
+        backgroundColor: "rgba(0,0,0,0.72)",
         justifyContent: "center",
         paddingHorizontal: 20,
     },
@@ -386,27 +414,28 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         borderWidth: 1,
         borderColor: "#12203A",
-        maxHeight: "75%",
+        maxHeight: "70%",
         overflow: "hidden",
     },
     modalHeader: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        paddingHorizontal: 18,
+        paddingTop: 18,
+        paddingBottom: 14,
         borderBottomWidth: 1,
         borderBottomColor: "#12203A",
     },
     modalTitle: {
         color: "#FFFFFF",
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: "700",
     },
     closeButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#0B1224",
@@ -414,10 +443,11 @@ const styles = StyleSheet.create({
         borderColor: "#1B2A4A",
     },
     modalScrollContent: {
-        padding: 16,
+        paddingHorizontal: 18,
+        paddingVertical: 18,
     },
     modalBody: {
-        color: "#D7E1F5",
+        color: "#D7DBE3",
         fontSize: 15,
         lineHeight: 24,
         marginBottom: 14,

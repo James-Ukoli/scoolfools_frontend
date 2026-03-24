@@ -20,7 +20,7 @@
     "android": {
        "versionCode": 3,
       "adaptiveIcon": {
-    "foregroundImage": "./assets/images/icon.png",
+    "foregroundImage": "./assets/images/iconandroid.png",
     "backgroundColor": "#000000"
   },
       "package": "com.justmove.app",
