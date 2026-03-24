@@ -242,7 +242,7 @@ export default function MenuScreen() {
                     <Ionicons name="home" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
 
-                <Text style={styles.footerText}>Just Move MVP</Text>
+                {/* <Text style={styles.footerText}>Just Move MVP</Text> */}
             </View>
 
             <Modal

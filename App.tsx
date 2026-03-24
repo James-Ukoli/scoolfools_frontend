@@ -9,37 +9,73 @@ import SearchScreen from "./src/screens/SearchScreen";
 import MenuScreen from "./src/screens/MenuScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { NotificationsProvider } from "./src/context/NotificationsContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, ActivityIndicator } from "react-native";
 
 const Stack = createNativeStackNavigator();
 
 export default function App() {
+    const [initialRoute, setInitialRoute] = useState<"GoogleSignIn" | "MainTabs" | null>(null);
+
     useEffect(() => {
-        const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-        const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+        const setupApp = async () => {
+            try {
+                const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+                const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
-        console.log("IOS CLIENT ID:", iosClientId);
-        console.log("WEB CLIENT ID:", webClientId);
+                console.log("IOS CLIENT ID:", iosClientId);
+                console.log("WEB CLIENT ID:", webClientId);
 
-        if (!iosClientId) {
-            console.log("Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID");
-            return;
-        }
+                if (iosClientId) {
+                    GoogleSignin.configure({
+                        iosClientId,
+                        webClientId,
+                        profileImageSize: 150,
+                    });
+                } else {
+                    console.log("Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID");
+                }
 
-        GoogleSignin.configure({
-            iosClientId,
-            webClientId,
-            profileImageSize: 150,
-        });
+                const token = await AsyncStorage.getItem("token");
+
+                if (token) {
+                    setInitialRoute("MainTabs");
+                } else {
+                    setInitialRoute("GoogleSignIn");
+                }
+            } catch (error) {
+                console.log("App bootstrap error:", error);
+                setInitialRoute("GoogleSignIn");
+            }
+        };
+
+        setupApp();
     }, []);
+
+    if (!initialRoute) {
+        return (
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    backgroundColor: "#000",
+                }}
+            >
+                <StatusBar style="light" />
+                <ActivityIndicator size="large" color="#fff" />
+            </View>
+        );
+    }
 
     return (
         <NotificationsProvider>
             <NavigationContainer>
                 <StatusBar style="light" />
                 <Stack.Navigator
-                    initialRouteName="GoogleSignIn"
+                    initialRouteName={initialRoute}
                     screenOptions={{ headerShown: false }}
                 >
                     <Stack.Screen
