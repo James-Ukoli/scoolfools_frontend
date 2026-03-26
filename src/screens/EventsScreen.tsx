@@ -8,9 +8,10 @@ import {
     Image,
     ActivityIndicator,
     RefreshControl,
-    Platform
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
 
 type Broadcaster = {
@@ -265,8 +266,16 @@ export default function EventsScreen({ navigation }: any) {
                     />
                 }
             >
-                <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Events</Text>
+                <View style={styles.topRow}>
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+
+                    <Text style={styles.screenTitle}>Events</Text>
                 </View>
 
                 {heroEvent ? (
@@ -366,6 +375,16 @@ export default function EventsScreen({ navigation }: any) {
                     </View>
                 ))}
             </ScrollView>
+
+            <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
+                <TouchableOpacity
+                    style={styles.homeButton}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+                >
+                    <Ionicons name="home" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
+            </View>
         </SafeAreaView>
     );
 }
@@ -381,7 +400,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 40,
+        paddingBottom: 120,
     },
     loadingContainer: {
         flex: 1,
@@ -392,18 +411,27 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 6,
     },
-    headerRow: {
-        marginTop: 6,
-        marginBottom: 18,
+    topRow: {
         flexDirection: "row",
         alignItems: "center",
-        justifyContent: "center",
+        marginTop: 6,
+        marginBottom: 18,
     },
-    headerTitle: {
+    backButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B1220",
+        borderWidth: 1,
+        borderColor: "#16233B",
+    },
+    screenTitle: {
         color: "#FFFFFF",
-        fontSize: 25,
-        fontWeight: "900",
-        textAlign: "center",
+        fontSize: 26,
+        fontWeight: "800",
+        marginLeft: 14,
     },
     heroWrapper: {
         marginBottom: 28,
@@ -513,5 +541,28 @@ const styles = StyleSheet.create({
         color: "#CFCFCF",
         fontSize: 13,
         lineHeight: 17,
+    },
+    fixedHomeButtonWrap: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 18,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    homeButton: {
+        width: 58,
+        height: 58,
+        borderRadius: 29,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B1A4A",
+        borderWidth: 1.5,
+        borderColor: "#1C3D8F",
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 8,
+        elevation: 8,
     },
 });

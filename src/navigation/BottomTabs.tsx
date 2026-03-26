@@ -5,8 +5,8 @@ import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import HomeScreen from "../screens/HomeScreen";
 import TrendingScreen from "../screens/TrendingScreen";
 import BlogsScreen from "../screens/BlogsScreen";
-import EventsScreen from "../screens/EventsScreen";
 import RankingsScreen from "../screens/RankingsScreen";
+import AlertsScreen from "../screens/AlertsScreen"; // 👈 ADD THIS
 
 const Tab = createBottomTabNavigator();
 
@@ -32,10 +32,12 @@ export default function BottomTabs() {
                     marginTop: 2,
                 },
                 tabBarIcon: ({ color, focused }) => {
-                    if (route.name === "Events") {
+
+                    // 🔥 ALERTS (NEW LEFT TAB)
+                    if (route.name === "Alerts") {
                         return (
                             <Ionicons
-                                name={focused ? "calendar" : "calendar-outline"}
+                                name={focused ? "megaphone" : "megaphone-outline"}
                                 size={22}
                                 color={color}
                             />
@@ -86,7 +88,8 @@ export default function BottomTabs() {
                 },
             })}
         >
-            <Tab.Screen name="Events" component={EventsScreen} />
+            {/* 👇 ORDER MATTERS — LEFT TO RIGHT */}
+            <Tab.Screen name="Alerts" component={AlertsScreen} />
             <Tab.Screen name="Trending" component={TrendingScreen} />
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Blogs" component={BlogsScreen} />

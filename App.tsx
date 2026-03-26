@@ -14,6 +14,7 @@ import { NotificationsProvider } from "./src/context/NotificationsContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, ActivityIndicator } from "react-native";
 import ContactUsScreen from "./src/screens/ContactUsScreen";
+import EventsScreen from "./src/screens/EventsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -106,6 +107,11 @@ export default function App() {
                         options={{ headerShown: false }}
                     />
                     <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+                    <Stack.Screen
+                        name="EventsScreen"
+                        component={EventsScreen}
+                        options={{ headerShown: false }}
+                    />
                 </Stack.Navigator>
             </NavigationContainer>
         </NotificationsProvider>

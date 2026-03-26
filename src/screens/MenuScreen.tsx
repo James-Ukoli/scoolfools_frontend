@@ -31,6 +31,7 @@ const TERMS_URL =
 export default function MenuScreen() {
     const navigation = useNavigation<any>();
     const [aboutVisible, setAboutVisible] = useState(false);
+    const [partyGamesVisible, setPartyGamesVisible] = useState(false);
 
     const handleOpenLink = async (url: string, label: string) => {
         try {
@@ -50,6 +51,14 @@ export default function MenuScreen() {
 
     const handleNotifications = () => {
         navigation.navigate("Notifications");
+    };
+
+    const handleEvents = () => {
+        navigation.navigate("EventsScreen");
+    };
+
+    const handlePartyGames = () => {
+        setPartyGamesVisible(true);
     };
 
     const handleContactUs = () => {
@@ -149,19 +158,23 @@ export default function MenuScreen() {
             <AppHeader />
 
             <View style={styles.content}>
-                <View>
-                    <View style={styles.topRow}>
-                        <TouchableOpacity
-                            onPress={() => navigation.goBack()}
-                            style={styles.backButton}
-                            activeOpacity={0.8}
-                        >
-                            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                        </TouchableOpacity>
+                <View style={styles.topRow}>
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backButton}
+                        activeOpacity={0.8}
+                    >
+                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
 
-                        <Text style={styles.screenTitle}>Menu</Text>
-                    </View>
+                    <Text style={styles.screenTitle}>Menu</Text>
+                </View>
 
+                <ScrollView
+                    style={styles.scrollView}
+                    contentContainerStyle={styles.scrollContent}
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.card}>
                         <TouchableOpacity
                             style={styles.menuItem}
@@ -203,6 +216,38 @@ export default function MenuScreen() {
                                     color="#3CF2FF"
                                 />
                                 <Text style={styles.menuText}>Notifications</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handleEvents}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="calendar-outline"
+                                    size={22}
+                                    color="#3CF2FF"
+                                />
+                                <Text style={styles.menuText}>Events</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            activeOpacity={0.85}
+                            onPress={handlePartyGames}
+                        >
+                            <View style={styles.menuLeft}>
+                                <Ionicons
+                                    name="game-controller-outline"
+                                    size={22}
+                                    color="#FFD166"
+                                />
+                                <Text style={styles.menuText}>Chess Party Games! 🎉</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
                         </TouchableOpacity>
@@ -263,9 +308,11 @@ export default function MenuScreen() {
                             <Ionicons name="chevron-forward" size={20} color="#8A8F98" />
                         </TouchableOpacity>
                     </View>
-                </View>
 
-                <View style={styles.bottomButtonWrap}>
+                    <View style={styles.bottomSpacer} />
+                </ScrollView>
+
+                <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
                     <TouchableOpacity
                         style={styles.homeButton}
                         activeOpacity={0.85}
@@ -317,6 +364,45 @@ export default function MenuScreen() {
                     </View>
                 </View>
             </Modal>
+
+            <Modal
+                visible={partyGamesVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPartyGamesVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chess Party Games! 🎉</Text>
+                            <Pressable
+                                onPress={() => setPartyGamesVisible(false)}
+                                style={styles.closeButton}
+                            >
+                                <Ionicons name="close" size={22} color="#FFFFFF" />
+                            </Pressable>
+                        </View>
+
+                        <ScrollView
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.modalScrollContent}
+                        >
+                            <Text style={styles.modalBody}>
+                                Party games for you and your chess friends are coming soon.
+                            </Text>
+
+                            <Text style={styles.modalBody}>
+                                We’re cooking up fun social games built for chess fans, hangouts,
+                                and good vibes.
+                            </Text>
+
+                            <Text style={styles.modalBody}>
+                                Stay tuned for a future update. ♟️🔥
+                            </Text>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -330,8 +416,6 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 20,
-        justifyContent: "space-between",
     },
     topRow: {
         flexDirection: "row",
@@ -339,36 +423,42 @@ const styles = StyleSheet.create({
         marginBottom: 18,
     },
     backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1224",
+        backgroundColor: "#0B1220",
         borderWidth: 1,
-        borderColor: "#1B2A4A",
-        marginRight: 12,
+        borderColor: "#16233B",
     },
     screenTitle: {
         color: "#FFFFFF",
-        fontSize: 24,
-        fontWeight: "700",
+        fontSize: 26,
+        fontWeight: "800",
+        marginLeft: 14,
+    },
+    scrollView: {
+        flex: 1,
+    },
+    scrollContent: {
+        paddingBottom: 140,
     },
     card: {
         backgroundColor: "#050816",
-        borderRadius: 18,
+        borderRadius: 22,
         borderWidth: 1,
         borderColor: "#12203A",
         overflow: "hidden",
     },
     menuItem: {
-        minHeight: 50,
-        paddingHorizontal: 16,
+        minHeight: 62,
+        paddingHorizontal: 18,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
         borderBottomWidth: 1,
-        borderBottomColor: "#12203A",
+        borderBottomColor: "#101A2E",
     },
     lastMenuItem: {
         borderBottomWidth: 0,
@@ -376,32 +466,46 @@ const styles = StyleSheet.create({
     menuLeft: {
         flexDirection: "row",
         alignItems: "center",
+        flex: 1,
+        paddingRight: 12,
     },
     menuText: {
         color: "#FFFFFF",
         fontSize: 16,
         fontWeight: "600",
-        marginLeft: 12,
+        marginLeft: 14,
     },
     deleteText: {
         color: "#FF6B6B",
         fontSize: 16,
-        fontWeight: "600",
-        marginLeft: 12,
+        fontWeight: "700",
+        marginLeft: 14,
     },
-    bottomButtonWrap: {
-        alignItems: "center",
-        paddingTop: 16,
+    bottomSpacer: {
+        height: 30,
     },
-    homeButton: {
-        width: 54,
-        height: 54,
-        borderRadius: 27,
-        backgroundColor: "#101A33",
-        borderWidth: 1,
-        borderColor: "#1B2A4A",
+    fixedHomeButtonWrap: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 18,
         alignItems: "center",
         justifyContent: "center",
+    },
+    homeButton: {
+        width: 58,
+        height: 58,
+        borderRadius: 29,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B1A4A",
+        borderWidth: 1.5,
+        borderColor: "#1C3D8F",
+        shadowColor: "#000000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 8,
+        elevation: 8,
     },
     modalOverlay: {
         flex: 1,
@@ -411,9 +515,9 @@ const styles = StyleSheet.create({
     },
     modalCard: {
         backgroundColor: "#050816",
-        borderRadius: 20,
+        borderRadius: 22,
         borderWidth: 1,
-        borderColor: "#12203A",
+        borderColor: "#163055",
         maxHeight: "70%",
         overflow: "hidden",
     },
@@ -422,15 +526,16 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         paddingHorizontal: 18,
-        paddingTop: 18,
-        paddingBottom: 14,
+        paddingVertical: 16,
         borderBottomWidth: 1,
-        borderBottomColor: "#12203A",
+        borderBottomColor: "#101A2E",
     },
     modalTitle: {
         color: "#FFFFFF",
-        fontSize: 18,
-        fontWeight: "700",
+        fontSize: 20,
+        fontWeight: "800",
+        flex: 1,
+        paddingRight: 12,
     },
     closeButton: {
         width: 34,
@@ -438,9 +543,7 @@ const styles = StyleSheet.create({
         borderRadius: 17,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1224",
-        borderWidth: 1,
-        borderColor: "#1B2A4A",
+        backgroundColor: "#0B1220",
     },
     modalScrollContent: {
         paddingHorizontal: 18,
@@ -450,6 +553,6 @@ const styles = StyleSheet.create({
         color: "#D7DBE3",
         fontSize: 15,
         lineHeight: 24,
-        marginBottom: 14,
+        marginBottom: 16,
     },
 });
