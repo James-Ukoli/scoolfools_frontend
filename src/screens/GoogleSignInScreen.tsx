@@ -34,7 +34,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
             } else {
                 Alert.alert("Error", "Cannot open this link.");
             }
-        } catch (err) {
+        } catch {
             Alert.alert("Error", "Something went wrong opening the link.");
         }
     };
@@ -43,15 +43,11 @@ export default function GoogleSignInScreen({ navigation }: any) {
         try {
             setLoadingProvider("google");
 
-            console.log("API_BASE_URL EXACT:", JSON.stringify(API_BASE_URL));
-
             await GoogleSignin.hasPlayServices();
             const response: any = await GoogleSignin.signIn();
 
             const googleUser =
                 response?.data?.user || response?.user || response;
-
-            console.log("Google sign in response:", response);
 
             if (!googleUser?.email || !googleUser?.id) {
                 throw new Error("Missing Google user data");
@@ -64,12 +60,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 avatar: googleUser.photo || "",
             };
 
-            const url = `${API_BASE_URL}/api/auth/google`;
-
-            console.log("FINAL URL EXACT:", JSON.stringify(url));
-            console.log("PAYLOAD EXACT:", JSON.stringify(payload));
-
-            const res = await fetch(url, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/google`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -77,15 +68,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 body: JSON.stringify(payload),
             });
 
-            const rawText = await res.text();
-
-            let data;
-            try {
-                data = JSON.parse(rawText);
-            } catch {
-                throw new Error(`Non-JSON response: ${rawText}`);
-            }
-            console.log("BACKEND GOOGLE AUTH RESPONSE:", data);
+            const data = await res.json();
 
             if (!res.ok || !data?.token) {
                 throw new Error(data?.message || "Backend Google auth failed");
@@ -96,8 +79,6 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
             navigation.replace("MainTabs");
         } catch (error: any) {
-            console.log("FETCH/G_AUTH FULL ERROR:", error);
-
             Alert.alert(
                 "Google Sign In Failed",
                 error?.message || "Something went wrong."
@@ -118,12 +99,8 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 ],
             });
 
-            if (!credential?.user) {
-                throw new Error("Missing Apple user data");
-            }
-
-            if (!credential?.identityToken) {
-                throw new Error("Missing Apple identity token");
+            if (!credential?.user || !credential?.identityToken) {
+                throw new Error("Missing Apple credentials");
             }
 
             const payload = {
@@ -138,9 +115,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 avatar: "",
             };
 
-            const url = `${API_BASE_URL}/api/auth/apple`;
-
-            const res = await fetch(url, {
+            const res = await fetch(`${API_BASE_URL}/api/auth/apple`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -181,67 +156,45 @@ export default function GoogleSignInScreen({ navigation }: any) {
                         style={styles.logo}
                         resizeMode="contain"
                     />
+
+                    <Text style={styles.headline}>
+                        The #1 App to Follow the World of Chess ♟️
+                    </Text>
+
+                    <Text style={styles.subheadline}>
+                        NEWS • BLOGS • ALERTS • RANKINGS
+                    </Text>
                 </View>
 
                 <View style={styles.bottomSection}>
+                    <Text style={styles.freeText}>
+                        Sign up is free 🚀
+                    </Text>
+
                     <Text style={styles.legalText}>
                         By continuing, you agree to our{" "}
-                        <Text
-                            style={styles.linkText}
-                            onPress={() => openLink(TERMS_URL)}
-                        >
-                            Terms and Conditions
+                        <Text style={styles.linkText} onPress={() => openLink(TERMS_URL)}>
+                            Terms
                         </Text>{" "}
                         and{" "}
-                        <Text
-                            style={styles.linkText}
-                            onPress={() => openLink(PRIVACY_POLICY_URL)}
-                        >
+                        <Text style={styles.linkText} onPress={() => openLink(PRIVACY_POLICY_URL)}>
                             Privacy Policy
                         </Text>
                         .
                     </Text>
 
                     {Platform.OS === "ios" && (
-                        <View
-                            style={
-                                loadingProvider !== null
-                                    ? styles.disabledAppleWrapper
-                                    : undefined
-                            }
-                        >
-                            <AppleAuthentication.AppleAuthenticationButton
-                                buttonType={
-                                    AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
-                                }
-                                buttonStyle={
-                                    AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE
-                                }
-                                cornerRadius={16}
-                                style={styles.appleButton}
-                                onPress={() => {
-                                    if (loadingProvider !== null) return;
-                                    handleAppleSignIn();
-                                }}
-                            />
-                        </View>
-                    )}
-
-                    {loadingProvider === "apple" && (
-                        <View style={styles.appleLoadingWrapper}>
-                            <ActivityIndicator color="#FFFFFF" />
-                            <Text style={styles.appleLoadingText}>
-                                Signing in with Apple...
-                            </Text>
-                        </View>
+                        <AppleAuthentication.AppleAuthenticationButton
+                            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                            buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE_OUTLINE}
+                            cornerRadius={16}
+                            style={styles.appleButton}
+                            onPress={handleAppleSignIn}
+                        />
                     )}
 
                     <TouchableOpacity
-                        style={[
-                            styles.googleButton,
-                            Platform.OS === "ios" && styles.googleButtonWithMargin,
-                            loadingProvider !== null && styles.disabledButton,
-                        ]}
+                        style={styles.googleButton}
                         onPress={handleGoogleSignIn}
                         disabled={loadingProvider !== null}
                     >
@@ -274,7 +227,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "space-between",
         paddingHorizontal: 24,
-        backgroundColor: "#000",
     },
     centerSection: {
         flex: 1,
@@ -282,18 +234,44 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     logo: {
-        width: 260,
-        height: 260,
+        width: 240,
+        height: 240,
+    },
+    headline: {
+        color: "#39FF14",
+        fontSize: 20,
+        fontWeight: "800",
+        textAlign: "center",
+        marginTop: 10,
+        letterSpacing: 1.2,
+        textShadowColor: "#39FF14",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+    subheadline: {
+        color: "#8EA0BF",
+        fontSize: 13,
+        textAlign: "center",
+        marginTop: 6,
+        letterSpacing: 2,
+        fontWeight: "600",
+        textTransform: "uppercase",
     },
     bottomSection: {
         paddingBottom: 28,
+    },
+    freeText: {
+        color: "#FFFFFF",
+        fontSize: 14,
+        textAlign: "center",
+        marginBottom: 10,
+        fontWeight: "600",
     },
     legalText: {
         color: "#8E8E93",
         fontSize: 12,
         textAlign: "center",
         marginBottom: 18,
-        lineHeight: 18,
     },
     linkText: {
         color: "#FFFFFF",
@@ -304,20 +282,6 @@ const styles = StyleSheet.create({
         height: 56,
         marginBottom: 12,
     },
-    disabledAppleWrapper: {
-        opacity: 0.7,
-    },
-    appleLoadingWrapper: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 12,
-    },
-    appleLoadingText: {
-        color: "#FFFFFF",
-        fontSize: 14,
-        marginLeft: 8,
-    },
     googleButton: {
         height: 56,
         borderRadius: 16,
@@ -325,12 +289,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         flexDirection: "row",
-    },
-    googleButtonWithMargin: {
-        marginTop: 0,
-    },
-    disabledButton: {
-        opacity: 0.7,
     },
     googleIcon: {
         width: 20,
