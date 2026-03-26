@@ -5,30 +5,21 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 
-const ENABLED_KEY = "push_notifications_enabled";
+const FEATURED_KEY = "featured_notifications_enabled";
+const ALERTS_KEY = "alerts_notifications_enabled";
 const TOKEN_KEY = "expo_push_token";
 
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-    }),
-});
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 type NotificationsContextType = {
-    enabled: boolean;
-    expoPushToken: string | null;
+    featuredEnabled: boolean;
+    alertsEnabled: boolean;
     loading: boolean;
-    enableNotifications: () => Promise<void>;
-    disableNotifications: () => Promise<void>;
-    toggleNotifications: () => Promise<void>;
+    toggleFeatured: () => Promise<void>;
+    toggleAlerts: () => Promise<void>;
 };
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 async function registerForPushNotificationsAsync(): Promise<string | null> {
     if (!Device.isDevice) {
@@ -49,133 +40,127 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
         return null;
     }
 
-    if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-            name: "default",
-            importance: Notifications.AndroidImportance.MAX,
-            vibrationPattern: [0, 250, 250, 250],
-        });
-    }
-
     const projectId =
         Constants.expoConfig?.extra?.eas?.projectId ??
         Constants.easConfig?.projectId;
 
-    if (!projectId) {
-        throw new Error("EAS projectId is missing in app.json");
-    }
-    try {
-        const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        console.log("Expo push token:", token);
-        return token;
-    } catch (error) {
-        console.log("getExpoPushTokenAsync error:", error);
-        throw error;
-    }
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    return token;
 }
 
-export function NotificationsProvider({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
-    const [enabled, setEnabled] = useState(false);
+export function NotificationsProvider({ children }: { children: React.ReactNode }) {
+    const [featuredEnabled, setFeaturedEnabled] = useState(false);
+    const [alertsEnabled, setAlertsEnabled] = useState(false);
     const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const loadStoredSettings = async () => {
-            try {
-                const savedEnabled = await AsyncStorage.getItem(ENABLED_KEY);
-                const savedToken = await AsyncStorage.getItem(TOKEN_KEY);
+        const load = async () => {
+            const f = await AsyncStorage.getItem(FEATURED_KEY);
+            const a = await AsyncStorage.getItem(ALERTS_KEY);
+            const t = await AsyncStorage.getItem(TOKEN_KEY);
 
-                setEnabled(savedEnabled === "true");
-                setExpoPushToken(savedToken);
-            } catch (error) {
-                console.log("Error loading notification settings:", error);
-            } finally {
-                setLoading(false);
-            }
+            setFeaturedEnabled(f === "true");
+            setAlertsEnabled(a === "true");
+            setExpoPushToken(t);
+            setLoading(false);
         };
 
-        loadStoredSettings();
+        load();
     }, []);
 
-    const registerTokenWithBackend = async (token: string) => {
-        try {
-            await fetch(`${API_BASE_URL}/notifications/register-device`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    token,
-                    platform: Platform.OS,
-                }),
-            });
-        } catch (error) {
-            console.log("Error registering notification token:", error);
-        }
+    const registerDevice = async (token: string, featured: boolean, alerts: boolean) => {
+        await fetch(`${API_BASE_URL}/notifications/register-device`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token,
+                platform: Platform.OS,
+                featured_posts_enabled: featured,
+                alerts_enabled: alerts,
+            }),
+        });
     };
 
-    const unregisterTokenFromBackend = async (token: string | null) => {
-        if (!token) return;
-
-        try {
-            await fetch(`${API_BASE_URL}/notifications/unregister-device`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ token }),
-            });
-        } catch (error) {
-            console.log("Error unregistering notification token:", error);
-        }
+    const updatePreferences = async (token: string, featured: boolean, alerts: boolean) => {
+        await fetch(`${API_BASE_URL}/notifications/preferences`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                token,
+                featured_posts_enabled: featured,
+                alerts_enabled: alerts,
+            }),
+        });
     };
 
-    const enableNotifications = async () => {
+    const unregisterDevice = async (token: string) => {
+        await fetch(`${API_BASE_URL}/notifications/unregister-device`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ token }),
+        });
+    };
+
+    const ensureToken = async (): Promise<string | null> => {
+        if (expoPushToken) return expoPushToken;
+
         const token = await registerForPushNotificationsAsync();
+        if (!token) return null;
 
-        if (!token) return;
-
-        setEnabled(true);
         setExpoPushToken(token);
-
-        await AsyncStorage.setItem(ENABLED_KEY, "true");
         await AsyncStorage.setItem(TOKEN_KEY, token);
 
-        await registerTokenWithBackend(token);
+        return token;
     };
 
-    const disableNotifications = async () => {
-        await unregisterTokenFromBackend(expoPushToken);
+    const handleUpdate = async (newFeatured: boolean, newAlerts: boolean) => {
+        const token = await ensureToken();
+        if (!token) return;
 
-        setEnabled(false);
-        setExpoPushToken(null);
+        const hasAny = newFeatured || newAlerts;
 
-        await AsyncStorage.setItem(ENABLED_KEY, "false");
-        await AsyncStorage.removeItem(TOKEN_KEY);
-    };
-
-    const toggleNotifications = async () => {
-        if (enabled) {
-            await disableNotifications();
-        } else {
-            await enableNotifications();
+        if (!hasAny) {
+            await unregisterDevice(token);
+            return;
         }
+
+        if (!expoPushToken) {
+            await registerDevice(token, newFeatured, newAlerts);
+        } else {
+            await updatePreferences(token, newFeatured, newAlerts);
+        }
+    };
+
+    const toggleFeatured = async () => {
+        const newValue = !featuredEnabled;
+        setFeaturedEnabled(newValue);
+        await AsyncStorage.setItem(FEATURED_KEY, String(newValue));
+        await handleUpdate(newValue, alertsEnabled);
+    };
+
+    const toggleAlerts = async () => {
+        const newValue = !alertsEnabled;
+        setAlertsEnabled(newValue);
+        await AsyncStorage.setItem(ALERTS_KEY, String(newValue));
+        await handleUpdate(featuredEnabled, newValue);
     };
 
     const value = useMemo(
         () => ({
-            enabled,
-            expoPushToken,
+            featuredEnabled,
+            alertsEnabled,
             loading,
-            enableNotifications,
-            disableNotifications,
-            toggleNotifications,
+            toggleFeatured,
+            toggleAlerts,
         }),
-        [enabled, expoPushToken, loading]
+        [featuredEnabled, alertsEnabled, loading]
     );
 
     return (
@@ -186,11 +171,7 @@ export function NotificationsProvider({
 }
 
 export function useNotifications() {
-    const context = useContext(NotificationsContext);
-
-    if (!context) {
-        throw new Error("useNotifications must be used inside NotificationsProvider");
-    }
-
-    return context;
+    const ctx = useContext(NotificationsContext);
+    if (!ctx) throw new Error("Must be used inside provider");
+    return ctx;
 }

@@ -117,7 +117,7 @@ export default function MenuScreen() {
                                 throw new Error("No auth token found.");
                             }
 
-                            const res = await fetch(`${API_BASE_URL}/auth/me`, {
+                            const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
                                 method: "DELETE",
                                 headers: {
                                     "Content-Type": "application/json",

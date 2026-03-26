@@ -7,11 +7,16 @@ import { useNotifications } from "../context/NotificationsContext";
 
 export default function AppHeader() {
     const navigation = useNavigation<any>();
-    const { enabled } = useNotifications();
+
+    const { featuredEnabled, alertsEnabled } = useNotifications();
+
+    const isOneEnabled = featuredEnabled || alertsEnabled;
+    const isBothEnabled = featuredEnabled && alertsEnabled;
 
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <View style={styles.container}>
+                {/* LEFT MENU */}
                 <TouchableOpacity
                     style={styles.iconButton}
                     activeOpacity={0.8}
@@ -20,6 +25,7 @@ export default function AppHeader() {
                     <Feather name="menu" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
 
+                {/* LOGO */}
                 <View style={styles.logoWrapper}>
                     <Image
                         source={require("../../assets/images/justmove_stretchlogo.png")}
@@ -28,6 +34,7 @@ export default function AppHeader() {
                     />
                 </View>
 
+                {/* RIGHT SIDE */}
                 <View style={styles.rightIcons}>
                     <TouchableOpacity
                         style={styles.iconButton}
@@ -37,10 +44,12 @@ export default function AppHeader() {
                         <Feather name="search" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
 
+                    {/* 🔔 BELL */}
                     <TouchableOpacity
                         style={[
                             styles.iconButton,
-                            enabled && styles.iconButtonActive,
+                            isOneEnabled && styles.iconButtonActive,
+                            isBothEnabled && styles.iconButtonFullyActive,
                         ]}
                         activeOpacity={0.8}
                         onPress={() => navigation.navigate("Notifications")}
@@ -48,7 +57,13 @@ export default function AppHeader() {
                         <FontAwesome6
                             name="bell"
                             size={20}
-                            color={enabled ? "#4DA3FF" : "#FFFFFF"}
+                            color={
+                                isBothEnabled
+                                    ? "#39FF14" // neon green (both ON)
+                                    : isOneEnabled
+                                        ? "#4DA3FF" // blue (one ON)
+                                        : "#FFFFFF" // none
+                            }
                         />
                     </TouchableOpacity>
                 </View>
@@ -84,6 +99,15 @@ const styles = StyleSheet.create({
     iconButtonActive: {
         backgroundColor: "#13203D",
         borderColor: "#4DA3FF",
+    },
+    iconButtonFullyActive: {
+        backgroundColor: "#0F2A12",
+        borderColor: "#39FF14",
+        shadowColor: "#39FF14",
+        shadowOpacity: 0.4,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6, // Android glow
     },
     logoWrapper: {
         flex: 1,
