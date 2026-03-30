@@ -10,7 +10,7 @@ import {
     StyleSheet,
     Text,
     View,
-    Platform
+    Platform,
 } from "react-native";
 import {
     RouteProp,
@@ -19,8 +19,8 @@ import {
 } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { WebView } from "react-native-webview";
 import { s, vs, ms } from "react-native-size-matters";
+import * as WebBrowser from "expo-web-browser";
 
 type PostBlock = {
     _id: string;
@@ -127,44 +127,53 @@ export default function ArticleScreen() {
         }
     };
 
-    const openExternalLink = async (url: string) => {
+    const normalizeUrl = (rawUrl: string) => {
+        const trimmed = rawUrl.trim();
+
+        if (!trimmed) return "";
+
+        if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+
+        if (
+            trimmed.includes("youtube.com/") ||
+            trimmed.includes("youtu.be/") ||
+            trimmed.includes("www.youtube.com/") ||
+            trimmed.includes("m.youtube.com/")
+        ) {
+            return `https://${trimmed}`;
+        }
+
+        if (trimmed.startsWith("www.")) {
+            return `https://${trimmed}`;
+        }
+
+        return trimmed;
+    };
+
+    const openExternalLink = async (rawUrl: string) => {
         try {
-            const supported = await Linking.canOpenURL(url);
-            if (!supported) {
-                Alert.alert("Invalid link", "This link cannot be opened.");
+            const url = normalizeUrl(rawUrl);
+
+            if (!url) {
+                Alert.alert("Invalid link", "This link is empty.");
                 return;
             }
-            await Linking.openURL(url);
+
+            console.log("Opening URL:", url);
+
+            await WebBrowser.openBrowserAsync(url);
         } catch (error) {
+            console.log("Could not open link:", error);
             Alert.alert("Error", "Could not open link.");
         }
     };
 
-    const getYoutubeEmbedUrl = (url: string) => {
+    const getYoutubeId = (rawUrl: string) => {
         try {
-            if (url.includes("youtube.com/shorts/")) {
-                const id = url.split("shorts/")[1]?.split("?")[0];
-                return id ? `https://www.youtube.com/embed/${id}` : null;
-            }
+            const url = normalizeUrl(rawUrl);
 
-            if (url.includes("youtube.com/watch?v=")) {
-                const id = url.split("v=")[1]?.split("&")[0];
-                return id ? `https://www.youtube.com/embed/${id}` : null;
-            }
-
-            if (url.includes("youtu.be/")) {
-                const id = url.split("youtu.be/")[1]?.split("?")[0];
-                return id ? `https://www.youtube.com/embed/${id}` : null;
-            }
-
-            return null;
-        } catch {
-            return null;
-        }
-    };
-
-    const getYoutubeId = (url: string) => {
-        try {
             if (url.includes("youtube.com/shorts/")) {
                 return url.split("shorts/")[1]?.split("?")[0] || null;
             }
@@ -375,6 +384,7 @@ export default function ArticleScreen() {
 
                 <View style={styles.articleBody}>{blocks.map(renderBlock)}</View>
             </ScrollView>
+
             {previewImage && (
                 <View style={styles.imagePreviewOverlay}>
                     <Pressable
@@ -624,17 +634,6 @@ const styles = StyleSheet.create({
         fontSize: ms(14),
         fontWeight: "600",
     },
-    videoContainer: {
-        height: vs(220),
-        borderRadius: s(18),
-        overflow: "hidden",
-        marginVertical: vs(12),
-        backgroundColor: "#000000",
-    },
-    webview: {
-        flex: 1,
-        backgroundColor: "#000000",
-    },
     imagePreviewOverlay: {
         position: "absolute",
         top: 0,
@@ -646,7 +645,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         zIndex: 1000,
     },
-
     previewImage: {
         width: "100%",
         height: vs(500),
@@ -656,7 +654,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
-
     closePreview: {
         position: "absolute",
         top: 60,
@@ -671,19 +668,16 @@ const styles = StyleSheet.create({
         backgroundColor: "#11192C",
         position: "relative",
     },
-
     videoPreviewImage: {
         width: "100%",
         height: "100%",
     },
-
     videoOverlay: {
         ...StyleSheet.absoluteFillObject,
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "rgba(0,0,0,0.18)",
     },
-
     videoFallback: {
         flex: 1,
         justifyContent: "center",

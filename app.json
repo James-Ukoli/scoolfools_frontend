@@ -2,15 +2,15 @@
   "expo": {
     "name": "Just Move",
     "slug": "frontend",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-        "buildNumber": "2",
-        "usesAppleSignIn": true,
+      "buildNumber": "1",
+      "usesAppleSignIn": true,
       "supportsTablet": false,
       "bundleIdentifier": "com.justmovechess.app",
       "infoPlist": {
@@ -18,13 +18,13 @@
       }
     },
     "android": {
-       "versionCode": 3,
+      "versionCode": 3,
       "adaptiveIcon": {
-    "foregroundImage": "./assets/images/iconandroid.png",
-    "backgroundColor": "#000000"
-  },
+        "foregroundImage": "./assets/images/iconandroid.png",
+        "backgroundColor": "#000000"
+      },
       "package": "com.justmove.app",
-          "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -35,14 +35,13 @@
     "plugins": [
       "expo-router",
       "expo-notifications",
-        "expo-apple-authentication",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-      
-  "resizeMode": "cover",
-    "backgroundColor": "#000000",
+          "resizeMode": "cover",
+          "backgroundColor": "#000000",
           "dark": {
             "backgroundColor": "#000000"
           }
@@ -53,7 +52,8 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.226445408215-38u7tbvl7dgtc9k01rp7f6bp6pqkcfb9"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
