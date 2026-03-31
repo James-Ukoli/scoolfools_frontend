@@ -9,7 +9,9 @@ import {
     Image,
     ActivityIndicator,
     RefreshControl,
-    Platform
+    Platform,
+    NativeSyntheticEvent,
+    NativeScrollEvent,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
@@ -43,6 +45,9 @@ const BLOG_CATEGORIES = [
     "Community",
     "Education",
 ];
+
+const INITIAL_VISIBLE_STORIES = 6;
+const LOAD_MORE_COUNT = 6;
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -103,6 +108,8 @@ export default function BlogsScreen({ navigation }: any) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [visibleStoriesCount, setVisibleStoriesCount] = useState(INITIAL_VISIBLE_STORIES);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     const fetchBlogPosts = useCallback(async () => {
         try {
@@ -129,11 +136,16 @@ export default function BlogsScreen({ navigation }: any) {
         fetchBlogPosts();
     }, [fetchBlogPosts]);
 
+    useEffect(() => {
+        setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
+    }, [selectedCategory]);
+
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
 
         try {
             await fetchBlogPosts();
+            setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
             await new Promise((resolve) => setTimeout(resolve, 700));
         } finally {
             setRefreshing(false);
@@ -147,10 +159,39 @@ export default function BlogsScreen({ navigation }: any) {
 
     const featuredPost = filteredPosts[0];
     const topStories = filteredPosts.slice(1);
+    const visibleTopStories = topStories.slice(0, visibleStoriesCount);
+    const hasMoreStories = visibleStoriesCount < topStories.length;
 
     const handleOpenPost = (post: Post) => {
         navigation.navigate("ArticleScreen", { slug: post.slug });
     };
+
+    const loadMoreStories = useCallback(async () => {
+        if (loadingMore || !hasMoreStories) return;
+
+        setLoadingMore(true);
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        setVisibleStoriesCount((prev) => prev + LOAD_MORE_COUNT);
+        setLoadingMore(false);
+    }, [loadingMore, hasMoreStories]);
+
+    const handleScroll = useCallback(
+        (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+            const paddingToBottom = 220;
+
+            const isNearBottom =
+                layoutMeasurement.height + contentOffset.y >=
+                contentSize.height - paddingToBottom;
+
+            if (isNearBottom && hasMoreStories && !loadingMore) {
+                loadMoreStories();
+            }
+        },
+        [hasMoreStories, loadingMore, loadMoreStories]
+    );
 
     if (loading) {
         return (
@@ -177,6 +218,8 @@ export default function BlogsScreen({ navigation }: any) {
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
@@ -262,7 +305,7 @@ export default function BlogsScreen({ navigation }: any) {
                             <Text style={styles.sectionTitle}>Latest Blogs</Text>
                         )}
 
-                        {topStories.map((post) => (
+                        {visibleTopStories.map((post) => (
                             <TouchableOpacity
                                 key={post._id}
                                 style={styles.storyRow}
@@ -302,6 +345,21 @@ export default function BlogsScreen({ navigation }: any) {
                                 </View>
                             </TouchableOpacity>
                         ))}
+
+                        {loadingMore && (
+                            <View style={styles.loadMoreWrap}>
+                                <ActivityIndicator size="small" color="#39C0ED" />
+                                <Text style={styles.loadMoreText}>Loading more blogs...</Text>
+                            </View>
+                        )}
+
+                        {!loadingMore && hasMoreStories && (
+                            <View style={styles.loadMoreHintWrap}>
+                                <Text style={styles.loadMoreHintText}>
+                                    Scroll for more blogs
+                                </Text>
+                            </View>
+                        )}
                     </>
                 ) : (
                     <View style={styles.emptyState}>
@@ -497,6 +555,27 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
         fontSize: 10,
         fontWeight: "900",
+    },
+    loadMoreWrap: {
+        paddingVertical: 18,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    loadMoreText: {
+        color: "#AFC7D6",
+        fontSize: 13,
+        fontWeight: "700",
+        marginTop: 8,
+    },
+    loadMoreHintWrap: {
+        paddingTop: 6,
+        paddingBottom: 10,
+        alignItems: "center",
+    },
+    loadMoreHintText: {
+        color: "#7E96A5",
+        fontSize: 12,
+        fontWeight: "700",
     },
     emptyState: {
         paddingVertical: 60,

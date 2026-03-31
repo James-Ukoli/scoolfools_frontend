@@ -8,13 +8,13 @@ import {
     ActivityIndicator,
     RefreshControl,
     Platform,
-    Linking,
     Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import * as WebBrowser from "expo-web-browser";
 import AppHeader from "../components/AppHeader";
 
 type RawAlertItem = {
@@ -117,7 +117,13 @@ function getTopicConfig(topicRaw?: string) {
             color: "#FFD84D",
             bg: "#231C08",
             border: "#5B4814",
-            icon: <MaterialCommunityIcons name="podium-gold" size={18} color="#FFD84D" />,
+            icon: (
+                <MaterialCommunityIcons
+                    name="podium-gold"
+                    size={18}
+                    color="#FFD84D"
+                />
+            ),
         };
     }
 
@@ -148,6 +154,28 @@ function getTopicConfig(topicRaw?: string) {
         border: "#5E2C11",
         icon: <Ionicons name="megaphone-outline" size={18} color="#FF8A3D" />,
     };
+}
+
+function normalizeUrl(rawUrl: string) {
+    const trimmed = rawUrl.trim();
+
+    if (!trimmed) return "";
+
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+
+    if (
+        trimmed.includes("youtube.com/") ||
+        trimmed.includes("youtu.be/") ||
+        trimmed.includes("www.youtube.com/") ||
+        trimmed.includes("m.youtube.com/") ||
+        trimmed.startsWith("www.")
+    ) {
+        return `https://${trimmed}`;
+    }
+
+    return trimmed;
 }
 
 export default function AlertsScreen() {
@@ -206,14 +234,16 @@ export default function AlertsScreen() {
         if (!destination) return;
 
         try {
-            const supported = await Linking.canOpenURL(destination);
+            const normalizedDestination = normalizeUrl(destination);
 
-            if (!supported) {
-                Alert.alert("Link unavailable", "This alert link could not be opened.");
+            if (!normalizedDestination) {
+                Alert.alert("Link unavailable", "This alert link is empty.");
                 return;
             }
 
-            await Linking.openURL(destination);
+            console.log("Opening alert URL:", normalizedDestination);
+
+            await WebBrowser.openBrowserAsync(normalizedDestination);
         } catch (error) {
             console.log("Open alert link error:", error);
             Alert.alert("Error", "Failed to open alert link.");

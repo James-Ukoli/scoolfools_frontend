@@ -16,7 +16,6 @@ export default function AppHeader() {
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <View style={styles.container}>
-                {/* LEFT MENU */}
                 <TouchableOpacity
                     style={styles.iconButton}
                     activeOpacity={0.8}
@@ -25,16 +24,20 @@ export default function AppHeader() {
                     <Feather name="menu" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
 
-                {/* LOGO */}
                 <View style={styles.logoWrapper}>
-                    <Image
-                        source={require("../../assets/images/justmove_stretchlogo.png")}
-                        style={styles.logo}
-                        resizeMode="contain"
-                    />
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => navigation.navigate("Home")}
+                        style={styles.logoPressable}
+                    >
+                        <Image
+                            source={require("../../assets/images/justmove_stretchlogo.png")}
+                            style={styles.logo}
+                            resizeMode="contain"
+                        />
+                    </TouchableOpacity>
                 </View>
 
-                {/* RIGHT SIDE */}
                 <View style={styles.rightIcons}>
                     <TouchableOpacity
                         style={styles.iconButton}
@@ -44,7 +47,6 @@ export default function AppHeader() {
                         <Feather name="search" size={20} color="#FFFFFF" />
                     </TouchableOpacity>
 
-                    {/* 🔔 BELL */}
                     <TouchableOpacity
                         style={[
                             styles.iconButton,
@@ -59,10 +61,10 @@ export default function AppHeader() {
                             size={20}
                             color={
                                 isBothEnabled
-                                    ? "#39FF14" // neon green (both ON)
+                                    ? "#39FF14"
                                     : isOneEnabled
-                                        ? "#4DA3FF" // blue (one ON)
-                                        : "#FFFFFF" // none
+                                        ? "#4DA3FF"
+                                        : "#FFFFFF"
                             }
                         />
                     </TouchableOpacity>
@@ -107,7 +109,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 6,
         shadowOffset: { width: 0, height: 0 },
-        elevation: 6, // Android glow
+        elevation: 6,
     },
     logoWrapper: {
         flex: 1,
@@ -115,10 +117,14 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingHorizontal: 10,
     },
+    logoPressable: {
+        alignItems: "center",
+        justifyContent: "center",
+    },
     logo: {
         width: 250,
         height: 100,
-        marginTop: 80,
+        marginTop: 30,
     },
     rightIcons: {
         flexDirection: "row",

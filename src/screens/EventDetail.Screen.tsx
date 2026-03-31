@@ -1,17 +1,18 @@
 import React from "react";
 import {
     Image,
-    Linking,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
-    Platform
+    Platform,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 
 type Broadcaster = {
     name: string;
@@ -102,21 +103,49 @@ function formatDateTime(dateString?: string) {
     });
 }
 
+function normalizeUrl(rawUrl: string) {
+    const trimmed = rawUrl.trim();
+
+    if (!trimmed) return "";
+
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+
+    if (
+        trimmed.includes("youtube.com/") ||
+        trimmed.includes("youtu.be/") ||
+        trimmed.includes("www.youtube.com/") ||
+        trimmed.includes("m.youtube.com/") ||
+        trimmed.startsWith("www.")
+    ) {
+        return `https://${trimmed}`;
+    }
+
+    return trimmed;
+}
+
 export default function EventDetailScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const event: EventItem = route.params?.event;
 
-    const openLink = async (url?: string) => {
-        if (!url) return;
+    const openLink = async (rawUrl?: string) => {
+        if (!rawUrl) return;
 
         try {
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
+            const url = normalizeUrl(rawUrl);
+
+            if (!url) {
+                Alert.alert("Invalid link", "This link is empty.");
+                return;
             }
+
+            console.log("Opening event URL:", url);
+            await WebBrowser.openBrowserAsync(url);
         } catch (error) {
-            console.log("Failed to open URL:", url);
+            console.log("Failed to open URL:", rawUrl, error);
+            Alert.alert("Error", "Could not open link.");
         }
     };
 
@@ -267,7 +296,11 @@ export default function EventDetailScreen() {
                                 style={styles.linkCard}
                                 onPress={() => openLink(platform.url)}
                             >
-                                <Ionicons name="game-controller-outline" size={18} color="#2EE7FF" />
+                                <Ionicons
+                                    name="game-controller-outline"
+                                    size={18}
+                                    color="#2EE7FF"
+                                />
                                 <View style={styles.linkContent}>
                                     <Text style={styles.linkTitle}>{platform.name}</Text>
                                     {!!platform.notes && (
