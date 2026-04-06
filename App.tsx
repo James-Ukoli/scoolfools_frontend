@@ -15,7 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, ActivityIndicator } from "react-native";
 import ContactUsScreen from "./src/screens/ContactUsScreen";
 import EventsScreen from "./src/screens/EventsScreen";
-
+import ReviewerLoginScreen from "./src/screens/ReviewerLoginScreen";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -101,6 +101,7 @@ export default function App() {
                         component={MenuScreen}
                         options={{ headerShown: false }}
                     />
+                    <Stack.Screen name="ReviewerLogin" component={ReviewerLoginScreen} />
                     <Stack.Screen
                         name="Notifications"
                         component={NotificationsScreen}

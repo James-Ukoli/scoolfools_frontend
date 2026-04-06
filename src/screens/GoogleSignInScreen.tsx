@@ -212,6 +212,16 @@ export default function GoogleSignInScreen({ navigation }: any) {
                             </>
                         )}
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.reviewerLinkButton}
+                        onPress={() => navigation.navigate("ReviewerLogin")}
+                        disabled={loadingProvider !== null}
+                    >
+                        <Text style={styles.reviewerLinkText}>
+                            Reviewer Login
+                        </Text>
+                    </TouchableOpacity>
                 </View>
             </View>
         </SafeAreaView>
@@ -299,5 +309,15 @@ const styles = StyleSheet.create({
         color: "#000",
         fontSize: 16,
         fontWeight: "700",
+    },
+    reviewerLinkButton: {
+        marginTop: 14,
+        alignSelf: "center",
+    },
+    reviewerLinkText: {
+        color: "#8EA0BF",
+        fontSize: 13,
+        textDecorationLine: "underline",
+        fontWeight: "600",
     },
 });
