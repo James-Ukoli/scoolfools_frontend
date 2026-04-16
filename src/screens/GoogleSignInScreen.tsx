@@ -218,9 +218,9 @@ export default function GoogleSignInScreen({ navigation }: any) {
                         onPress={() => navigation.navigate("ReviewerLogin")}
                         disabled={loadingProvider !== null}
                     >
-                        <Text style={styles.reviewerLinkText}>
+                        {/* <Text style={styles.reviewerLinkText}>
                             Reviewer Login
-                        </Text>
+                        </Text> */}
                     </TouchableOpacity>
                 </View>
             </View>

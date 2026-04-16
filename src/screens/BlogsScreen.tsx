@@ -231,7 +231,7 @@ export default function BlogsScreen({ navigation }: any) {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Blogs</Text>
+                    <Text style={styles.headerTitle}>Blogs ✍️</Text>
                 </View>
 
                 <ScrollView
@@ -403,9 +403,18 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     headerTitle: {
-        color: "#FFFFFF",
+        color: "#39C0ED",
         fontSize: 28,
         fontWeight: "900",
+        textAlign: "center",
+
+        letterSpacing: 2,
+        textTransform: "uppercase",
+        paddingHorizontal: 16, // prevents edge crowding
+
+        textShadowColor: "#39C0ED",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 16,
     },
     tabsContainer: {
         paddingBottom: 14,
@@ -448,7 +457,7 @@ const styles = StyleSheet.create({
         elevation: 6,
     },
     featuredImage: {
-        borderRadius: 24,
+        borderRadius: 0,
     },
     featuredImageArea: {
         height: 182,

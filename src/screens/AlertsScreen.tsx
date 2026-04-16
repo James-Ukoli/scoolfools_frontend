@@ -286,7 +286,7 @@ export default function AlertsScreen() {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Alerts</Text>
+                    <Text style={styles.headerTitle}> 🚨 Alerts 📢 🚨</Text>
                 </View>
 
                 {alerts.length === 0 ? (
@@ -404,9 +404,18 @@ const styles = StyleSheet.create({
         paddingBottom: 10,
     },
     headerTitle: {
-        color: "#FFFFFF",
-        fontSize: 28,
+        color: "#ffffff",
+        fontSize: 24,
         fontWeight: "900",
+        textAlign: "center",
+
+        letterSpacing: 2,
+        textTransform: "uppercase",
+        paddingHorizontal: 16, // prevents edge crowding
+
+        textShadowColor: "#ff0000",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 16,
     },
     alertCard: {
         backgroundColor: "#141414",

@@ -586,11 +586,11 @@ export default function PowerRankingsScreen() {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Power Rankings</Text>
+                    <Text style={styles.headerTitle}>Power Rankings 🥇 </Text>
                 </View>
 
                 <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{monthlyTitle}</Text>
+                    {/* <Text style={styles.sectionTitle}>{monthlyTitle}</Text> */}
 
                     <View style={styles.topControlRow}>
                         <View style={styles.divisionCompact}>
@@ -653,7 +653,7 @@ export default function PowerRankingsScreen() {
                 </View>
 
                 <View style={styles.sectionBlock}>
-                    <Text style={styles.sectionTitle}>{quarterlyTitle}</Text>
+                    {/* <Text style={styles.sectionTitle}>{quarterlyTitle}</Text> */}
 
                     <View style={styles.topControlRowQuarterly}>
                         <View style={styles.categoryCompact}>
@@ -746,10 +746,21 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     headerTitle: {
-        color: "#FFFFFF",
-        fontSize: 22,
+        color: "#ff00b7",
+        fontSize: 25,
         fontWeight: "900",
         textAlign: "center",
+
+        letterSpacing: 2,
+        textTransform: "uppercase",
+
+        marginTop: 12,   // space from logo/nav
+        marginBottom: 10, // space before filters
+        paddingHorizontal: 16, // prevents edge crowding
+
+        textShadowColor: "#ff00b7",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 16,
     },
     sectionBlock: {
         marginBottom: 12,

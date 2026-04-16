@@ -231,7 +231,7 @@ export default function TrendingScreen({ navigation }: any) {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Trending</Text>
+                    <Text style={styles.headerTitle}>Trending 🔥</Text>
                 </View>
 
                 <ScrollView
@@ -403,9 +403,16 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     headerTitle: {
-        color: "#FFFFFF",
-        fontSize: 28,
+        color: "#A3E635",
+        textShadowColor: "#A3E635",
+        fontSize: 32,
         fontWeight: "900",
+        textAlign: "center",
+        letterSpacing: 2,
+        textTransform: "uppercase",
+        paddingHorizontal: 16, // prevents edge crowding
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 16,
     },
     tabsContainer: {
         paddingBottom: 14,
@@ -448,7 +455,7 @@ const styles = StyleSheet.create({
         elevation: 6,
     },
     featuredImage: {
-        borderRadius: 24,
+        borderRadius: 0,
     },
     featuredImageArea: {
         height: 182,
