@@ -1,27 +1,60 @@
+import React, { useEffect, useState } from "react";
 import { Image, StyleSheet, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
 import { useNotifications } from "../context/NotificationsContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function AppHeader() {
     const navigation = useNavigation<any>();
-
     const { featuredEnabled, alertsEnabled } = useNotifications();
+
+    const [user, setUser] = useState<any>(null);
+
+    useEffect(() => {
+        const loadUser = async () => {
+            try {
+                const storedUser = await AsyncStorage.getItem("user");
+
+                if (storedUser) {
+                    setUser(JSON.parse(storedUser));
+                }
+            } catch (error) {
+                console.log("Error loading user:", error);
+            }
+        };
+
+        loadUser();
+    }, []);
 
     const isOneEnabled = featuredEnabled || alertsEnabled;
     const isBothEnabled = featuredEnabled && alertsEnabled;
+
+    const avatarUri = user?.photo || user?.photoURL || user?.avatar || null;
+    const isLoggedIn = !!avatarUri;
 
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <View style={styles.container}>
                 <TouchableOpacity
-                    style={styles.iconButton}
+                    style={[
+                        styles.avatarButton,
+                        isLoggedIn && styles.avatarButtonActive,
+                    ]}
                     activeOpacity={0.8}
                     onPress={() => navigation.navigate("Menu")}
                 >
-                    <Feather name="menu" size={24} color="#FFFFFF" />
+                    {avatarUri ? (
+                        <Image
+                            source={{ uri: avatarUri }}
+                            style={styles.avatar}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <Feather name="user" size={18} color="#FFFFFF" />
+                    )}
                 </TouchableOpacity>
 
                 <View style={styles.logoWrapper}>
@@ -87,6 +120,29 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         borderBottomWidth: 1,
         borderBottomColor: "#12203A",
+    },
+    avatarButton: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#0B1224",
+        borderWidth: 1,
+        borderColor: "#1B2A4A",
+        overflow: "hidden",
+    },
+    avatarButtonActive: {
+        borderColor: "#3CF2FF",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.35,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 5,
+    },
+    avatar: {
+        width: "100%",
+        height: "100%",
     },
     iconButton: {
         width: 30,

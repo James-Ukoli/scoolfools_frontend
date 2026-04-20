@@ -22,7 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { s, vs, ms } from "react-native-size-matters";
 import * as WebBrowser from "expo-web-browser";
-import * as Speech from "expo-speech";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 
 type PostBlock = {
     _id: string;
@@ -77,7 +77,11 @@ export default function ArticleScreen() {
     const [blocks, setBlocks] = useState<PostBlock[]>([]);
     const [loading, setLoading] = useState(true);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
-    const [isSpeaking, setIsSpeaking] = useState(false);
+    const [isGeneratingNarration, setIsGeneratingNarration] = useState(false);
+    const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
+
+    const player = useAudioPlayer(null);
+    const playerStatus = useAudioPlayerStatus(player);
 
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const rippleAnim1 = useRef(new Animated.Value(0)).current;
@@ -95,8 +99,6 @@ export default function ArticleScreen() {
 
                 const postResponse = await fetch(`${API_BASE_URL}/api/posts/slug/${slug}`);
                 const postJson = await postResponse.json();
-
-                console.log("POST JSON RESPONSE:", postJson);
 
                 const fetchedPost: Post = postJson;
                 const fetchedBlocks: PostBlock[] = (postJson.blocks || []).sort(
@@ -138,14 +140,10 @@ export default function ArticleScreen() {
             .map((block) => block.input?.trim())
             .filter(Boolean);
 
-        return [
-            post.title?.trim(),
-            post.summary?.trim(),
-            ...readableBlocks,
-        ]
-            .filter(Boolean)
-            .join(". ");
+        return readableBlocks.join(". ");
     }, [post, blocks]);
+
+    const isPlaying = !!playerStatus?.playing;
 
     const handleShare = async () => {
         if (!post) return;
@@ -193,8 +191,6 @@ export default function ArticleScreen() {
                 Alert.alert("Invalid link", "This link is empty.");
                 return;
             }
-
-            console.log("Opening URL:", url);
 
             await WebBrowser.openBrowserAsync(url);
         } catch (error) {
@@ -304,61 +300,81 @@ export default function ArticleScreen() {
         }, 450);
     };
 
-    const stopSpeech = () => {
-        Speech.stop();
-        setIsSpeaking(false);
-        stopSpeakingAnimation();
-    };
-
-    const handleToggleSpeech = async () => {
-        if (!articleSpeechText.trim()) {
-            Alert.alert("No text available", "There is no article text to read.");
-            return;
+    useEffect(() => {
+        if (isPlaying) {
+            startSpeakingAnimation();
+        } else {
+            stopSpeakingAnimation();
         }
-
-        const currentlySpeaking = await Speech.isSpeakingAsync();
-
-        if (currentlySpeaking || isSpeaking) {
-            stopSpeech();
-            return;
-        }
-
-        setIsSpeaking(true);
-        startSpeakingAnimation();
-
-        Speech.speak(articleSpeechText, {
-            language: "en-US",
-            pitch: 1.0,
-            rate: 0.95,
-            onDone: () => {
-                setIsSpeaking(false);
-                stopSpeakingAnimation();
-            },
-            onStopped: () => {
-                setIsSpeaking(false);
-                stopSpeakingAnimation();
-            },
-            onError: (error) => {
-                console.log("Speech error:", error);
-                setIsSpeaking(false);
-                stopSpeakingAnimation();
-                Alert.alert("Audio error", "Unable to play text to speech.");
-            },
-        });
-    };
+    }, [isPlaying]);
 
     useEffect(() => {
         return () => {
-            Speech.stop();
+            try {
+                if (player && typeof player.pause === "function") {
+                    player.pause();
+                }
+            } catch (error) {
+                console.log("Player cleanup pause skipped:", error);
+            }
+
             stopSpeakingAnimation();
         };
-    }, []);
+    }, [player]);
 
     useEffect(() => {
-        Speech.stop();
-        setIsSpeaking(false);
+        player.pause();
+        setCurrentAudioUrl(null);
         stopSpeakingAnimation();
     }, [slug]);
+
+    const handleToggleNarration = async () => {
+        if (!post) return;
+
+        if (isPlaying) {
+            player.pause();
+            return;
+        }
+
+        try {
+            if (currentAudioUrl) {
+                player.play();
+                return;
+            }
+
+            setIsGeneratingNarration(true);
+
+            const response = await fetch(`${API_BASE_URL}/api/article-narration`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    slug: post.slug,
+                    title: post.title,
+                    summary: post.summary,
+                    text: articleSpeechText,
+                }),
+            });
+
+            const json = await response.json();
+
+            if (!response.ok || !json.audioUrl) {
+                throw new Error(json?.error || "Narration generation failed.");
+            }
+
+            const fullAudioUrl = `${API_BASE_URL}${json.audioUrl}`;
+            setCurrentAudioUrl(fullAudioUrl);
+
+            player.replace(fullAudioUrl);
+            player.play();
+        } catch (error) {
+            console.log("Narration error:", error);
+            Alert.alert("Error", "Could not generate article narration.");
+        } finally {
+            setIsGeneratingNarration(false);
+        }
+    };
 
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
@@ -532,9 +548,6 @@ export default function ArticleScreen() {
                     <Image
                         source={{ uri: post.cover_image_url }}
                         style={styles.heroImage}
-                        onError={() =>
-                            console.log("Hero image failed:", post.cover_image_url)
-                        }
                     />
                 )}
 
@@ -548,6 +561,10 @@ export default function ArticleScreen() {
                             {post.author || "Just Move"} · {displayDate}
                         </Text>
                     </View>
+
+                    <Text style={styles.aiDisclosure}>
+                        AI audio narration available
+                    </Text>
                 </View>
 
                 <View style={styles.articleBody}>{blocks.map(renderBlock)}</View>
@@ -586,7 +603,7 @@ export default function ArticleScreen() {
                     },
                 ]}
             >
-                {isSpeaking && (
+                {isPlaying && (
                     <>
                         <Animated.View
                             pointerEvents="none"
@@ -632,18 +649,22 @@ export default function ArticleScreen() {
                 )}
 
                 <Pressable
-                    onPress={handleToggleSpeech}
+                    onPress={handleToggleNarration}
                     style={({ pressed }) => [
                         styles.ttsButton,
-                        isSpeaking && styles.ttsButtonActive,
+                        (isPlaying || isGeneratingNarration) && styles.ttsButtonActive,
                         pressed && styles.ttsButtonPressed,
                     ]}
                 >
-                    <Ionicons
-                        name={isSpeaking ? "volume-high" : "volume-medium"}
-                        size={24}
-                        color="#FFFFFF"
-                    />
+                    {isGeneratingNarration ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                        <Ionicons
+                            name={isPlaying ? "volume-high" : "volume-medium"}
+                            size={24}
+                            color="#FFFFFF"
+                        />
+                    )}
                 </Pressable>
             </Animated.View>
         </SafeAreaView>
@@ -764,6 +785,15 @@ const styles = StyleSheet.create({
         color: "#7E8AA3",
         fontSize: ms(12),
         fontWeight: "600",
+    },
+    aiDisclosure: {
+        color: "#6FB8FF",
+        fontSize: ms(11),
+        fontWeight: "700",
+        marginTop: vs(2),
+        marginBottom: vs(2),
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
     },
     articleBody: {
         paddingHorizontal: s(16),
