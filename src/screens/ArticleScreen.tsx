@@ -1,16 +1,17 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Animated,
+    Easing,
     Image,
-    Linking,
+    Platform,
     Pressable,
     ScrollView,
     Share,
     StyleSheet,
     Text,
     View,
-    Platform,
 } from "react-native";
 import {
     RouteProp,
@@ -21,6 +22,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { s, vs, ms } from "react-native-size-matters";
 import * as WebBrowser from "expo-web-browser";
+import * as Speech from "expo-speech";
 
 type PostBlock = {
     _id: string;
@@ -75,6 +77,16 @@ export default function ArticleScreen() {
     const [blocks, setBlocks] = useState<PostBlock[]>([]);
     const [loading, setLoading] = useState(true);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [isSpeaking, setIsSpeaking] = useState(false);
+
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+    const rippleAnim1 = useRef(new Animated.Value(0)).current;
+    const rippleAnim2 = useRef(new Animated.Value(0)).current;
+
+    const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+    const rippleLoop1Ref = useRef<Animated.CompositeAnimation | null>(null);
+    const rippleLoop2Ref = useRef<Animated.CompositeAnimation | null>(null);
+    const rippleDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const fetchArticle = async () => {
@@ -113,6 +125,27 @@ export default function ArticleScreen() {
             year: "numeric",
         });
     }, [post]);
+
+    const articleSpeechText = useMemo(() => {
+        if (!post) return "";
+
+        const readableBlocks = blocks
+            .filter((block) =>
+                ["header", "subheader", "paragraph", "caption", "quote"].includes(
+                    block.block_type
+                )
+            )
+            .map((block) => block.input?.trim())
+            .filter(Boolean);
+
+        return [
+            post.title?.trim(),
+            post.summary?.trim(),
+            ...readableBlocks,
+        ]
+            .filter(Boolean)
+            .join(". ");
+    }, [post, blocks]);
 
     const handleShare = async () => {
         if (!post) return;
@@ -191,6 +224,141 @@ export default function ArticleScreen() {
             return null;
         }
     };
+
+    const stopSpeakingAnimation = () => {
+        pulseLoopRef.current?.stop();
+        rippleLoop1Ref.current?.stop();
+        rippleLoop2Ref.current?.stop();
+
+        if (rippleDelayTimeoutRef.current) {
+            clearTimeout(rippleDelayTimeoutRef.current);
+            rippleDelayTimeoutRef.current = null;
+        }
+
+        pulseAnim.stopAnimation();
+        rippleAnim1.stopAnimation();
+        rippleAnim2.stopAnimation();
+
+        pulseAnim.setValue(1);
+        rippleAnim1.setValue(0);
+        rippleAnim2.setValue(0);
+    };
+
+    const startSpeakingAnimation = () => {
+        stopSpeakingAnimation();
+
+        pulseLoopRef.current = Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.08,
+                    duration: 700,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1,
+                    duration: 700,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        rippleLoop1Ref.current = Animated.loop(
+            Animated.sequence([
+                Animated.timing(rippleAnim1, {
+                    toValue: 1,
+                    duration: 1600,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(rippleAnim1, {
+                    toValue: 0,
+                    duration: 0,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        rippleLoop2Ref.current = Animated.loop(
+            Animated.sequence([
+                Animated.timing(rippleAnim2, {
+                    toValue: 1,
+                    duration: 1600,
+                    easing: Easing.out(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(rippleAnim2, {
+                    toValue: 0,
+                    duration: 0,
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        pulseLoopRef.current.start();
+        rippleLoop1Ref.current.start();
+
+        rippleDelayTimeoutRef.current = setTimeout(() => {
+            rippleLoop2Ref.current?.start();
+        }, 450);
+    };
+
+    const stopSpeech = () => {
+        Speech.stop();
+        setIsSpeaking(false);
+        stopSpeakingAnimation();
+    };
+
+    const handleToggleSpeech = async () => {
+        if (!articleSpeechText.trim()) {
+            Alert.alert("No text available", "There is no article text to read.");
+            return;
+        }
+
+        const currentlySpeaking = await Speech.isSpeakingAsync();
+
+        if (currentlySpeaking || isSpeaking) {
+            stopSpeech();
+            return;
+        }
+
+        setIsSpeaking(true);
+        startSpeakingAnimation();
+
+        Speech.speak(articleSpeechText, {
+            language: "en-US",
+            pitch: 1.0,
+            rate: 0.95,
+            onDone: () => {
+                setIsSpeaking(false);
+                stopSpeakingAnimation();
+            },
+            onStopped: () => {
+                setIsSpeaking(false);
+                stopSpeakingAnimation();
+            },
+            onError: (error) => {
+                console.log("Speech error:", error);
+                setIsSpeaking(false);
+                stopSpeakingAnimation();
+                Alert.alert("Audio error", "Unable to play text to speech.");
+            },
+        });
+    };
+
+    useEffect(() => {
+        return () => {
+            Speech.stop();
+            stopSpeakingAnimation();
+        };
+    }, []);
+
+    useEffect(() => {
+        Speech.stop();
+        setIsSpeaking(false);
+        stopSpeakingAnimation();
+    }, [slug]);
 
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
@@ -409,6 +577,75 @@ export default function ArticleScreen() {
                     </ScrollView>
                 </View>
             )}
+
+            <Animated.View
+                style={[
+                    styles.ttsButtonWrapper,
+                    {
+                        transform: [{ scale: pulseAnim }],
+                    },
+                ]}
+            >
+                {isSpeaking && (
+                    <>
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[
+                                styles.ttsRipple,
+                                {
+                                    opacity: rippleAnim1.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [0.35, 0],
+                                    }),
+                                    transform: [
+                                        {
+                                            scale: rippleAnim1.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [1, 1.9],
+                                            }),
+                                        },
+                                    ],
+                                },
+                            ]}
+                        />
+                        <Animated.View
+                            pointerEvents="none"
+                            style={[
+                                styles.ttsRipple,
+                                {
+                                    opacity: rippleAnim2.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [0.24, 0],
+                                    }),
+                                    transform: [
+                                        {
+                                            scale: rippleAnim2.interpolate({
+                                                inputRange: [0, 1],
+                                                outputRange: [1, 2.15],
+                                            }),
+                                        },
+                                    ],
+                                },
+                            ]}
+                        />
+                    </>
+                )}
+
+                <Pressable
+                    onPress={handleToggleSpeech}
+                    style={({ pressed }) => [
+                        styles.ttsButton,
+                        isSpeaking && styles.ttsButtonActive,
+                        pressed && styles.ttsButtonPressed,
+                    ]}
+                >
+                    <Ionicons
+                        name={isSpeaking ? "volume-high" : "volume-medium"}
+                        size={24}
+                        color="#FFFFFF"
+                    />
+                </Pressable>
+            </Animated.View>
         </SafeAreaView>
     );
 }
@@ -423,7 +660,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#050816",
     },
     contentContainer: {
-        paddingBottom: vs(40),
+        paddingBottom: vs(120),
     },
     loadingContainer: {
         flex: 1,
@@ -683,5 +920,44 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: "#11192C",
+    },
+    ttsButtonWrapper: {
+        position: "absolute",
+        right: s(20),
+        bottom: vs(24),
+        width: s(64),
+        height: s(64),
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+    },
+    ttsButton: {
+        width: s(60),
+        height: s(60),
+        borderRadius: s(30),
+        backgroundColor: "#14233F",
+        borderWidth: 1.5,
+        borderColor: "#274E7A",
+        justifyContent: "center",
+        alignItems: "center",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 7,
+    },
+    ttsButtonActive: {
+        backgroundColor: "#17304F",
+        borderColor: "#3CF2FF",
+    },
+    ttsButtonPressed: {
+        opacity: 0.88,
+    },
+    ttsRipple: {
+        position: "absolute",
+        width: s(60),
+        height: s(60),
+        borderRadius: s(30),
+        backgroundColor: "#3CF2FF",
     },
 });
