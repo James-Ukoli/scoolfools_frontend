@@ -16,6 +16,13 @@ import { View, ActivityIndicator } from "react-native";
 import ContactUsScreen from "./src/screens/ContactUsScreen";
 import EventsScreen from "./src/screens/EventsScreen";
 import ReviewerLoginScreen from "./src/screens/ReviewerLoginScreen";
+import GameHomeScreen from "./src/screens/games/GameHomeScreen";
+import CharadesPlayScreen from "./src/screens/games/charades/CharadesPlayScreen";
+import CharadesSetupScreen from "./src/screens/games/charades/CharadesSetupScreen";
+import MostLikelyScreen from "./src/screens/games/mostlikely/MostLikelyScreen";
+import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScreen";
+import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
+import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -26,9 +33,6 @@ export default function App() {
             try {
                 const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
                 const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-
-                console.log("IOS CLIENT ID:", iosClientId);
-                console.log("WEB CLIENT ID:", webClientId);
 
                 if (iosClientId) {
                     GoogleSignin.configure({
@@ -111,6 +115,47 @@ export default function App() {
                     <Stack.Screen
                         name="EventsScreen"
                         component={EventsScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="GameHome"
+                        component={GameHomeScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="CharadesSetup"
+                        component={CharadesSetupScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="CharadesPlay"
+                        component={CharadesPlayScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="MostLikely"
+                        component={MostLikelyScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="ImpostorSetup"
+                        component={ImpostorSetupScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="ImpostorReveal"
+                        component={ImpostorRevealScreen}
+                        options={{ headerShown: false }}
+                    />
+
+                    <Stack.Screen
+                        name="JustMoveClock"
+                        component={JustMoveClockScreen}
                         options={{ headerShown: false }}
                     />
                 </Stack.Navigator>

@@ -58,7 +58,7 @@ export default function MenuScreen() {
     };
 
     const handlePartyGames = () => {
-        setPartyGamesVisible(true);
+        navigation.navigate("GameHome");
     };
 
     const handleContactUs = () => {

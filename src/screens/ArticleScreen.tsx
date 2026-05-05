@@ -310,20 +310,18 @@ export default function ArticleScreen() {
 
     useEffect(() => {
         return () => {
-            try {
-                if (player && typeof player.pause === "function") {
-                    player.pause();
-                }
-            } catch (error) {
-                console.log("Player cleanup pause skipped:", error);
-            }
-
             stopSpeakingAnimation();
         };
-    }, [player]);
-
+    }, []);
     useEffect(() => {
-        player.pause();
+        try {
+            if (playerStatus?.playing) {
+                player.pause();
+            }
+        } catch (error) {
+            console.log("Player slug cleanup pause skipped:", error);
+        }
+
         setCurrentAudioUrl(null);
         stopSpeakingAnimation();
     }, [slug]);
@@ -332,16 +330,15 @@ export default function ArticleScreen() {
         if (!post) return;
 
         if (isPlaying) {
-            player.pause();
+            try {
+                player.pause();
+            } catch (error) {
+                console.log("Pause failed:", error);
+            }
             return;
         }
 
         try {
-            if (currentAudioUrl) {
-                player.play();
-                return;
-            }
-
             setIsGeneratingNarration(true);
 
             const response = await fetch(`${API_BASE_URL}/api/article-narration`, {
@@ -363,19 +360,21 @@ export default function ArticleScreen() {
                 throw new Error(json?.error || "Narration generation failed.");
             }
 
-            const fullAudioUrl = `${API_BASE_URL}${json.audioUrl}`;
+            const fullAudioUrl = json.audioUrl.startsWith("http")
+                ? json.audioUrl
+                : `${API_BASE_URL}${json.audioUrl}`;
+
             setCurrentAudioUrl(fullAudioUrl);
 
             player.replace(fullAudioUrl);
             player.play();
         } catch (error) {
             console.log("Narration error:", error);
-            Alert.alert("Error", "Could not generate article narration.");
+            Alert.alert("Error", "Could not play article narration.");
         } finally {
             setIsGeneratingNarration(false);
         }
     };
-
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
             case "header":
