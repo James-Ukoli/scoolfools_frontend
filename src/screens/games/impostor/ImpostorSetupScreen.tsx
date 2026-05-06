@@ -1,5 +1,12 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import GameBackButton from "../../../components/GameBackButton";
@@ -7,25 +14,96 @@ import GameScreenWrapper from "../../../components/GameScreenWrapper";
 
 export default function ImpostorSetupScreen() {
     const navigation = useNavigation<any>();
-    const [players, setPlayers] = useState(4);
+
+    const [players, setPlayers] = useState(10);
     const [guessTimeSeconds, setGuessTimeSeconds] = useState(120);
+    const [votingTimeSeconds, setVotingTimeSeconds] = useState(30);
+
+    const popSoundRef = useRef<Audio.Sound | null>(null);
+    const startSoundRef = useRef<Audio.Sound | null>(null);
+
+    useEffect(() => {
+        loadSounds();
+
+        return () => {
+            unloadSounds();
+        };
+    }, []);
+
+    const loadSounds = async () => {
+        try {
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+            });
+
+            const pop = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/pop.mp3")
+            );
+
+            const start = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/amongus2.mp3")
+            );
+
+            popSoundRef.current = pop.sound;
+            startSoundRef.current = start.sound;
+        } catch (error) {
+            console.log("Impostor setup sound load error:", error);
+        }
+    };
+
+    const unloadSounds = async () => {
+        try {
+            await popSoundRef.current?.unloadAsync();
+            await startSoundRef.current?.unloadAsync();
+        } catch (error) {
+            console.log("Impostor setup sound unload error:", error);
+        }
+    };
+
+    const playSound = async (sound: Audio.Sound | null) => {
+        if (!sound) return;
+
+        try {
+            await sound.setPositionAsync(0);
+            await sound.playAsync();
+        } catch (error) {
+            console.log("Impostor setup sound play error:", error);
+        }
+    };
 
     const decreasePlayers = () => {
+        playSound(popSoundRef.current);
+
         if (players > 3) {
             setPlayers(players - 1);
         }
     };
 
     const increasePlayers = () => {
+        playSound(popSoundRef.current);
+
         if (players < 12) {
             setPlayers(players + 1);
         }
     };
 
-    const startGame = () => {
+    const selectGuessTime = (seconds: number) => {
+        playSound(popSoundRef.current);
+        setGuessTimeSeconds(seconds);
+    };
+
+    const selectVotingTime = (seconds: number) => {
+        playSound(popSoundRef.current);
+        setVotingTimeSeconds(seconds);
+    };
+
+    const startGame = async () => {
+        await playSound(startSoundRef.current);
+
         navigation.navigate("ImpostorReveal", {
             players,
             guessTimeSeconds,
+            votingTimeSeconds,
         });
     };
 
@@ -36,8 +114,13 @@ export default function ImpostorSetupScreen() {
                 <Text style={styles.screenTitle}>Impostor</Text>
             </View>
 
-            <View style={styles.center}>
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <Text style={styles.title}>Game Setup</Text>
+
                 <Text style={styles.subtitle}>
                     Everyone gets the same chess word except one hidden impostor.
                 </Text>
@@ -50,7 +133,7 @@ export default function ImpostorSetupScreen() {
                         activeOpacity={0.85}
                         onPress={decreasePlayers}
                     >
-                        <Ionicons name="remove" size={28} color="#FFFFFF" />
+                        <Ionicons name="remove" size={26} color="#FFFFFF" />
                     </TouchableOpacity>
 
                     <View style={styles.playerCountWrap}>
@@ -63,11 +146,11 @@ export default function ImpostorSetupScreen() {
                         activeOpacity={0.85}
                         onPress={increasePlayers}
                     >
-                        <Ionicons name="add" size={28} color="#FFFFFF" />
+                        <Ionicons name="add" size={26} color="#FFFFFF" />
                     </TouchableOpacity>
                 </View>
 
-                <Text style={styles.sectionTitle}>Guess Time</Text>
+                <Text style={styles.sectionTitle}>Discussion Time</Text>
 
                 <View style={styles.timeOptions}>
                     {[60, 120, 180, 300].map((seconds) => (
@@ -75,18 +158,47 @@ export default function ImpostorSetupScreen() {
                             key={seconds}
                             style={[
                                 styles.timeOption,
-                                guessTimeSeconds === seconds && styles.selectedTimeOption,
+                                guessTimeSeconds === seconds &&
+                                styles.selectedTimeOption,
                             ]}
                             activeOpacity={0.85}
-                            onPress={() => setGuessTimeSeconds(seconds)}
+                            onPress={() => selectGuessTime(seconds)}
                         >
                             <Text
                                 style={[
                                     styles.timeOptionText,
-                                    guessTimeSeconds === seconds && styles.selectedTimeOptionText,
+                                    guessTimeSeconds === seconds &&
+                                    styles.selectedTimeOptionText,
                                 ]}
                             >
                                 {seconds / 60} min
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+                <Text style={styles.sectionTitle}>Voting Time</Text>
+
+                <View style={styles.votingOptions}>
+                    {[30, 60].map((seconds) => (
+                        <TouchableOpacity
+                            key={seconds}
+                            style={[
+                                styles.timeOption,
+                                votingTimeSeconds === seconds &&
+                                styles.selectedVotingOption,
+                            ]}
+                            activeOpacity={0.85}
+                            onPress={() => selectVotingTime(seconds)}
+                        >
+                            <Text
+                                style={[
+                                    styles.timeOptionText,
+                                    votingTimeSeconds === seconds &&
+                                    styles.selectedTimeOptionText,
+                                ]}
+                            >
+                                {seconds === 30 ? "30 sec" : "1 min"}
                             </Text>
                         </TouchableOpacity>
                     ))}
@@ -98,9 +210,14 @@ export default function ImpostorSetupScreen() {
                     onPress={startGame}
                 >
                     <Text style={styles.startText}>Start Game</Text>
-                    <Ionicons name="arrow-forward" size={20} color="#000000" />
+
+                    <Ionicons
+                        name="arrow-forward"
+                        size={20}
+                        color="#000000"
+                    />
                 </TouchableOpacity>
-            </View>
+            </ScrollView>
         </GameScreenWrapper>
     );
 }
@@ -109,7 +226,7 @@ const styles = StyleSheet.create({
     topRow: {
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 14,
+        marginBottom: 6,
     },
     screenTitle: {
         color: "#FFFFFF",
@@ -117,46 +234,48 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         marginLeft: 14,
     },
-    center: {
+    scrollView: {
         flex: 1,
-        justifyContent: "center",
-        paddingBottom: 50,
+    },
+    scrollContent: {
+        paddingBottom: 30,
     },
     title: {
         color: "#FFFFFF",
-        fontSize: 30,
+        fontSize: 28,
         fontWeight: "900",
         textAlign: "center",
-        marginBottom: 10,
+        lineHeight: 30,
+        marginBottom: 8,
     },
     subtitle: {
         color: "#AAB2C0",
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 14,
+        lineHeight: 20,
         textAlign: "center",
-        marginBottom: 28,
+        marginBottom: 18,
     },
     sectionTitle: {
         color: "#FFFFFF",
-        fontSize: 18,
+        fontSize: 17,
         fontWeight: "900",
-        marginBottom: 12,
+        marginBottom: 10,
     },
     counterCard: {
         backgroundColor: "#050816",
-        borderRadius: 26,
+        borderRadius: 24,
         borderWidth: 1,
         borderColor: "#12203A",
-        padding: 22,
+        padding: 14,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 28,
+        marginBottom: 18,
     },
     counterButton: {
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         backgroundColor: "#0B1220",
         borderWidth: 1,
         borderColor: "#16233B",
@@ -168,26 +287,31 @@ const styles = StyleSheet.create({
     },
     playerCount: {
         color: "#FFFFFF",
-        fontSize: 54,
+        fontSize: 42,
         fontWeight: "900",
     },
     playerLabel: {
         color: "#7A8599",
         fontSize: 14,
         fontWeight: "700",
-        marginTop: -4,
+        marginTop: -2,
     },
     timeOptions: {
         flexDirection: "row",
         flexWrap: "wrap",
         gap: 10,
-        marginBottom: 28,
+        marginBottom: 18,
+    },
+    votingOptions: {
+        flexDirection: "row",
+        gap: 10,
+        marginBottom: 22,
     },
     timeOption: {
         flex: 1,
         minWidth: "45%",
-        height: 48,
-        borderRadius: 24,
+        height: 50,
+        borderRadius: 25,
         backgroundColor: "#050816",
         borderWidth: 1,
         borderColor: "#12203A",
@@ -198,6 +322,10 @@ const styles = StyleSheet.create({
         backgroundColor: "#3CF2FF",
         borderColor: "#3CF2FF",
     },
+    selectedVotingOption: {
+        backgroundColor: "#FFD166",
+        borderColor: "#FFD166",
+    },
     timeOptionText: {
         color: "#FFFFFF",
         fontSize: 15,
@@ -207,8 +335,8 @@ const styles = StyleSheet.create({
         color: "#000000",
     },
     startButton: {
-        height: 58,
-        borderRadius: 29,
+        height: 54,
+        borderRadius: 27,
         backgroundColor: "#3CF2FF",
         alignItems: "center",
         justifyContent: "center",
