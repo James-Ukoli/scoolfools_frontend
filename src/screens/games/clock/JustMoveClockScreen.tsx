@@ -1,5 +1,13 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    Animated,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
@@ -7,48 +15,231 @@ import { justMoveClockConfig } from "../../../../assets/data/justMoveClock";
 
 type Player = 1 | 2;
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 export default function JustMoveClockScreen() {
     const [activePlayer, setActivePlayer] = useState<Player>(1);
     const [timeLeft, setTimeLeft] = useState(0);
     const [running, setRunning] = useState(false);
     const [showJustMove, setShowJustMove] = useState(false);
+    const [winner, setWinner] = useState<Player | null>(null);
+    const [loser, setLoser] = useState<Player | null>(null);
+
+    const warningSoundRef = useRef<Audio.Sound | null>(null);
+    const tickingSoundRef = useRef<Audio.Sound | null>(null);
+    const clickSoundRef = useRef<Audio.Sound | null>(null);
+    const gameOverSoundRef = useRef<Audio.Sound | null>(null);
+    const pacmanSoundRef = useRef<Audio.Sound | null>(null);
+
+    const hasPlayedWarningRef = useRef(false);
+
+    const pulseAnim = useRef(new Animated.Value(0)).current;
+    const modalScale = useRef(new Animated.Value(0.85)).current;
+    const modalOpacity = useRef(new Animated.Value(0)).current;
 
     const getRandomSeconds = () => {
         const { minSeconds, maxSeconds } = justMoveClockConfig;
         return Math.floor(Math.random() * (maxSeconds - minSeconds + 1)) + minSeconds;
     };
 
+    useEffect(() => {
+        loadSounds();
+
+        return () => {
+            unloadSounds();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (running) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 750,
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 0,
+                        duration: 750,
+                        useNativeDriver: false,
+                    }),
+                ])
+            ).start();
+        } else {
+            pulseAnim.stopAnimation();
+            pulseAnim.setValue(0);
+        }
+    }, [running]);
+
+    useEffect(() => {
+        if (winner) {
+            modalScale.setValue(0.85);
+            modalOpacity.setValue(0);
+
+            Animated.parallel([
+                Animated.timing(modalOpacity, {
+                    toValue: 1,
+                    duration: 180,
+                    useNativeDriver: true,
+                }),
+                Animated.spring(modalScale, {
+                    toValue: 1,
+                    friction: 5,
+                    tension: 90,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [winner]);
+
+    const loadSounds = async () => {
+        try {
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+            });
+
+            const warning = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/techaliensound.mp3")
+            );
+
+            const ticking = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/clock-ticking-fast.mp3")
+            );
+
+            const click = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/scribblenauts-button-click.mp3")
+            );
+
+            const gameOver = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/gameover.mp3")
+            );
+
+            const pacman = await Audio.Sound.createAsync(
+                require("../../../../assets/sounds/pacman-die.mp3")
+            );
+
+            warningSoundRef.current = warning.sound;
+            tickingSoundRef.current = ticking.sound;
+            clickSoundRef.current = click.sound;
+            gameOverSoundRef.current = gameOver.sound;
+            pacmanSoundRef.current = pacman.sound;
+        } catch (e) {
+            console.log("Sound load error:", e);
+        }
+    };
+
+    const unloadSounds = async () => {
+        try {
+            await warningSoundRef.current?.unloadAsync();
+            await tickingSoundRef.current?.unloadAsync();
+            await clickSoundRef.current?.unloadAsync();
+            await gameOverSoundRef.current?.unloadAsync();
+            await pacmanSoundRef.current?.unloadAsync();
+        } catch (e) {
+            console.log("Sound unload error:", e);
+        }
+    };
+
+    const playSound = async (sound: Audio.Sound | null) => {
+        if (!sound) return;
+
+        try {
+            await sound.setPositionAsync(0);
+            await sound.playAsync();
+        } catch (e) {
+            console.log("Sound play error:", e);
+        }
+    };
+
+    const stopSound = async (sound: Audio.Sound | null) => {
+        if (!sound) return;
+
+        try {
+            await sound.stopAsync();
+            await sound.setPositionAsync(0);
+        } catch (e) {
+            console.log("Sound stop error:", e);
+        }
+    };
+
+    const playWarningSounds = async () => {
+        playSound(warningSoundRef.current);
+        playSound(tickingSoundRef.current);
+    };
+
+    const playGameOverSounds = async () => {
+        await stopSound(tickingSoundRef.current);
+        await playSound(gameOverSoundRef.current);
+
+        setTimeout(() => {
+            playSound(pacmanSoundRef.current);
+        }, 250);
+    };
+
     const startClock = () => {
         const newTime = getRandomSeconds();
 
+        stopSound(tickingSoundRef.current);
+
+        setWinner(null);
+        setLoser(null);
         setTimeLeft(newTime);
         setRunning(true);
         setShowJustMove(newTime <= justMoveClockConfig.warningSecond);
+
+        hasPlayedWarningRef.current = false;
+
+        if (newTime <= justMoveClockConfig.warningSecond) {
+            playWarningSounds();
+            hasPlayedWarningRef.current = true;
+        }
     };
 
     const switchTurn = (player: Player) => {
-        if (!running) {
-            return;
-        }
+        if (!running) return;
+        if (player !== activePlayer) return;
 
-        if (player !== activePlayer) {
-            return;
-        }
+        playSound(clickSoundRef.current);
+        stopSound(tickingSoundRef.current);
 
         const nextPlayer: Player = activePlayer === 1 ? 2 : 1;
-
-        setActivePlayer(nextPlayer);
         const newTime = getRandomSeconds();
 
+        setActivePlayer(nextPlayer);
         setTimeLeft(newTime);
         setShowJustMove(newTime <= justMoveClockConfig.warningSecond);
+
+        hasPlayedWarningRef.current = false;
+
+        if (newTime <= justMoveClockConfig.warningSecond) {
+            playWarningSounds();
+            hasPlayedWarningRef.current = true;
+        }
+    };
+
+    const handleTimeout = () => {
+        const winningPlayer: Player = activePlayer === 1 ? 2 : 1;
+
+        setRunning(false);
+        setShowJustMove(false);
+        setTimeLeft(0);
+        setWinner(winningPlayer);
+        setLoser(activePlayer);
+
+        playGameOverSounds();
     };
 
     const resetClock = () => {
+        stopSound(tickingSoundRef.current);
+
         setActivePlayer(1);
         setTimeLeft(0);
         setRunning(false);
         setShowJustMove(false);
+        setWinner(null);
+        setLoser(null);
+        hasPlayedWarningRef.current = false;
     };
 
     useEffect(() => {
@@ -57,13 +248,17 @@ export default function JustMoveClockScreen() {
         const interval = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 1) {
-                    setRunning(false);
-                    setShowJustMove(false);
+                    handleTimeout();
                     return 0;
                 }
 
-                if (prev - 1 === justMoveClockConfig.warningSecond) {
+                if (
+                    prev - 1 === justMoveClockConfig.warningSecond &&
+                    !hasPlayedWarningRef.current
+                ) {
                     setShowJustMove(true);
+                    playWarningSounds();
+                    hasPlayedWarningRef.current = true;
                 }
 
                 return prev - 1;
@@ -71,19 +266,35 @@ export default function JustMoveClockScreen() {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [running, timeLeft]);
+    }, [running, timeLeft, activePlayer]);
+
+    const activeBackground = pulseAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["#0B1A2F", "#102B4D"],
+    });
+
+    const activeBorder = pulseAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["#3CF2FF", "#FFD166"],
+    });
 
     const renderPlayerClock = (player: Player) => {
         const isActive = activePlayer === player;
         const isTopPlayer = player === 2;
 
         return (
-            <TouchableOpacity
+            <AnimatedTouchable
                 activeOpacity={0.9}
                 style={[
                     styles.playerPanel,
-                    isActive && running && styles.activePanel,
                     isTopPlayer && styles.topPanel,
+                    isActive && running && styles.activePanel,
+                    isActive &&
+                    running && {
+                        backgroundColor: activeBackground,
+                        borderColor: activeBorder,
+                    },
+                    isActive && running && showJustMove && styles.warningPanel,
                 ]}
                 onPress={() => switchTurn(player)}
             >
@@ -107,12 +318,10 @@ export default function JustMoveClockScreen() {
                 ) : (
                     <>
                         <Text style={styles.notTurnText}>Not your turn</Text>
-                        <Text style={styles.tapHint}>
-                            Wait for opponent
-                        </Text>
+                        <Text style={styles.tapHint}>Wait for opponent</Text>
                     </>
                 )}
-            </TouchableOpacity>
+            </AnimatedTouchable>
         );
     };
 
@@ -160,6 +369,39 @@ export default function JustMoveClockScreen() {
 
                 {renderPlayerClock(1)}
             </View>
+
+            <Modal visible={winner !== null} transparent animationType="none">
+                <View style={styles.modalOverlay}>
+                    <Animated.View
+                        style={[
+                            styles.winnerModal,
+                            {
+                                opacity: modalOpacity,
+                                transform: [{ scale: modalScale }],
+                            },
+                        ]}
+                    >
+                        <Text style={styles.modalKicker}>TIMEOUT</Text>
+
+                        <Text style={styles.modalTitle}>
+                            Player {winner} Wins!
+                        </Text>
+
+                        <Text style={styles.modalSubtitle}>
+                            Player {loser} did not move in time.
+                        </Text>
+
+                        <TouchableOpacity
+                            style={styles.modalButton}
+                            activeOpacity={0.9}
+                            onPress={resetClock}
+                        >
+                            <Text style={styles.modalButtonText}>Play Again</Text>
+                            <Ionicons name="refresh" size={18} color="#000000" />
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </Modal>
         </GameScreenWrapper>
     );
 }
@@ -195,12 +437,17 @@ const styles = StyleSheet.create({
         transform: [{ rotate: "180deg" }],
     },
     activePanel: {
-        borderColor: "#3CF2FF",
         shadowColor: "#3CF2FF",
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
-        elevation: 8,
+        shadowOpacity: 0.45,
+        shadowRadius: 14,
+        elevation: 10,
+    },
+    warningPanel: {
+        shadowColor: "#FFD166",
+        shadowOpacity: 0.65,
+        shadowRadius: 18,
+        elevation: 14,
     },
     playerLabel: {
         color: "#AAB2C0",
@@ -285,5 +532,58 @@ const styles = StyleSheet.create({
         borderColor: "#1C3D8F",
         alignItems: "center",
         justifyContent: "center",
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.78)",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 22,
+    },
+    winnerModal: {
+        width: "100%",
+        backgroundColor: "#071426",
+        borderRadius: 30,
+        borderWidth: 2,
+        borderColor: "#3CF2FF",
+        padding: 26,
+        alignItems: "center",
+    },
+    modalKicker: {
+        color: "#FF6B6B",
+        fontSize: 13,
+        fontWeight: "900",
+        letterSpacing: 1.5,
+        marginBottom: 12,
+    },
+    modalTitle: {
+        color: "#FFFFFF",
+        fontSize: 34,
+        fontWeight: "900",
+        textAlign: "center",
+        marginBottom: 10,
+    },
+    modalSubtitle: {
+        color: "#B8C4D6",
+        fontSize: 16,
+        fontWeight: "700",
+        textAlign: "center",
+        lineHeight: 23,
+        marginBottom: 24,
+    },
+    modalButton: {
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: "#3CF2FF",
+        paddingHorizontal: 28,
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: 8,
+    },
+    modalButtonText: {
+        color: "#000000",
+        fontSize: 15,
+        fontWeight: "900",
     },
 });
