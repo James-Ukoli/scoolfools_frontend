@@ -23,6 +23,7 @@ import MostLikelyScreen from "./src/screens/games/mostlikely/MostLikelyScreen";
 import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScreen";
 import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
+import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen"
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -156,6 +157,11 @@ export default function App() {
                     <Stack.Screen
                         name="JustMoveClock"
                         component={JustMoveClockScreen}
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name="GamesPaywall"
+                        component={GamesPaywallScreen}
                         options={{ headerShown: false }}
                     />
                 </Stack.Navigator>

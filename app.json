@@ -32,30 +32,43 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-    "plugins": [
-      "expo-router",
-      "expo-notifications",
-      "expo-apple-authentication",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "resizeMode": "cover",
-          "backgroundColor": "#000000",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
-        }
-      ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.226445408215-38u7tbvl7dgtc9k01rp7f6bp6pqkcfb9"
-        }
-      ],
-      "expo-web-browser",
-      "expo-audio"
-    ],
+"plugins": [
+  "expo-router",
+  "expo-notifications",
+  "expo-apple-authentication",
+  "react-native-iap",
+
+  [
+    "expo-build-properties",
+    {
+      "android": {
+        "kotlinVersion": "2.2.0"
+      }
+    }
+  ],
+
+  [
+    "expo-splash-screen",
+    {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#000000",
+      "dark": {
+        "backgroundColor": "#000000"
+      }
+    }
+  ],
+
+  [
+    "@react-native-google-signin/google-signin",
+    {
+      "iosUrlScheme": "com.googleusercontent.apps.226445408215-38u7tbvl7dgtc9k01rp7f6bp6pqkcfb9"
+    }
+  ],
+
+  "expo-web-browser",
+  "expo-audio"
+],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
