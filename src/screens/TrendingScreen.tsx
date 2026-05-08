@@ -231,7 +231,7 @@ export default function TrendingScreen({ navigation }: any) {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Trending 🔥</Text>
+                    <Text style={styles.headerTitle}>Trending</Text>
                 </View>
 
                 <ScrollView

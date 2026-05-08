@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import GameBackButton from "../../components/GameBackButton";
@@ -19,6 +20,7 @@ const games = [
         icon: "body-outline",
         color: "#FFD166",
         route: "CharadesSetup",
+        sound: "charades",
     },
     {
         title: "Most Likely",
@@ -26,6 +28,7 @@ const games = [
         icon: "people-outline",
         color: "#3CF2FF",
         route: "MostLikely",
+        sound: "mostlikely",
     },
     {
         title: "Impostor",
@@ -33,6 +36,7 @@ const games = [
         icon: "eye-outline",
         color: "#FF6B6B",
         route: "ImpostorSetup",
+        sound: "impostor",
     },
     {
         title: "Just Move Clock",
@@ -40,11 +44,104 @@ const games = [
         icon: "timer-outline",
         color: "#7CFF6B",
         route: "JustMoveClock",
+        sound: "clock",
     },
 ];
 
 export default function GameHomeScreen() {
     const navigation = useNavigation<any>();
+
+    const charadesSoundRef = useRef<Audio.Sound | null>(null);
+    const mostLikelySoundRef = useRef<Audio.Sound | null>(null);
+    const impostorSoundRef = useRef<Audio.Sound | null>(null);
+    const clockSoundRef = useRef<Audio.Sound | null>(null);
+
+    useEffect(() => {
+        loadSounds();
+
+        return () => {
+            unloadSounds();
+        };
+    }, []);
+
+    const loadSounds = async () => {
+        try {
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+            });
+
+            const charades = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/soniccashregister.mp3")
+            );
+
+            const mostLikely = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/card-flip.mp3")
+            );
+
+            const impostor = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/amongus2.mp3")
+            );
+
+            const clock = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/scribblenauts-button-click.mp3")
+            );
+
+            charadesSoundRef.current = charades.sound;
+            mostLikelySoundRef.current = mostLikely.sound;
+            impostorSoundRef.current = impostor.sound;
+            clockSoundRef.current = clock.sound;
+        } catch (error) {
+            console.log("Game home sound load error:", error);
+        }
+    };
+
+    const unloadSounds = async () => {
+        try {
+            await charadesSoundRef.current?.unloadAsync();
+            await mostLikelySoundRef.current?.unloadAsync();
+            await impostorSoundRef.current?.unloadAsync();
+            await clockSoundRef.current?.unloadAsync();
+        } catch (error) {
+            console.log("Game home sound unload error:", error);
+        }
+    };
+
+    const playSound = async (soundType: string) => {
+        try {
+            let sound: Audio.Sound | null = null;
+
+            if (soundType === "charades") {
+                sound = charadesSoundRef.current;
+            }
+
+            if (soundType === "mostlikely") {
+                sound = mostLikelySoundRef.current;
+            }
+
+            if (soundType === "impostor") {
+                sound = impostorSoundRef.current;
+            }
+
+            if (soundType === "clock") {
+                sound = clockSoundRef.current;
+            }
+
+            if (!sound) return;
+
+            await sound.setPositionAsync(0);
+            await sound.playAsync();
+        } catch (error) {
+            console.log("Game home sound play error:", error);
+        }
+    };
+
+    const handleGamePress = async (route: string, soundType: string) => {
+        await playSound(soundType);
+
+        setTimeout(() => {
+            navigation.navigate(route);
+        }, 120);
+    };
 
     return (
         <GameScreenWrapper>
@@ -67,7 +164,7 @@ export default function GameHomeScreen() {
                         key={game.title}
                         style={styles.gameCard}
                         activeOpacity={0.85}
-                        onPress={() => navigation.navigate(game.route)}
+                        onPress={() => handleGamePress(game.route, game.sound)}
                     >
                         <View style={styles.gameLeft}>
                             <View
@@ -85,6 +182,7 @@ export default function GameHomeScreen() {
 
                             <View style={styles.gameTextWrap}>
                                 <Text style={styles.gameTitle}>{game.title}</Text>
+
                                 <Text style={styles.gameDescription}>
                                     {game.description}
                                 </Text>

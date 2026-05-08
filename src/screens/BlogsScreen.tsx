@@ -231,7 +231,7 @@ export default function BlogsScreen({ navigation }: any) {
                 }
             >
                 <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Blogs ✍️</Text>
+                    <Text style={styles.headerTitle}>Blogs</Text>
                 </View>
 
                 <ScrollView

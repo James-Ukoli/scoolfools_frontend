@@ -197,7 +197,7 @@ export default function HomeScreen() {
                     }
                 >
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle}>Breaking News</Text>
+                        <Text style={styles.sectionTitle}>Featured Stories</Text>
                         <View style={styles.sectionAccentLine} />
                     </View>
 
@@ -206,7 +206,7 @@ export default function HomeScreen() {
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle}>Featured Stories</Text>
+                        <Text style={styles.sectionTitle2}>More Featured Stories...</Text>
                         <View style={styles.sectionAccentLine} />
                     </View>
 
@@ -237,6 +237,13 @@ const styles = StyleSheet.create({
     sectionTitle: {
         color: "#FFFFFF",
         fontSize: ms(23),
+        fontWeight: "900",
+        letterSpacing: 0.2,
+        marginBottom: vs(8),
+    },
+    sectionTitle2: {
+        color: "#FFFFFF",
+        fontSize: ms(16),
         fontWeight: "900",
         letterSpacing: 0.2,
         marginBottom: vs(8),
