@@ -151,6 +151,58 @@ export default function GameHomeScreen() {
         }
     };
 
+    const loadIAP = async () => {
+        try {
+            await initializeIAP();
+            const fetchedProduct = await getGamesPackProduct();
+            setProduct(fetchedProduct);
+        } catch (error) {
+            console.log("IAP load error:", error);
+        }
+    };
+
+    const loadSounds = async () => {
+        try {
+            await Audio.setAudioModeAsync({
+                playsInSilentModeIOS: true,
+            });
+
+            const charades = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/soniccashregister.mp3")
+            );
+
+            const mostLikely = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/card-flip.mp3")
+            );
+
+            const impostor = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/amongus2.mp3")
+            );
+
+            const clock = await Audio.Sound.createAsync(
+                require("../../../assets/sounds/scribblenauts-button-click.mp3")
+            );
+
+            charadesSoundRef.current = charades.sound;
+            mostLikelySoundRef.current = mostLikely.sound;
+            impostorSoundRef.current = impostor.sound;
+            clockSoundRef.current = clock.sound;
+        } catch (error) {
+            console.log("Game home sound load error:", error);
+        }
+    };
+
+    const unloadSounds = async () => {
+        try {
+            await charadesSoundRef.current?.unloadAsync();
+            await mostLikelySoundRef.current?.unloadAsync();
+            await impostorSoundRef.current?.unloadAsync();
+            await clockSoundRef.current?.unloadAsync();
+        } catch (error) {
+            console.log("Game home sound unload error:", error);
+        }
+    };
+
     useEffect(() => {
         loadSounds();
         loadIAP();
@@ -160,12 +212,13 @@ export default function GameHomeScreen() {
             onPurchaseSuccess: async () => {
                 await unlockGamesOnBackend();
             },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async () => { },
             onPurchaseError: (error: any) => {
                 setLoadingPurchase(false);
                 console.log("Purchase error listener:", error);
             },
         });
-
         return () => {
             unloadSounds();
             cleanupIAP();
@@ -227,58 +280,6 @@ export default function GameHomeScreen() {
             ]).start();
         }
     }, [paywallVisible]);
-
-    const loadIAP = async () => {
-        try {
-            await initializeIAP();
-            const fetchedProduct = await getGamesPackProduct();
-            setProduct(fetchedProduct);
-        } catch (error) {
-            console.log("IAP load error:", error);
-        }
-    };
-
-    const loadSounds = async () => {
-        try {
-            await Audio.setAudioModeAsync({
-                playsInSilentModeIOS: true,
-            });
-
-            const charades = await Audio.Sound.createAsync(
-                require("../../../assets/sounds/soniccashregister.mp3")
-            );
-
-            const mostLikely = await Audio.Sound.createAsync(
-                require("../../../assets/sounds/card-flip.mp3")
-            );
-
-            const impostor = await Audio.Sound.createAsync(
-                require("../../../assets/sounds/amongus2.mp3")
-            );
-
-            const clock = await Audio.Sound.createAsync(
-                require("../../../assets/sounds/scribblenauts-button-click.mp3")
-            );
-
-            charadesSoundRef.current = charades.sound;
-            mostLikelySoundRef.current = mostLikely.sound;
-            impostorSoundRef.current = impostor.sound;
-            clockSoundRef.current = clock.sound;
-        } catch (error) {
-            console.log("Game home sound load error:", error);
-        }
-    };
-
-    const unloadSounds = async () => {
-        try {
-            await charadesSoundRef.current?.unloadAsync();
-            await mostLikelySoundRef.current?.unloadAsync();
-            await impostorSoundRef.current?.unloadAsync();
-            await clockSoundRef.current?.unloadAsync();
-        } catch (error) {
-            console.log("Game home sound unload error:", error);
-        }
-    };
 
     const playSound = async (soundType: string) => {
         try {
@@ -472,9 +473,7 @@ export default function GameHomeScreen() {
                             <Ionicons name="sparkles" size={42} color="#050816" />
                         </View>
 
-                        <Text style={styles.paywallTitle}>
-                            Unlock Party Games
-                        </Text>
+                        <Text style={styles.paywallTitle}>Unlock Party Games</Text>
 
                         <Text style={styles.paywallSubtitle}>
                             Get every chess party mode in one bundle.
@@ -515,9 +514,7 @@ export default function GameHomeScreen() {
                         </TouchableOpacity>
 
                         <TouchableOpacity activeOpacity={0.8}>
-                            <Text style={styles.restoreText}>
-                                Restore Purchase
-                            </Text>
+                            <Text style={styles.restoreText}>Restore Purchase</Text>
                         </TouchableOpacity>
 
                         <Text style={styles.finePrint}>

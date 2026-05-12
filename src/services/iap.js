@@ -15,7 +15,13 @@ const GAMES_PACK_PRODUCT_ID = Platform.select({
   android: "jmpg_499_1t",
 });
 
-export const productIds = [GAMES_PACK_PRODUCT_ID];
+const BLOGS_SUBSCRIPTION_PRODUCT_ID = Platform.select({
+  ios: "jms_599_1y",
+  android: "jms_599_1y",
+});
+
+export const productIds = [GAMES_PACK_PRODUCT_ID].filter(Boolean);
+export const subscriptionIds = [BLOGS_SUBSCRIPTION_PRODUCT_ID].filter(Boolean);
 
 let purchaseUpdateSubscription = null;
 let purchaseErrorSubscription = null;
@@ -35,11 +41,24 @@ export const getGamesPackProduct = async () => {
       skus: productIds,
     });
 
-    console.log("✅ Products fetched:", products);
-
+    console.log("✅ Game products fetched:", products);
     return products?.[0] || null;
   } catch (error) {
-    console.log("❌ Get products error:", error);
+    console.log("❌ Get game products error:", error);
+    return null;
+  }
+};
+
+export const getBlogsSubscriptionProduct = async () => {
+  try {
+    const products = await getProducts({
+      skus: subscriptionIds,
+    });
+
+    console.log("✅ Blog subscription fetched:", products);
+    return products?.[0] || null;
+  } catch (error) {
+    console.log("❌ Get blog subscription error:", error);
     return null;
   }
 };
@@ -57,38 +76,70 @@ export const buyGamesPack = async () => {
       },
     });
 
-    console.log("✅ Purchase request started");
+    console.log("✅ Game purchase request started");
   } catch (error) {
-    console.log("❌ Purchase request error:", error);
+    console.log("❌ Game purchase request error:", error);
+    throw error;
+  }
+};
+
+export const buyBlogsSubscription = async () => {
+  try {
+    await requestPurchase({
+      request: {
+        ios: {
+          sku: BLOGS_SUBSCRIPTION_PRODUCT_ID,
+        },
+        android: {
+          skus: [BLOGS_SUBSCRIPTION_PRODUCT_ID],
+        },
+      },
+    });
+
+    console.log("✅ Blog subscription request started");
+  } catch (error) {
+    console.log("❌ Blog subscription request error:", error);
     throw error;
   }
 };
 
 export const setupPurchaseListeners = ({
   onPurchaseSuccess,
+  onGamesPackSuccess,
+  onBlogsSubscriptionSuccess,
   onPurchaseError,
 }) => {
-  purchaseUpdateSubscription = purchaseUpdatedListener(
-    async (purchase) => {
-      try {
-        console.log("✅ Purchase updated:", purchase);
+  purchaseUpdateSubscription = purchaseUpdatedListener(async (purchase) => {
+    try {
+      console.log("✅ Purchase updated:", purchase);
 
-        const productId = purchase.productId;
+      const productId = purchase.productId;
 
-        if (productId === GAMES_PACK_PRODUCT_ID) {
-          await finishTransaction({
-            purchase,
-            isConsumable: false,
-          });
+      if (productId === GAMES_PACK_PRODUCT_ID) {
+        await finishTransaction({
+          purchase,
+          isConsumable: false,
+        });
 
-          onPurchaseSuccess?.(purchase);
-        }
-      } catch (error) {
-        console.log("❌ Purchase listener error:", error);
-        onPurchaseError?.(error);
+        onPurchaseSuccess?.(purchase);
+        onGamesPackSuccess?.(purchase);
+        return;
       }
+
+      if (productId === BLOGS_SUBSCRIPTION_PRODUCT_ID) {
+        await finishTransaction({
+          purchase,
+          isConsumable: false,
+        });
+
+        onBlogsSubscriptionSuccess?.(purchase);
+        return;
+      }
+    } catch (error) {
+      console.log("❌ Purchase listener error:", error);
+      onPurchaseError?.(error);
     }
-  );
+  });
 
   purchaseErrorSubscription = purchaseErrorListener((error) => {
     console.log("❌ Purchase error listener:", error);

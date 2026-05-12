@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
         borderRadius: 0,
     },
     featuredImageArea: {
-        height: 182,
+        height: 230,
         backgroundColor: "#1A1A1A",
         justifyContent: "flex-end",
     },
