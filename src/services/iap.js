@@ -6,8 +6,8 @@ import {
   purchaseUpdatedListener,
   purchaseErrorListener,
   finishTransaction,
+  fetchProducts,
 } from "react-native-iap";
-
 import { Platform } from "react-native";
 
 const GAMES_PACK_PRODUCT_ID = Platform.select({
@@ -37,8 +37,9 @@ export const initializeIAP = async () => {
 
 export const getGamesPackProduct = async () => {
   try {
-    const products = await getProducts({
+    const products = await fetchProducts({
       skus: productIds,
+      type: "in-app",
     });
 
     console.log("✅ Game products fetched:", products);
@@ -51,8 +52,9 @@ export const getGamesPackProduct = async () => {
 
 export const getBlogsSubscriptionProduct = async () => {
   try {
-    const products = await getProducts({
+    const products = await fetchProducts({
       skus: subscriptionIds,
+      type: "subs",
     });
 
     console.log("✅ Blog subscription fetched:", products);
@@ -65,6 +67,17 @@ export const getBlogsSubscriptionProduct = async () => {
 
 export const buyGamesPack = async () => {
   try {
+    const products = await fetchProducts({
+      skus: productIds,
+      type: "in-app",
+    });
+
+    console.log("FULL GAME PRODUCT OBJECT:", JSON.stringify(products?.[0], null, 2));
+
+    if (!products?.[0]) {
+      throw new Error("Game product not found");
+    }
+
     await requestPurchase({
       request: {
         ios: {
@@ -74,6 +87,7 @@ export const buyGamesPack = async () => {
           skus: [GAMES_PACK_PRODUCT_ID],
         },
       },
+      type: "in-app",
     });
 
     console.log("✅ Game purchase request started");
@@ -85,6 +99,27 @@ export const buyGamesPack = async () => {
 
 export const buyBlogsSubscription = async () => {
   try {
+    const subscriptions = await fetchProducts({
+      skus: subscriptionIds,
+      type: "subs",
+    });
+
+    const subscription = subscriptions?.[0];
+
+    if (!subscription) {
+      throw new Error("Subscription not found");
+    }
+
+    const offerToken =
+      Platform.OS === "android"
+        ? subscription?.subscriptionOffers?.[0]?.offerTokenAndroid ||
+          subscription?.subscriptionOfferDetailsAndroid?.[0]?.offerToken
+        : null;
+
+    if (Platform.OS === "android" && !offerToken) {
+      throw new Error("Missing Android subscription offer token");
+    }
+
     await requestPurchase({
       request: {
         ios: {
@@ -92,8 +127,15 @@ export const buyBlogsSubscription = async () => {
         },
         android: {
           skus: [BLOGS_SUBSCRIPTION_PRODUCT_ID],
+          subscriptionOffers: [
+            {
+              sku: BLOGS_SUBSCRIPTION_PRODUCT_ID,
+              offerToken,
+            },
+          ],
         },
       },
+      type: "subs",
     });
 
     console.log("✅ Blog subscription request started");

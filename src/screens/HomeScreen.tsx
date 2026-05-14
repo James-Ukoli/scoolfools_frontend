@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -6,9 +6,14 @@ import {
     View,
     RefreshControl,
     ActivityIndicator,
-    Platform
+    Platform,
+    Animated,
+    TouchableOpacity,
+    Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
@@ -94,6 +99,8 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export default function HomeScreen() {
+    const navigation = useNavigation<any>();
+
     const [featuredPosts, setFeaturedPosts] = useState<Post[]>([]);
     const [featuredStories, setFeaturedStories] = useState<Post[]>([]);
     const [countdownEvent, setCountdownEvent] = useState<EventItem | null>(null);
@@ -128,6 +135,7 @@ export default function HomeScreen() {
                 );
 
             const now = Date.now();
+
             const upcomingEvents = publishedEvents.filter(
                 (event: EventItem) => new Date(event.end_at).getTime() >= now
             );
@@ -158,7 +166,6 @@ export default function HomeScreen() {
     }, [fetchHomeData]);
 
     const onRefresh = useCallback(async () => {
-        console.log("HOME REFRESH STARTED");
         setRefreshing(true);
 
         try {
@@ -168,7 +175,6 @@ export default function HomeScreen() {
             console.log("HOME REFRESH ERROR:", error);
         } finally {
             setRefreshing(false);
-            console.log("HOME REFRESH FINISHED");
         }
     }, [fetchHomeData]);
 
@@ -203,6 +209,8 @@ export default function HomeScreen() {
 
                     <FeaturedCarousel posts={featuredPosts} loading={loadingHome} />
 
+                    <SupportGrowthBanner navigation={navigation} />
+
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
                     <View style={styles.sectionHeaderWrap}>
@@ -217,23 +225,153 @@ export default function HomeScreen() {
     );
 }
 
+function SupportGrowthBanner({ navigation }: any) {
+    const pulse = useRef(new Animated.Value(1)).current;
+    const glow = useRef(new Animated.Value(0)).current;
+    const arrowFloat = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.parallel([
+                Animated.sequence([
+                    Animated.timing(pulse, {
+                        toValue: 1.018,
+                        duration: 900,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(pulse, {
+                        toValue: 1,
+                        duration: 900,
+                        easing: Easing.in(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ]),
+                Animated.sequence([
+                    Animated.timing(glow, {
+                        toValue: 1,
+                        duration: 900,
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(glow, {
+                        toValue: 0,
+                        duration: 900,
+                        useNativeDriver: false,
+                    }),
+                ]),
+                Animated.sequence([
+                    Animated.timing(arrowFloat, {
+                        toValue: -4,
+                        duration: 800,
+                        easing: Easing.out(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                    Animated.timing(arrowFloat, {
+                        toValue: 0,
+                        duration: 800,
+                        easing: Easing.in(Easing.ease),
+                        useNativeDriver: false,
+                    }),
+                ]),
+            ])
+        ).start();
+    }, []);
+
+    const shadowOpacity = glow.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0.18, 0.62],
+    });
+
+    const shadowRadius = glow.interpolate({
+        inputRange: [0, 1],
+        outputRange: [7, 17],
+    });
+
+    return (
+        <Animated.View
+            style={[
+                styles.supportCard,
+                {
+                    transform: [{ scale: pulse }],
+                    shadowOpacity,
+                    shadowRadius,
+                },
+            ]}
+        >
+            <View style={styles.supportTopRow}>
+                <View style={styles.supportIconCircle}>
+                    <Animated.View style={{ transform: [{ translateY: arrowFloat }] }}>
+                        <Ionicons name="trending-up" size={22} color="#050816" />
+                    </Animated.View>
+                </View>
+
+                <View style={styles.supportTextWrap}>
+                    <Text style={styles.supportTitle}>Help Push Chess Forward</Text>
+
+                    <Text style={styles.supportSubtitle}>
+                        Support and help Just Move take chess to the next level.
+                    </Text>
+                </View>
+            </View>
+
+            <View style={styles.supportActionsRow}>
+                <TouchableOpacity
+                    activeOpacity={0.88}
+                    style={[styles.supportActionButton, styles.gamesActionButton]}
+                    onPress={() => navigation.navigate("GameHome")}
+                >
+                    <Ionicons
+                        name="game-controller-outline"
+                        size={18}
+                        color="#D98CFF"
+                    />
+
+                    <Text style={styles.supportActionText}>
+                        Party Games 🎉
+                    </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    activeOpacity={0.88}
+                    style={[styles.supportActionButton, styles.blogsActionButton]}
+                    onPress={() => navigation.navigate("Blogs")}
+                >
+                    <Ionicons
+                        name="newspaper-outline"
+                        size={18}
+                        color="#FFD166"
+                    />
+
+                    <Text style={styles.supportActionText}>
+                        Exclusive Blogs 📝
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </Animated.View>
+    );
+}
+
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
         backgroundColor: "#000000",
     },
+
     container: {
         flex: 1,
         backgroundColor: "#000000",
     },
+
     scrollContent: {
         paddingHorizontal: s(16),
         paddingTop: vs(10),
         paddingBottom: vs(160),
     },
+
     sectionHeaderWrap: {
         marginBottom: vs(14),
     },
+
     sectionTitle: {
         color: "#FFFFFF",
         fontSize: ms(23),
@@ -241,6 +379,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.2,
         marginBottom: vs(8),
     },
+
     sectionTitle2: {
         color: "#FFFFFF",
         fontSize: ms(16),
@@ -248,6 +387,7 @@ const styles = StyleSheet.create({
         letterSpacing: 0.2,
         marginBottom: vs(8),
     },
+
     sectionAccentLine: {
         width: s(58),
         height: vs(3),
@@ -259,18 +399,88 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 0 },
         elevation: 4,
     },
-    eventHeaderWrap: {
-        alignItems: "center",
+
+    supportCard: {
+        backgroundColor: "#07111F",
+        borderRadius: ms(20),
+        borderWidth: 1.2,
+        borderColor: "rgba(57, 192, 237, 0.62)",
+        paddingHorizontal: s(13),
+        paddingVertical: vs(11),
         marginTop: vs(2),
-        marginBottom: vs(10),
+        marginBottom: vs(14),
+        shadowColor: "#39C0ED",
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
     },
-    sectionLabel: {
-        fontSize: ms(14),
+
+    supportTopRow: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+
+    supportIconCircle: {
+        width: s(40),
+        height: s(40),
+        borderRadius: s(20),
+        backgroundColor: "#39C0ED",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: s(11),
+    },
+
+    supportTextWrap: {
+        flex: 1,
+    },
+
+    supportTitle: {
+        color: "#FFFFFF",
+        fontSize: ms(15.5),
+        fontWeight: "900",
+        marginBottom: vs(3),
+    },
+
+    supportSubtitle: {
+        color: "#BFD8E8",
+        fontSize: ms(11.5),
         fontWeight: "700",
-        textAlign: "center",
-        color: "#FF9A3C",
-        letterSpacing: 0.5,
+        lineHeight: ms(16),
     },
+
+    supportActionsRow: {
+        flexDirection: "row",
+        gap: s(9),
+        marginTop: vs(10),
+    },
+
+    supportActionButton: {
+        flex: 1,
+        height: vs(38),
+        borderRadius: ms(13),
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: s(6),
+    },
+
+    gamesActionButton: {
+        backgroundColor: "rgba(119, 70, 255, 0.16)",
+        borderWidth: 1,
+        borderColor: "rgba(217, 140, 255, 0.7)",
+    },
+
+    blogsActionButton: {
+        backgroundColor: "rgba(255, 209, 102, 0.13)",
+        borderWidth: 1,
+        borderColor: "rgba(255, 209, 102, 0.75)",
+    },
+
+    supportActionText: {
+        color: "#FFFFFF",
+        fontSize: ms(10),
+        fontWeight: "900",
+    },
+
     refreshIndicator: {
         alignItems: "center",
         paddingVertical: vs(6),

@@ -192,15 +192,27 @@ export default function GameHomeScreen() {
         }
     };
 
-    const unloadSounds = async () => {
+    const safeUnload = async (soundRef: Audio.Sound | null) => {
         try {
-            await charadesSoundRef.current?.unloadAsync();
-            await mostLikelySoundRef.current?.unloadAsync();
-            await impostorSoundRef.current?.unloadAsync();
-            await clockSoundRef.current?.unloadAsync();
+            if (!soundRef) return;
+
+            await soundRef.stopAsync().catch(() => { });
+            await soundRef.unloadAsync().catch(() => { });
         } catch (error) {
-            console.log("Game home sound unload error:", error);
+            console.log("Sound unload warning:", error);
         }
+    };
+
+    const unloadSounds = async () => {
+        await safeUnload(charadesSoundRef.current);
+        await safeUnload(mostLikelySoundRef.current);
+        await safeUnload(impostorSoundRef.current);
+        await safeUnload(clockSoundRef.current);
+
+        charadesSoundRef.current = null;
+        mostLikelySoundRef.current = null;
+        impostorSoundRef.current = null;
+        clockSoundRef.current = null;
     };
 
     useEffect(() => {
