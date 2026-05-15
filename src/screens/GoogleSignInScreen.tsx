@@ -158,7 +158,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
                     />
 
                     <Text style={styles.headline}>
-                        The #1 App to Follow the World of Chess ♟️
+                        Follow Chess Like a Sport ♟️
                     </Text>
 
                     <Text style={styles.subheadline}>

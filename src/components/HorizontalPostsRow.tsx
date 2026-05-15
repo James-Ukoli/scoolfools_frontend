@@ -29,11 +29,15 @@ type Post = {
 type HorizontalPostsRowProps = {
     posts: Post[];
     loading?: boolean;
+    isSubscribed?: boolean;
+    onRequireSubscription?: () => void;
 };
 
 export default function HorizontalPostsRow({
     posts,
     loading = false,
+    isSubscribed = false,
+    onRequireSubscription,
 }: HorizontalPostsRowProps) {
     const navigation = useNavigation<any>();
 
@@ -50,6 +54,19 @@ export default function HorizontalPostsRow({
             return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
         }
         return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    };
+
+    const handleOpenPost = (post: Post) => {
+        const isBlog = post.content_type === "blog";
+
+        if (isBlog && !isSubscribed) {
+            onRequireSubscription?.();
+            return;
+        }
+
+        navigation.navigate("ArticleScreen", {
+            slug: post.slug,
+        });
     };
 
     if (loading) {
@@ -74,11 +91,7 @@ export default function HorizontalPostsRow({
             renderItem={({ item }) => (
                 <Pressable
                     style={styles.card}
-                    onPress={() =>
-                        navigation.navigate("ArticleScreen", {
-                            slug: item.slug,
-                        })
-                    }
+                    onPress={() => handleOpenPost(item)}
                 >
                     <View style={styles.imageSection}>
                         <Image

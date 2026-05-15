@@ -33,8 +33,6 @@ export default function GamesPaywallScreen() {
         setupPurchaseListeners({
             onPurchaseSuccess: async () => {
                 try {
-                    // TEMP BACKEND UNLOCK
-                    // Later replace with real receipt validation.
                     await fetch(
                         `${process.env.EXPO_PUBLIC_API_BASE_URL}/api/auth/me/unlock-games`,
                         {
@@ -55,6 +53,10 @@ export default function GamesPaywallScreen() {
                     console.log("Unlock API error:", error);
                 }
             },
+
+            onGamesPackSuccess: async () => { },
+
+            onBlogsSubscriptionSuccess: async () => { },
 
             onPurchaseError: (error: any) => {
                 console.log("Purchase listener error:", error);

@@ -10,13 +10,18 @@ import {
     RefreshControl,
     NativeSyntheticEvent,
     NativeScrollEvent,
-    Platform
+    Platform,
+    Animated,
+    Easing,
+    Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
+import { Audio } from "expo-av";
 
 type MonthlyDivision = "pro" | "women";
-type QuarterlyCategory = "countries" | "colleges" | "influencers";
+type QuarterlyCategory = "countries" | "colleges";
+type RankingView = MonthlyDivision | QuarterlyCategory;
 
 type MonthlyRankingItem = {
     rank: number;
@@ -72,12 +77,11 @@ type MovementType = "up" | "down" | "same" | "new";
 type DisplayRow = {
     rank: number;
     name: string;
-    rightLabel?: string;
     movementType: MovementType;
     movementValue?: number;
     imageUrl?: string | null;
     metaText?: string;
-    isInfluencer?: boolean;
+    isCollege?: boolean;
 };
 
 const API_BASE =
@@ -85,8 +89,7 @@ const API_BASE =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-
-const REFRESH_COLOR = "#FF4FD8";
+const REFRESH_COLOR = "#2EE7FF";
 
 const MONTH_OPTIONS = [
     { label: "Jan", value: 1 },
@@ -103,50 +106,39 @@ const MONTH_OPTIONS = [
     { label: "Dec", value: 12 },
 ];
 
+const VIEW_OPTIONS: {
+    label: string;
+    value: RankingView;
+    type: "monthly" | "quarterly";
+}[] = [
+        { label: "Pro", value: "pro", type: "monthly" },
+        { label: "Women", value: "women", type: "monthly" },
+        { label: "Countries", value: "countries", type: "quarterly" },
+        { label: "Colleges", value: "colleges", type: "quarterly" },
+    ];
+
 function formatMonthParam(year: number, month: number) {
     return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 function getPreviousMonth(year: number, month: number) {
-    if (month === 1) {
-        return { year: year - 1, month: 12 };
-    }
+    if (month === 1) return { year: year - 1, month: 12 };
     return { year, month: month - 1 };
 }
 
 function getNextMonth(year: number, month: number) {
-    if (month === 12) {
-        return { year: year + 1, month: 1 };
-    }
+    if (month === 12) return { year: year + 1, month: 1 };
     return { year, month: month + 1 };
 }
 
 function getPreviousQuarter(year: number, quarter: number) {
-    if (quarter === 1) {
-        return { year: year - 1, quarter: 4 };
-    }
+    if (quarter === 1) return { year: year - 1, quarter: 4 };
     return { year, quarter: quarter - 1 };
 }
 
 function getNextQuarter(year: number, quarter: number) {
-    if (quarter === 4) {
-        return { year: year + 1, quarter: 1 };
-    }
+    if (quarter === 4) return { year: year + 1, quarter: 1 };
     return { year, quarter: quarter + 1 };
-}
-
-function titleCase(value: string) {
-    return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function sanitizeHandle(handle?: string) {
-    if (!handle) return "";
-    return handle.replace(/^@+/, "").trim();
-}
-
-function getQuarterlyIdentity(entry: QuarterlyEntry) {
-    const cleanHandle = sanitizeHandle(entry.meta?.handle);
-    return cleanHandle || entry.name;
 }
 
 function getMovementBadgeData(
@@ -155,20 +147,11 @@ function getMovementBadgeData(
     previousList: { name: string; rank: number }[]
 ): { movementType: MovementType; movementValue?: number } {
     const previousItem = previousList.find((item) => item.name === currentName);
-
-    if (!previousItem) {
-        return { movementType: "new" };
-    }
+    if (!previousItem) return { movementType: "new" };
 
     const diff = previousItem.rank - currentRank;
-
-    if (diff > 0) {
-        return { movementType: "up", movementValue: diff };
-    }
-
-    if (diff < 0) {
-        return { movementType: "down", movementValue: Math.abs(diff) };
-    }
+    if (diff > 0) return { movementType: "up", movementValue: diff };
+    if (diff < 0) return { movementType: "down", movementValue: Math.abs(diff) };
 
     return { movementType: "same", movementValue: 0 };
 }
@@ -197,89 +180,250 @@ function getFlagCode(countryCode?: string) {
         KAZ: "kz",
         SUI: "ch",
         RUS: "ru",
+        FIDE: "un",
+        ARM: "am",
+        AZE: "az",
+        ESP: "es",
+        ENG: "gb-eng",
+        HUN: "hu",
+        ROU: "ro",
+        TUR: "tr",
+        IRN: "ir",
+        ARG: "ar",
+        BRA: "br",
     };
 
     return map[countryCode] ?? null;
 }
 
 function getFlagUrl(countryCode?: string) {
+    if (countryCode === "FIDE") return null;
+
     const code = getFlagCode(countryCode);
     if (!code) return null;
-    return `https://flagcdn.com/w40/${code}.png`;
+
+    return `https://flagcdn.com/w80/${code}.png`;
 }
 
-function getPlatformLogoUrl(platform?: string) {
-    if (!platform) return null;
+function getViewLabel(view: RankingView) {
+    return VIEW_OPTIONS.find((option) => option.value === view)?.label ?? "Pro";
+}
 
-    const normalized = platform.trim().toLowerCase();
+function isMonthlyView(view: RankingView): view is MonthlyDivision {
+    return view === "pro" || view === "women";
+}
 
-    const map: Record<string, string> = {
-        youtube: "https://img.icons8.com/color/48/youtube-play.png",
-        twitch: "https://img.icons8.com/color/48/twitch--v1.png",
-        instagram: "https://img.icons8.com/fluency/48/instagram-new.png",
-        x: "https://img.icons8.com/ios-filled/50/ffffff/twitterx--v1.png",
-        twitter: "https://img.icons8.com/ios-filled/50/ffffff/twitterx--v1.png",
-        tiktok: "https://img.icons8.com/color/48/tiktok--v1.png",
-        kick: "https://img.icons8.com/fluency/48/video-call.png",
-    };
+function getMedalNameStyle(rank: number) {
+    if (rank === 1) return styles.goldName;
+    if (rank === 2) return styles.silverName;
+    if (rank === 3) return styles.bronzeName;
+    return null;
+}
 
-    return map[normalized] ?? null;
+function getMedalRankStyle(rank: number) {
+    if (rank === 1) return styles.goldRank;
+    if (rank === 2) return styles.silverRank;
+    if (rank === 3) return styles.bronzeRank;
+    return null;
+}
+
+function RankingIcon({ row }: { row: DisplayRow }) {
+    if (row.isCollege) {
+        return (
+            <View style={styles.emojiIcon}>
+                <Text style={styles.emojiIconText}>🎓</Text>
+            </View>
+        );
+    }
+
+    if (row.metaText === "FIDE") {
+        return (
+            <View style={styles.emojiIcon}>
+                <Text style={styles.knightIconText}>♞</Text>
+            </View>
+        );
+    }
+
+    if (row.imageUrl) {
+        return <Image source={{ uri: row.imageUrl }} style={styles.flagImage} />;
+    }
+
+    return <View style={styles.flagFallback} />;
+}
+
+function AnimatedRankRow({ row, index }: { row: DisplayRow; index: number }) {
+    const flip = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        flip.setValue(0);
+
+        Animated.timing(flip, {
+            toValue: 1,
+            duration: 520,
+            delay: index * 65,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        }).start();
+    }, [flip, index, row.name]);
+
+    const rotateX = flip.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["82deg", "0deg"],
+    });
+
+    const translateY = flip.interpolate({
+        inputRange: [0, 1],
+        outputRange: [18, 0],
+    });
+
+    const opacity = flip.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+    });
+
+    return (
+        <Animated.View
+            style={[
+                styles.rankRow,
+                row.rank === 1 ? styles.goldRow : null,
+                row.rank === 2 ? styles.silverRow : null,
+                row.rank === 3 ? styles.bronzeRow : null,
+                {
+                    opacity,
+                    transform: [{ perspective: 900 }, { rotateX }, { translateY }],
+                },
+            ]}
+        >
+            <Text style={[styles.rankNumber, getMedalRankStyle(row.rank)]}>
+                {row.rank}
+            </Text>
+
+            <View style={styles.rankMain}>
+                <View style={styles.nameLine}>
+                    <RankingIcon row={row} />
+
+                    <View style={styles.nameStack}>
+                        <Text
+                            style={[
+                                styles.rankName,
+                                row.isCollege ? styles.collegeName : null,
+                                getMedalNameStyle(row.rank),
+                            ]}
+                            numberOfLines={row.isCollege ? 2 : 1}
+                        >
+                            {row.name}
+                        </Text>
+
+                        {!!row.metaText && !row.isCollege && (
+                            <Text style={styles.rankMeta} numberOfLines={1}>
+                                {row.metaText}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            </View>
+
+            <View
+                style={[
+                    styles.movementBadge,
+                    row.movementType === "up" ? styles.movementUp : null,
+                    row.movementType === "down" ? styles.movementDown : null,
+                    row.movementType === "same" ? styles.movementSame : null,
+                    row.movementType === "new" ? styles.movementNew : null,
+                ]}
+            >
+                <Text style={styles.movementText}>
+                    {getMovementText(row.movementType, row.movementValue)}
+                </Text>
+            </View>
+        </Animated.View>
+    );
 }
 
 export default function PowerRankingsScreen() {
     const scrollRef = useRef<ScrollView>(null);
-    const scrollYRef = useRef(0);
-    const pendingRestoreScrollRef = useRef<number | null>(null);
-
-    const [monthlyDivision, setMonthlyDivision] =
-        useState<MonthlyDivision>("pro");
 
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
     const currentQuarter = Math.floor((currentMonth - 1) / 3) + 1;
 
+    const [selectedView, setSelectedView] = useState<RankingView>("pro");
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [infoOpen, setInfoOpen] = useState(false);
+
     const [monthlyYear, setMonthlyYear] = useState(currentYear);
     const [monthlyMonth, setMonthlyMonth] = useState(currentMonth);
 
-    const [quarterlyCategory, setQuarterlyCategory] =
-        useState<QuarterlyCategory>("countries");
     const [quarterlyYear, setQuarterlyYear] = useState(currentYear);
     const [quarterlyQuarter, setQuarterlyQuarter] = useState(currentQuarter);
 
-    const [monthlyRows, setMonthlyRows] = useState<DisplayRow[]>([]);
-    const [quarterlyRows, setQuarterlyRows] = useState<DisplayRow[]>([]);
-
-    const [monthlyLoading, setMonthlyLoading] = useState(false);
-    const [quarterlyLoading, setQuarterlyLoading] = useState(false);
-
-    const [monthlyError, setMonthlyError] = useState("");
-    const [quarterlyError, setQuarterlyError] = useState("");
-
+    const [rows, setRows] = useState<DisplayRow[]>([]);
+    const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState("");
 
-    const monthlyTitle = useMemo(() => {
-        const monthLabel =
-            MONTH_OPTIONS.find((m) => m.value === monthlyMonth)?.label ?? "";
-        return `${titleCase(monthlyDivision)} • ${monthLabel} ${monthlyYear}`;
-    }, [monthlyDivision, monthlyMonth, monthlyYear]);
+    const swooshSoundRef = useRef<Audio.Sound | null>(null);
+    const [soundReady, setSoundReady] = useState(false);
 
-    const quarterlyTitle = useMemo(() => {
-        return `${titleCase(quarterlyCategory)} • Q${quarterlyQuarter} ${quarterlyYear}`;
-    }, [quarterlyCategory, quarterlyQuarter, quarterlyYear]);
+    useEffect(() => {
+        let mounted = true;
 
-    const fetchMonthly = useCallback(async () => {
+        const loadSound = async () => {
+            const { sound } = await Audio.Sound.createAsync(
+                require("../../assets/sounds/swoosh.mp3")
+            );
+
+            if (mounted) {
+                swooshSoundRef.current = sound;
+                setSoundReady(true);
+            }
+        };
+
+        loadSound();
+
+        return () => {
+            mounted = false;
+            swooshSoundRef.current?.unloadAsync();
+        };
+    }, []);
+
+    const playSwoosh = async () => {
         try {
-            setMonthlyLoading(true);
-            setMonthlyError("");
+            const sound = swooshSoundRef.current;
+            if (!sound) return;
 
+            await sound.setPositionAsync(0);
+            await sound.playAsync();
+        } catch {
+            // ignore sound errors
+        }
+    };
+
+    const selectedOption = useMemo(
+        () => VIEW_OPTIONS.find((option) => option.value === selectedView),
+        [selectedView]
+    );
+
+    const periodTitle = useMemo(() => {
+        if (isMonthlyView(selectedView)) {
+            const monthLabel =
+                MONTH_OPTIONS.find((month) => month.value === monthlyMonth)?.label ?? "";
+            return `${monthLabel} ${monthlyYear}`;
+        }
+
+        return `Q${quarterlyQuarter} ${quarterlyYear}`;
+    }, [selectedView, monthlyMonth, monthlyYear, quarterlyQuarter, quarterlyYear]);
+
+    const fetchMonthly = useCallback(
+        async (division: MonthlyDivision) => {
             const currentMonthParam = formatMonthParam(monthlyYear, monthlyMonth);
             const prev = getPreviousMonth(monthlyYear, monthlyMonth);
             const previousMonthParam = formatMonthParam(prev.year, prev.month);
 
-            const currentUrl = `${API_BASE}/api/power-rankings/month/${currentMonthParam}?division=${monthlyDivision}`;
-            const previousUrl = `${API_BASE}/api/power-rankings/month/${previousMonthParam}?division=${monthlyDivision}`;
+            const currentUrl = `${API_BASE}/api/power-rankings/month/${currentMonthParam}?division=${division}`;
+            const previousUrl = `${API_BASE}/api/power-rankings/month/${previousMonthParam}?division=${division}`;
 
             const [currentRes, previousRes] = await Promise.all([
                 fetch(currentUrl),
@@ -301,7 +445,7 @@ export default function PowerRankingsScreen() {
                 rank: item.rank,
             }));
 
-            const normalizedRows: DisplayRow[] = currentItems.map((item) => {
+            return currentItems.map((item) => {
                 const movement = getMovementBadgeData(
                     item.player_name,
                     item.rank,
@@ -311,36 +455,26 @@ export default function PowerRankingsScreen() {
                 return {
                     rank: item.rank,
                     name: item.player_name,
-                    rightLabel: item.country_code,
                     movementType: movement.movementType,
                     movementValue: movement.movementValue,
                     imageUrl: getFlagUrl(item.country_code),
                     metaText: item.country_code,
-                    isInfluencer: false,
+                    isCollege: false,
                 };
             });
+        },
+        [monthlyYear, monthlyMonth]
+    );
 
-            setMonthlyRows(normalizedRows);
-        } catch {
-            setMonthlyRows([]);
-            setMonthlyError("Could not load monthly rankings.");
-        } finally {
-            setMonthlyLoading(false);
-        }
-    }, [monthlyDivision, monthlyYear, monthlyMonth]);
-
-    const fetchQuarterly = useCallback(async () => {
-        try {
-            setQuarterlyLoading(true);
-            setQuarterlyError("");
-
+    const fetchQuarterly = useCallback(
+        async (category: QuarterlyCategory) => {
             const res = await fetch(`${API_BASE}/api/power-rankings/quarterly`);
             const json: QuarterlyRankingResponse = await res.json();
             const allItems = json?.items ?? [];
 
             const selected = allItems.find(
                 (item) =>
-                    item.category === quarterlyCategory &&
+                    item.category === category &&
                     item.year === quarterlyYear &&
                     item.quarter === quarterlyQuarter
             );
@@ -349,7 +483,7 @@ export default function PowerRankingsScreen() {
 
             const previous = allItems.find(
                 (item) =>
-                    item.category === quarterlyCategory &&
+                    item.category === category &&
                     item.year === prev.year &&
                     item.quarter === prev.quarter
             );
@@ -358,130 +492,115 @@ export default function PowerRankingsScreen() {
             const previousEntries = previous?.entries ?? [];
 
             const previousList = previousEntries.map((entry) => ({
-                name: getQuarterlyIdentity(entry),
+                name: entry.name,
                 rank: entry.rank,
             }));
 
-            const normalizedRows: DisplayRow[] = currentEntries.map((entry) => {
-                const identity = getQuarterlyIdentity(entry);
-                const cleanHandle = sanitizeHandle(entry.meta?.handle);
-                const isInfluencer = quarterlyCategory === "influencers";
-                const flagUrl = getFlagUrl(entry.meta?.country_code);
-                const platformLogo = getPlatformLogoUrl(entry.meta?.platform);
-
-                const movement = getMovementBadgeData(
-                    identity,
-                    entry.rank,
-                    previousList
-                );
+            return currentEntries.map((entry) => {
+                const movement = getMovementBadgeData(entry.name, entry.rank, previousList);
 
                 return {
                     rank: entry.rank,
-                    name: isInfluencer ? (cleanHandle || entry.name) : entry.name,
-                    rightLabel: isInfluencer ? undefined : entry.meta?.country_code,
+                    name: entry.name,
                     movementType: movement.movementType,
                     movementValue: movement.movementValue,
-                    imageUrl: isInfluencer ? platformLogo : flagUrl,
-                    metaText: isInfluencer ? undefined : entry.meta?.country_code,
-                    isInfluencer,
+                    imageUrl: getFlagUrl(entry.meta?.country_code),
+                    metaText: entry.meta?.country_code,
+                    isCollege: category === "colleges",
                 };
             });
+        },
+        [quarterlyYear, quarterlyQuarter]
+    );
 
-            setQuarterlyRows(normalizedRows);
+    const fetchRankings = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError("");
+
+            let nextRows: DisplayRow[] = [];
+
+            if (isMonthlyView(selectedView)) {
+                nextRows = await fetchMonthly(selectedView);
+            } else {
+                nextRows = await fetchQuarterly(selectedView);
+            }
+
+            setRows(nextRows);
         } catch {
-            setQuarterlyRows([]);
-            setQuarterlyError("Could not load quarterly rankings.");
+            setRows([]);
+            setError("Could not load rankings.");
         } finally {
-            setQuarterlyLoading(false);
-        }
-    }, [quarterlyCategory, quarterlyYear, quarterlyQuarter]);
-
-    const fetchAllRankings = useCallback(async () => {
-        await Promise.all([fetchMonthly(), fetchQuarterly()]);
-    }, [fetchMonthly, fetchQuarterly]);
-
-    useEffect(() => {
-        const run = async () => {
-            await fetchAllRankings();
+            setLoading(false);
             setInitialLoading(false);
-        };
-        run();
-    }, [fetchAllRankings]);
+        }
+    }, [selectedView, fetchMonthly, fetchQuarterly]);
+    useEffect(() => {
+        fetchRankings();
+    }, [fetchRankings]);
 
     useEffect(() => {
-        if (!quarterlyLoading && pendingRestoreScrollRef.current != null) {
-            const y = pendingRestoreScrollRef.current;
-            requestAnimationFrame(() => {
-                scrollRef.current?.scrollTo({ y, animated: false });
-                pendingRestoreScrollRef.current = null;
-            });
-        }
-    }, [quarterlyLoading, quarterlyRows]);
+        if (!soundReady) return;
+
+        playSwoosh();
+    }, [soundReady]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         try {
-            await fetchAllRankings();
-            await new Promise((resolve) => setTimeout(resolve, 700));
+            await fetchRankings();
+            await new Promise((resolve) => setTimeout(resolve, 500));
         } finally {
             setRefreshing(false);
         }
-    }, [fetchAllRankings]);
+    }, [fetchRankings]);
 
-    const preserveScroll = () => {
-        pendingRestoreScrollRef.current = scrollYRef.current;
-    };
+    const onScroll = (_e: NativeSyntheticEvent<NativeScrollEvent>) => { };
 
-    const goMonthlyBack = () => {
-        preserveScroll();
-        const prev = getPreviousMonth(monthlyYear, monthlyMonth);
-        setMonthlyYear(prev.year);
-        setMonthlyMonth(prev.month);
-    };
+    const goBack = async () => {
+        await playSwoosh();
 
-    const goMonthlyForward = () => {
-        preserveScroll();
-        const next = getNextMonth(monthlyYear, monthlyMonth);
-        setMonthlyYear(next.year);
-        setMonthlyMonth(next.month);
-    };
+        if (isMonthlyView(selectedView)) {
+            const prev = getPreviousMonth(monthlyYear, monthlyMonth);
+            setMonthlyYear(prev.year);
+            setMonthlyMonth(prev.month);
+            return;
+        }
 
-    const goQuarterlyBack = () => {
-        preserveScroll();
         const prev = getPreviousQuarter(quarterlyYear, quarterlyQuarter);
         setQuarterlyYear(prev.year);
         setQuarterlyQuarter(prev.quarter);
     };
 
-    const goQuarterlyForward = () => {
-        preserveScroll();
+    const goForward = async () => {
+        await playSwoosh();
+
+        if (isMonthlyView(selectedView)) {
+            const next = getNextMonth(monthlyYear, monthlyMonth);
+            setMonthlyYear(next.year);
+            setMonthlyMonth(next.month);
+            return;
+        }
+
         const next = getNextQuarter(quarterlyYear, quarterlyQuarter);
         setQuarterlyYear(next.year);
         setQuarterlyQuarter(next.quarter);
     };
 
-    const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-        scrollYRef.current = e.nativeEvent.contentOffset.y;
-    };
-
-    const renderRows = (
-        rows: DisplayRow[],
-        loading: boolean,
-        errorMessage: string
-    ) => {
+    const renderRows = () => {
         if (loading) {
             return (
                 <View style={styles.centerState}>
                     <ActivityIndicator size="small" color={REFRESH_COLOR} />
-                    <Text style={styles.stateText}>Loading...</Text>
+                    <Text style={styles.stateText}>Loading rankings...</Text>
                 </View>
             );
         }
 
-        if (errorMessage) {
+        if (error) {
             return (
                 <View style={styles.centerState}>
-                    <Text style={styles.errorText}>{errorMessage}</Text>
+                    <Text style={styles.errorText}>{error}</Text>
                 </View>
             );
         }
@@ -496,53 +615,13 @@ export default function PowerRankingsScreen() {
 
         return (
             <View style={styles.rankingsCard}>
-                {rows.map((row) => {
-                    return (
-                        <View key={`${row.rank}-${row.name}`} style={styles.rankRow}>
-                            <Text style={styles.rankNumber}>{row.rank}</Text>
-
-                            <View style={styles.rankMain}>
-                                <View style={styles.nameLine}>
-                                    {row.imageUrl ? (
-                                        <Image
-                                            source={{ uri: row.imageUrl }}
-                                            style={row.isInfluencer ? styles.platformImage : styles.flagImage}
-                                        />
-                                    ) : null}
-
-                                    <Text style={styles.rankName} numberOfLines={1}>
-                                        {row.name}
-                                    </Text>
-                                </View>
-
-                                {!!row.metaText && (
-                                    <Text
-                                        style={[
-                                            styles.rankMeta,
-                                            row.isInfluencer && styles.rankMetaInfluencer,
-                                        ]}
-                                    >
-                                        {row.metaText}
-                                    </Text>
-                                )}
-                            </View>
-
-                            <View
-                                style={[
-                                    styles.movementBadge,
-                                    row.movementType === "up" && styles.movementUp,
-                                    row.movementType === "down" && styles.movementDown,
-                                    row.movementType === "same" && styles.movementSame,
-                                    row.movementType === "new" && styles.movementNew,
-                                ]}
-                            >
-                                <Text style={styles.movementText}>
-                                    {getMovementText(row.movementType, row.movementValue)}
-                                </Text>
-                            </View>
-                        </View>
-                    );
-                })}
+                {rows.map((row, index) => (
+                    <AnimatedRankRow
+                        key={`${selectedView}-${periodTitle}-${row.rank}-${row.name}`}
+                        row={row}
+                        index={index}
+                    />
+                ))}
             </View>
         );
     };
@@ -562,12 +641,6 @@ export default function PowerRankingsScreen() {
         <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
-            {refreshing && (
-                <View style={styles.refreshIndicator}>
-                    <ActivityIndicator size="small" color={REFRESH_COLOR} />
-                </View>
-            )}
-
             <ScrollView
                 ref={scrollRef}
                 style={styles.container}
@@ -585,133 +658,113 @@ export default function PowerRankingsScreen() {
                     />
                 }
             >
-                <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}>Power Rankings 🥇 </Text>
+                <View style={styles.hero}>
+                    <Text style={styles.headerTitle}>POWER RANKINGS</Text>
+
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        style={styles.infoButton}
+                        onPress={() => setInfoOpen(true)}
+                    >
+                        <Text style={styles.infoButtonText}>i</Text>
+                    </TouchableOpacity>
                 </View>
 
-                <View style={styles.sectionBlock}>
-                    {/* <Text style={styles.sectionTitle}>{monthlyTitle}</Text> */}
-
-                    <View style={styles.topControlRow}>
-                        <View style={styles.divisionCompact}>
-                            {(["pro", "women"] as MonthlyDivision[]).map((division) => {
-                                const active = monthlyDivision === division;
-                                return (
-                                    <TouchableOpacity
-                                        key={division}
-                                        style={[
-                                            styles.compactPill,
-                                            active && styles.compactPillActive,
-                                        ]}
-                                        onPress={() => {
-                                            preserveScroll();
-                                            setMonthlyDivision(division);
-                                        }}
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.compactPillText,
-                                                active && styles.compactPillTextActive,
-                                            ]}
-                                        >
-                                            {titleCase(division)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        <View style={styles.monthNavCompact}>
-                            <TouchableOpacity style={styles.arrowButton} onPress={goMonthlyBack}>
-                                <Text style={styles.arrowText}>‹</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.periodValueBox}>
-                                <Text style={styles.periodValueText}>
-                                    {MONTH_OPTIONS.find((m) => m.value === monthlyMonth)?.label}{" "}
-                                    {monthlyYear}
-                                </Text>
+                <View style={styles.controlsRow}>
+                    <View style={styles.dropdownWrap}>
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={styles.dropdownButton}
+                            onPress={() => setDropdownOpen((prev) => !prev)}
+                        >
+                            <View>
+                                <Text style={styles.dropdownLabel}>Ranking List</Text>
+                                <Text style={styles.dropdownValue}>{getViewLabel(selectedView)}</Text>
                             </View>
 
-                            <TouchableOpacity
-                                style={styles.arrowButton}
-                                onPress={goMonthlyForward}
-                            >
-                                <Text style={styles.arrowText}>›</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
+                            <Text style={styles.dropdownArrow}>{dropdownOpen ? "⌃" : "⌄"}</Text>
+                        </TouchableOpacity>
 
-                    {renderRows(monthlyRows, monthlyLoading, monthlyError)}
-                </View>
+                        {dropdownOpen && (
+                            <View style={styles.dropdownMenu}>
+                                {VIEW_OPTIONS.map((option) => {
+                                    const active = selectedView === option.value;
 
-                <View style={styles.sponsorBlock}>
-                    <Text style={styles.sponsorLabel}>Sponsored by CyberGlobe, LLC</Text>
-                    <Text style={styles.sponsorSubtext}>
-                        "Lets Build Helpful Software Applications, TOGETHER"
-                    </Text>
-                </View>
-
-                <View style={styles.sectionBlock}>
-                    {/* <Text style={styles.sectionTitle}>{quarterlyTitle}</Text> */}
-
-                    <View style={styles.topControlRowQuarterly}>
-                        <View style={styles.categoryCompact}>
-                            {(
-                                ["countries", "colleges", "influencers"] as QuarterlyCategory[]
-                            ).map((category) => {
-                                const active = quarterlyCategory === category;
-                                return (
-                                    <TouchableOpacity
-                                        key={category}
-                                        style={[
-                                            styles.compactPill,
-                                            active && styles.compactPillActive,
-                                        ]}
-                                        onPress={() => {
-                                            preserveScroll();
-                                            setQuarterlyCategory(category);
-                                        }}
-                                    >
-                                        <Text
+                                    return (
+                                        <TouchableOpacity
+                                            key={option.value}
                                             style={[
-                                                styles.compactPillText,
-                                                active && styles.compactPillTextActive,
+                                                styles.dropdownItem,
+                                                active ? styles.dropdownItemActive : null,
                                             ]}
+                                            onPress={async () => {
+                                                await playSwoosh();
+
+                                                setSelectedView(option.value);
+                                                setDropdownOpen(false);
+                                                scrollRef.current?.scrollTo({ y: 0, animated: true });
+                                            }}
                                         >
-                                            {titleCase(category)}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-                        <View style={styles.monthNavCompact}>
-                            <TouchableOpacity
-                                style={styles.arrowButton}
-                                onPress={goQuarterlyBack}
-                            >
-                                <Text style={styles.arrowText}>‹</Text>
-                            </TouchableOpacity>
-
-                            <View style={styles.periodValueBox}>
-                                <Text style={styles.periodValueText}>
-                                    Q{quarterlyQuarter} {quarterlyYear}
-                                </Text>
+                                            <Text
+                                                style={[
+                                                    styles.dropdownItemText,
+                                                    active ? styles.dropdownItemTextActive : null,
+                                                ]}
+                                            >
+                                                {option.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </View>
-
-                            <TouchableOpacity
-                                style={styles.arrowButton}
-                                onPress={goQuarterlyForward}
-                            >
-                                <Text style={styles.arrowText}>›</Text>
-                            </TouchableOpacity>
-                        </View>
+                        )}
                     </View>
 
-                    {renderRows(quarterlyRows, quarterlyLoading, quarterlyError)}
+                    <View style={styles.periodControl}>
+                        <TouchableOpacity style={styles.arrowButton} onPress={goBack}>
+                            <Text style={styles.arrowText}>‹</Text>
+                        </TouchableOpacity>
+
+                        <View style={styles.periodValueBox}>
+                            <Text style={styles.periodValueText}>{periodTitle}</Text>
+                            <Text style={styles.periodTypeText}>
+                                {selectedOption?.type === "quarterly" ? "Quarterly" : "Monthly"}
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity style={styles.arrowButton} onPress={goForward}>
+                            <Text style={styles.arrowText}>›</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
+
+                {renderRows()}
             </ScrollView>
+
+            <Modal visible={infoOpen} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>What are Power Rankings?</Text>
+
+                        <Text style={styles.modalText}>
+                            Just Move Power Rankings are based mainly on recent classical chess performance,
+                            player or team activity, strength of opposition, consistency, and current form.
+                            While classical chess carries the most weight in our rankings, strong performances
+                            in rapid, blitz, and Fischer Random tournaments can also influence movement depending
+                            on the strength and importance of the event. Rankings are designed to reflect who is
+                            performing at the highest level right now across the competitive chess landscape.
+                        </Text>
+
+                        <TouchableOpacity
+                            activeOpacity={0.85}
+                            style={styles.modalCloseButton}
+                            onPress={() => setInfoOpen(false)}
+                        >
+                            <Text style={styles.modalCloseText}>Got it</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -721,265 +774,461 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#000000",
     },
+
     container: {
         flex: 1,
         backgroundColor: "#000000",
     },
+
     contentContainer: {
         paddingHorizontal: 16,
         paddingBottom: 42,
     },
+
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
     },
-    refreshIndicator: {
-        alignItems: "center",
-        paddingVertical: 6,
-    },
-    headerRow: {
-        marginTop: 4,
-        marginBottom: 12,
-        flexDirection: "row",
+
+    hero: {
+        marginTop: 10,
+        marginBottom: 14,
+        height: 78,
+        borderRadius: 22,
+        backgroundColor: "#070A10",
+        borderWidth: 1,
+        borderColor: "#132033",
         alignItems: "center",
         justifyContent: "center",
+        shadowColor: "#2EE7FF",
+        shadowOpacity: 0.18,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
     },
+
     headerTitle: {
-        color: "#ff00b7",
+        color: "#FFFFFF",
         fontSize: 25,
         fontWeight: "900",
         textAlign: "center",
-
-        letterSpacing: 2,
-        textTransform: "uppercase",
-
-        marginTop: 12,   // space from logo/nav
-        marginBottom: 10, // space before filters
-        paddingHorizontal: 16, // prevents edge crowding
-
-        textShadowColor: "#ff00b7",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 16,
+        letterSpacing: 1.2,
     },
-    sectionBlock: {
-        marginBottom: 12,
+
+    infoButton: {
+        position: "absolute",
+        right: 14,
+        top: 12,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: "#101827",
+        borderWidth: 1,
+        borderColor: "#2EE7FF",
+        alignItems: "center",
+        justifyContent: "center",
     },
-    sectionTitle: {
-        color: "#FFFFFF",
-        fontSize: 17,
+
+    infoButtonText: {
+        color: "#2EE7FF",
+        fontSize: 13,
         fontWeight: "900",
-        marginBottom: 8,
-        textAlign: "center",
+        fontStyle: "italic",
     },
-    topControlRow: {
+
+    controlsRow: {
+        flexDirection: "row",
+        alignItems: "stretch",
+        gap: 8,
+        marginBottom: 12,
+        zIndex: 30,
+    },
+
+    dropdownWrap: {
+        flex: 0.9,
+        position: "relative",
+        zIndex: 40,
+    },
+
+    dropdownButton: {
+        minHeight: 54,
+        borderRadius: 18,
+        backgroundColor: "#101010",
+        borderWidth: 1,
+        borderColor: "#263241",
+        paddingHorizontal: 13,
+        paddingVertical: 8,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        marginBottom: 8,
-        gap: 6,
     },
-    topControlRowQuarterly: {
-        flexDirection: "column",
-        marginBottom: 8,
-        gap: 6,
+
+    dropdownLabel: {
+        color: "#7DDFFF",
+        fontSize: 8.5,
+        fontWeight: "900",
+        letterSpacing: 1,
+        textTransform: "uppercase",
     },
-    divisionCompact: {
-        flexDirection: "row",
-        gap: 5,
-    },
-    categoryCompact: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 5,
-    },
-    compactPill: {
-        paddingHorizontal: 9,
-        paddingVertical: 4,
-        borderRadius: 999,
-        backgroundColor: "#151515",
-        borderWidth: 1,
-        borderColor: "#282828",
-    },
-    compactPillActive: {
-        backgroundColor: "#2EE7FF",
-        borderColor: "#63F0FF",
-    },
-    compactPillText: {
-        color: "#F1F1F1",
-        fontSize: 11,
-        fontWeight: "800",
-    },
-    compactPillTextActive: {
-        color: "#081018",
-    },
-    monthNavCompact: {
-        flexDirection: "row",
-        alignItems: "center",
-        flex: 1,
-        justifyContent: "flex-end",
-    },
-    arrowButton: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: "#121212",
-        borderWidth: 1,
-        borderColor: "#262626",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    arrowText: {
-        color: "#F4D03F",
+
+    dropdownValue: {
+        color: "#FFFFFF",
         fontSize: 16,
         fontWeight: "900",
-        lineHeight: 16,
+        marginTop: 2,
     },
-    periodValueBox: {
-        minWidth: 100,
-        marginHorizontal: 6,
-        paddingVertical: 5,
-        paddingHorizontal: 9,
-        borderRadius: 10,
-        backgroundColor: "#101010",
+
+    dropdownArrow: {
+        color: "#F4D03F",
+        fontSize: 20,
+        fontWeight: "900",
+    },
+
+    dropdownMenu: {
+        position: "absolute",
+        top: 60,
+        left: 0,
+        right: 0,
+        borderRadius: 18,
+        backgroundColor: "#0B0F17",
         borderWidth: 1,
-        borderColor: "#1E1E1E",
+        borderColor: "#263241",
+        overflow: "hidden",
+        zIndex: 50,
+    },
+
+    dropdownItem: {
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#171D28",
+    },
+
+    dropdownItemActive: {
+        backgroundColor: "rgba(46,231,255,0.13)",
+    },
+
+    dropdownItemText: {
+        color: "#E5E7EB",
+        fontSize: 14,
+        fontWeight: "900",
+    },
+
+    dropdownItemTextActive: {
+        color: "#2EE7FF",
+    },
+
+    periodControl: {
+        flex: 1.15,
+        minHeight: 54,
+        borderRadius: 18,
+        backgroundColor: "#090909",
+        borderWidth: 1,
+        borderColor: "#202020",
+        paddingHorizontal: 8,
+        flexDirection: "row",
         alignItems: "center",
+        justifyContent: "space-between",
     },
-    periodValueText: {
-        color: "#FFFFFF",
-        fontSize: 12,
-        fontWeight: "800",
-    },
-    sponsorBlock: {
+
+    arrowButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: "#141414",
+        borderWidth: 1,
+        borderColor: "#2A2A2A",
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 2,
-        marginBottom: 14,
-        paddingVertical: 6,
     },
-    sponsorLabel: {
-        color: "#2EE7FF",
-        fontSize: 12,
-        fontWeight: "800",
-        textAlign: "center",
-        letterSpacing: 0.3,
-        marginBottom: 3,
+
+    arrowText: {
+        color: "#F4D03F",
+        fontSize: 22,
+        fontWeight: "900",
+        lineHeight: 24,
     },
-    sponsorSubtext: {
-        color: "#CFCFCF",
-        fontSize: 11,
-        fontWeight: "700",
-        textAlign: "center",
+
+    periodValueBox: {
+        alignItems: "center",
+        justifyContent: "center",
+        flex: 1,
     },
+
+    periodValueText: {
+        color: "#FFFFFF",
+        fontSize: 14,
+        fontWeight: "900",
+    },
+
+    periodTypeText: {
+        color: "#8B949E",
+        fontSize: 8.5,
+        fontWeight: "900",
+        marginTop: 1,
+        textTransform: "uppercase",
+        letterSpacing: 1,
+    },
+
     centerState: {
-        paddingVertical: 16,
+        paddingVertical: 24,
         alignItems: "center",
     },
+
     stateText: {
         color: "#CFCFCF",
         fontSize: 12,
-        fontWeight: "700",
+        fontWeight: "800",
         marginTop: 8,
     },
+
     errorText: {
         color: "#FF6B6B",
         fontSize: 12,
-        fontWeight: "700",
+        fontWeight: "800",
         textAlign: "center",
     },
+
     rankingsCard: {
-        backgroundColor: "#0C0C0C",
-        borderRadius: 16,
-        paddingVertical: 1,
-        paddingHorizontal: 8,
+        backgroundColor: "#070707",
+        borderRadius: 22,
+        paddingVertical: 4,
+        paddingHorizontal: 10,
         borderWidth: 1,
-        borderColor: "#171717",
+        borderColor: "#1E1E1E",
+        overflow: "hidden",
     },
+
     rankRow: {
-        minHeight: 32,
+        minHeight: 54,
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 2,
-        paddingVertical: 4,
+        paddingHorizontal: 4,
+        paddingVertical: 6,
         borderBottomWidth: 1,
-        borderBottomColor: "#141414",
+        borderBottomColor: "#171717",
     },
+
+    goldRow: {
+        backgroundColor: "rgba(244,208,63,0.055)",
+    },
+
+    silverRow: {
+        backgroundColor: "rgba(209,213,219,0.05)",
+    },
+
+    bronzeRow: {
+        backgroundColor: "rgba(205,127,50,0.055)",
+    },
+
     rankNumber: {
-        width: 20,
+        width: 30,
         color: "#F4D03F",
-        fontSize: 12,
+        fontSize: 17,
         fontWeight: "900",
-        marginRight: 8,
+        marginRight: 7,
+        textAlign: "center",
     },
+
+    goldRank: {
+        color: "#F8D84A",
+        textShadowColor: "#F8D84A",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 12,
+    },
+
+    silverRank: {
+        color: "#E5E7EB",
+        textShadowColor: "#E5E7EB",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+
+    bronzeRank: {
+        color: "#D99A56",
+        textShadowColor: "#CD7F32",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+
     rankMain: {
         flex: 1,
         marginRight: 8,
     },
+
     nameLine: {
         flexDirection: "row",
         alignItems: "center",
     },
+
     flagImage: {
-        width: 14,
-        height: 10,
-        borderRadius: 2,
-        marginRight: 6,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        marginRight: 9,
         backgroundColor: "#1A1A1A",
+        borderWidth: 1,
+        borderColor: "#2A2A2A",
     },
-    platformImage: {
-        width: 14,
-        height: 14,
-        borderRadius: 3,
-        marginRight: 6,
-        backgroundColor: "#1A1A1A",
+
+    flagFallback: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        marginRight: 9,
+        backgroundColor: "#151515",
+        borderWidth: 1,
+        borderColor: "#2A2A2A",
     },
+
+    emojiIcon: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        marginRight: 9,
+        backgroundColor: "#151515",
+        borderWidth: 1,
+        borderColor: "#2A2A2A",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    emojiIconText: {
+        fontSize: 15,
+    },
+
+    knightIconText: {
+        color: "#FFFFFF",
+        fontSize: 18,
+        fontWeight: "900",
+    },
+
+    nameStack: {
+        flex: 1,
+    },
+
     rankName: {
         color: "#FFFFFF",
-        fontSize: 11,
-        fontWeight: "800",
-        lineHeight: 13,
+        fontSize: 14.5,
+        fontWeight: "900",
+        lineHeight: 17,
         flexShrink: 1,
     },
+
+    collegeName: {
+        fontSize: 13.5,
+        lineHeight: 16,
+    },
+
+    goldName: {
+        color: "#F8D84A",
+        textShadowColor: "#F8D84A",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 12,
+    },
+
+    silverName: {
+        color: "#E5E7EB",
+        textShadowColor: "#E5E7EB",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+
+    bronzeName: {
+        color: "#D99A56",
+        textShadowColor: "#CD7F32",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
+    },
+
     rankMeta: {
         color: "#9B9B9B",
-        fontSize: 9,
-        fontWeight: "700",
+        fontSize: 10.5,
+        fontWeight: "900",
         marginTop: 1,
-        letterSpacing: 0.3,
-        marginLeft: 20,
+        letterSpacing: 0.5,
     },
-    rankMetaInfluencer: {
-        marginLeft: 20,
-    },
+
     movementBadge: {
-        minWidth: 38,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
+        minWidth: 44,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
         borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 1,
+        borderWidth: 1.5,
     },
+
     movementUp: {
-        backgroundColor: "rgba(46,231,165,0.12)",
+        backgroundColor: "rgba(46,231,165,0.13)",
         borderColor: "#2EE7A5",
     },
+
     movementDown: {
-        backgroundColor: "rgba(255,92,92,0.12)",
+        backgroundColor: "rgba(255,92,92,0.13)",
         borderColor: "#FF5C5C",
     },
+
     movementSame: {
         backgroundColor: "rgba(156,163,175,0.12)",
         borderColor: "#9CA3AF",
     },
+
     movementNew: {
-        backgroundColor: "rgba(46,231,255,0.12)",
+        backgroundColor: "rgba(46,231,255,0.13)",
         borderColor: "#2EE7FF",
     },
+
     movementText: {
         color: "#FFFFFF",
-        fontSize: 9.5,
+        fontSize: 11,
+        fontWeight: "900",
+        letterSpacing: 0.3,
+    },
+
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: "rgba(0,0,0,0.72)",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 22,
+    },
+
+    modalCard: {
+        width: "100%",
+        borderRadius: 24,
+        backgroundColor: "#080B12",
+        borderWidth: 1,
+        borderColor: "#2EE7FF",
+        padding: 20,
+    },
+
+    modalTitle: {
+        color: "#FFFFFF",
+        fontSize: 21,
+        fontWeight: "900",
+        marginBottom: 10,
+    },
+
+    modalText: {
+        color: "#D1D5DB",
+        fontSize: 13.5,
+        fontWeight: "700",
+        lineHeight: 21,
+    },
+
+    modalCloseButton: {
+        marginTop: 18,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: "#2EE7FF",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    modalCloseText: {
+        color: "#041014",
+        fontSize: 14,
         fontWeight: "900",
     },
 });

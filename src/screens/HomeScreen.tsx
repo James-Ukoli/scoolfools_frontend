@@ -10,15 +10,26 @@ import {
     Animated,
     TouchableOpacity,
     Easing,
+    Modal,
+    Pressable,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
 import { s, vs, ms } from "react-native-size-matters";
+import {
+    initializeIAP,
+    getBlogsSubscriptionProduct,
+    buyBlogsSubscription,
+    setupPurchaseListeners,
+    cleanupIAP,
+} from "../services/iap";
 
 type Post = {
     _id: string;
@@ -108,6 +119,108 @@ export default function HomeScreen() {
     const [loadingHome, setLoadingHome] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [gamesPackagePurchased, setGamesPackagePurchased] = useState(false);
+
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+
+    const getToken = async () => {
+        return await AsyncStorage.getItem("token");
+    };
+
+    const fetchEntitlements = async () => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) return;
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (data?.success) {
+                setIsSubscribed(!!data?.entitlements?.isSubscribed);
+                setGamesPackagePurchased(!!data?.entitlements?.gamesPackagePurchased);
+            }
+        } catch (error) {
+            console.log("Home entitlement fetch error:", error);
+        }
+    };
+
+    const loadBlogSubscription = async () => {
+        try {
+            await initializeIAP();
+
+            const product = await getBlogsSubscriptionProduct();
+            setSubscriptionProduct(product);
+        } catch (error) {
+            console.log("Home blog subscription load error:", error);
+        }
+    };
+
+    const activateBlogSubscriptionOnBackend = async () => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) {
+                throw new Error("Missing token or API base URL");
+            }
+
+            const response = await fetch(
+                `${API_BASE_URL}/api/auth/me/activate-blog-subscription`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to activate subscription");
+            }
+
+            setIsSubscribed(true);
+            setPaywallVisible(false);
+
+            Alert.alert("Subscribed 🎉", "You now have access to Just Move blogs.");
+        } catch (error) {
+            console.log("Activate home blog subscription error:", error);
+
+            Alert.alert(
+                "Purchase Complete",
+                "Purchase worked, but saving the subscription to your account failed."
+            );
+        } finally {
+            setLoadingSubscription(false);
+        }
+    };
+
+    const handleSubscribePress = async () => {
+        try {
+            setLoadingSubscription(true);
+            await buyBlogsSubscription();
+        } catch (error) {
+            setLoadingSubscription(false);
+            console.log("Home blog subscription request error:", error);
+
+            Alert.alert(
+                "Subscription Failed",
+                "Something went wrong while starting the subscription."
+            );
+        }
+    };
+
     const fetchHomeData = useCallback(async () => {
         try {
             const [postsRes, eventsRes] = await Promise.all([
@@ -163,6 +276,24 @@ export default function HomeScreen() {
 
     useEffect(() => {
         fetchHomeData();
+        fetchEntitlements();
+        loadBlogSubscription();
+
+        setupPurchaseListeners({
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async () => {
+                await activateBlogSubscriptionOnBackend();
+            },
+            onPurchaseError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Home subscription listener error:", error);
+            },
+        });
+
+        return () => {
+            cleanupIAP();
+        };
     }, [fetchHomeData]);
 
     const onRefresh = useCallback(async () => {
@@ -170,6 +301,7 @@ export default function HomeScreen() {
 
         try {
             await fetchHomeData();
+            await fetchEntitlements();
             await new Promise((resolve) => setTimeout(resolve, 900));
         } catch (error) {
             console.log("HOME REFRESH ERROR:", error);
@@ -207,9 +339,19 @@ export default function HomeScreen() {
                         <View style={styles.sectionAccentLine} />
                     </View>
 
-                    <FeaturedCarousel posts={featuredPosts} loading={loadingHome} />
+                    <FeaturedCarousel
+                        posts={featuredPosts}
+                        loading={loadingHome}
+                        isSubscribed={isSubscribed}
+                        onRequireSubscription={() => setPaywallVisible(true)}
+                    />
 
-                    <SupportGrowthBanner navigation={navigation} />
+                    <SupportGrowthBanner
+                        navigation={navigation}
+                        isSubscribed={isSubscribed}
+                        gamesPackagePurchased={gamesPackagePurchased}
+                        onOpenBlogPaywall={() => setPaywallVisible(true)}
+                    />
 
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
@@ -218,19 +360,101 @@ export default function HomeScreen() {
                         <View style={styles.sectionAccentLine} />
                     </View>
 
-                    <HorizontalPostsRow posts={featuredStories} loading={loadingHome} />
+                    <HorizontalPostsRow
+                        posts={featuredStories}
+                        loading={loadingHome}
+                        isSubscribed={isSubscribed}
+                        onRequireSubscription={() => setPaywallVisible(true)}
+                    />
                 </ScrollView>
             </View>
+
+            <Modal
+                visible={paywallVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPaywallVisible(false)}
+            >
+                <View style={styles.paywallOverlay}>
+                    <Pressable
+                        style={styles.paywallBackdrop}
+                        onPress={() => setPaywallVisible(false)}
+                    />
+
+                    <View style={styles.paywallCard}>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setPaywallVisible(false)}
+                        >
+                            <Text style={styles.closeButtonText}>×</Text>
+                        </TouchableOpacity>
+
+                        <Text style={styles.paywallEmoji}>♟️</Text>
+
+                        <Text style={styles.paywallTitle}>
+                            Support Just Move Blogs
+                        </Text>
+
+                        <Text style={styles.paywallSubtitle}>
+                            Help support independent chess journalism and the future of
+                            modern chess media.
+                        </Text>
+
+                        <View style={styles.priceBox}>
+                            <Text style={styles.freeTrialText}>1 Month Free</Text>
+                            <Text style={styles.priceText}>
+                                Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
+                            </Text>
+                        </View>
+
+                        <View style={styles.benefitsBox}>
+                            <Text style={styles.benefitText}>✓ Exclusive blogs and stories</Text>
+                            <Text style={styles.benefitText}>✓ Support independent chess coverage</Text>
+                            <Text style={styles.benefitText}>✓ Help grow modern chess media</Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.subscribeButton}
+                            activeOpacity={0.9}
+                            onPress={handleSubscribePress}
+                            disabled={loadingSubscription}
+                        >
+                            {loadingSubscription ? (
+                                <ActivityIndicator color="#050816" />
+                            ) : (
+                                <Text style={styles.subscribeButtonText}>
+                                    Start Free Month
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <Text style={styles.paywallFinePrint}>
+                            Cancel anytime. Subscription renews yearly after the free trial.
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
 
-function SupportGrowthBanner({ navigation }: any) {
+function SupportGrowthBanner({
+    navigation,
+    isSubscribed,
+    gamesPackagePurchased,
+    onOpenBlogPaywall,
+}: any) {
     const pulse = useRef(new Animated.Value(1)).current;
     const glow = useRef(new Animated.Value(0)).current;
     const arrowFloat = useRef(new Animated.Value(0)).current;
 
+    const showGamesButton = !gamesPackagePurchased;
+    const showBlogsButton = !isSubscribed;
+    const singleButton = showGamesButton !== showBlogsButton;
+
     useEffect(() => {
+        if (!showGamesButton && !showBlogsButton) return;
+
         Animated.loop(
             Animated.parallel([
                 Animated.sequence([
@@ -275,7 +499,11 @@ function SupportGrowthBanner({ navigation }: any) {
                 ]),
             ])
         ).start();
-    }, []);
+    }, [showGamesButton, showBlogsButton]);
+
+    if (!showGamesButton && !showBlogsButton) {
+        return null;
+    }
 
     const shadowOpacity = glow.interpolate({
         inputRange: [0, 1],
@@ -315,37 +543,53 @@ function SupportGrowthBanner({ navigation }: any) {
             </View>
 
             <View style={styles.supportActionsRow}>
-                <TouchableOpacity
-                    activeOpacity={0.88}
-                    style={[styles.supportActionButton, styles.gamesActionButton]}
-                    onPress={() => navigation.navigate("GameHome")}
-                >
-                    <Ionicons
-                        name="game-controller-outline"
-                        size={18}
-                        color="#D98CFF"
-                    />
+                {showGamesButton && (
+                    <TouchableOpacity
+                        activeOpacity={0.88}
+                        style={[
+                            styles.supportActionButton,
+                            styles.gamesActionButton,
+                            singleButton && styles.fullWidthSupportButton,
+                        ]}
+                        onPress={() => navigation.navigate("GameHome")}
+                    >
+                        <Ionicons
+                            name="game-controller-outline"
+                            size={18}
+                            color="#D98CFF"
+                        />
 
-                    <Text style={styles.supportActionText}>
-                        Party Games 🎉
-                    </Text>
-                </TouchableOpacity>
+                        <Text style={styles.supportActionText}>
+                            {singleButton
+                                ? "Party Games with Chess Friends 🎉"
+                                : "Party Games 🎉"}
+                        </Text>
+                    </TouchableOpacity>
+                )}
 
-                <TouchableOpacity
-                    activeOpacity={0.88}
-                    style={[styles.supportActionButton, styles.blogsActionButton]}
-                    onPress={() => navigation.navigate("Blogs")}
-                >
-                    <Ionicons
-                        name="newspaper-outline"
-                        size={18}
-                        color="#FFD166"
-                    />
+                {showBlogsButton && (
+                    <TouchableOpacity
+                        activeOpacity={0.88}
+                        style={[
+                            styles.supportActionButton,
+                            styles.blogsActionButton,
+                            singleButton && styles.fullWidthSupportButton,
+                        ]}
+                        onPress={onOpenBlogPaywall}
+                    >
+                        <Ionicons
+                            name="newspaper-outline"
+                            size={18}
+                            color="#FFD166"
+                        />
 
-                    <Text style={styles.supportActionText}>
-                        Exclusive Blogs 📝
-                    </Text>
-                </TouchableOpacity>
+                        <Text style={styles.supportActionText}>
+                            {singleButton
+                                ? "Exclusive Chess Blogs 📝"
+                                : "Exclusive Blogs 📝"}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </Animated.View>
     );
@@ -463,6 +707,10 @@ const styles = StyleSheet.create({
         gap: s(6),
     },
 
+    fullWidthSupportButton: {
+        flex: 1,
+    },
+
     gamesActionButton: {
         backgroundColor: "rgba(119, 70, 255, 0.16)",
         borderWidth: 1,
@@ -479,10 +727,142 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
         fontSize: ms(10),
         fontWeight: "900",
+        textAlign: "center",
     },
 
     refreshIndicator: {
         alignItems: "center",
         paddingVertical: vs(6),
+    },
+
+    paywallOverlay: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 26,
+    },
+
+    paywallBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.82)",
+    },
+
+    paywallCard: {
+        width: "100%",
+        backgroundColor: "#070A16",
+        borderRadius: 28,
+        borderWidth: 1.5,
+        borderColor: "#39C0ED",
+        paddingHorizontal: 22,
+        paddingTop: 26,
+        paddingBottom: 20,
+        alignItems: "center",
+        shadowColor: "#39C0ED",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.45,
+        shadowRadius: 24,
+        elevation: 14,
+    },
+
+    closeButton: {
+        position: "absolute",
+        top: 12,
+        right: 14,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#111827",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    closeButtonText: {
+        color: "#FFFFFF",
+        fontSize: 26,
+        lineHeight: 28,
+        fontWeight: "700",
+    },
+
+    paywallEmoji: {
+        fontSize: 42,
+        marginBottom: 10,
+    },
+
+    paywallTitle: {
+        color: "#FFFFFF",
+        fontSize: 23,
+        fontWeight: "900",
+        textAlign: "center",
+        marginBottom: 8,
+    },
+
+    paywallSubtitle: {
+        color: "#C9D4E5",
+        fontSize: 14,
+        lineHeight: 21,
+        fontWeight: "700",
+        textAlign: "center",
+        marginBottom: 16,
+    },
+
+    priceBox: {
+        width: "100%",
+        backgroundColor: "#101827",
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "#1E4660",
+        paddingVertical: 14,
+        alignItems: "center",
+        marginBottom: 16,
+    },
+
+    freeTrialText: {
+        color: "#39C0ED",
+        fontSize: 26,
+        fontWeight: "900",
+    },
+
+    priceText: {
+        color: "#FFFFFF",
+        fontSize: 13,
+        fontWeight: "800",
+        marginTop: 4,
+        opacity: 0.9,
+    },
+
+    benefitsBox: {
+        width: "100%",
+        marginBottom: 18,
+    },
+
+    benefitText: {
+        color: "#FFFFFF",
+        fontSize: 13.5,
+        fontWeight: "800",
+        marginBottom: 8,
+    },
+
+    subscribeButton: {
+        width: "100%",
+        height: 50,
+        borderRadius: 16,
+        backgroundColor: "#39C0ED",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 12,
+    },
+
+    subscribeButtonText: {
+        color: "#050816",
+        fontSize: 15,
+        fontWeight: "900",
+    },
+
+    paywallFinePrint: {
+        color: "#7E96A5",
+        fontSize: 11,
+        lineHeight: 16,
+        textAlign: "center",
+        fontWeight: "600",
     },
 });

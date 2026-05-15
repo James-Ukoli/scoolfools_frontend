@@ -33,11 +33,15 @@ type Post = {
 type FeaturedCarouselProps = {
     posts: Post[];
     loading?: boolean;
+    isSubscribed?: boolean;
+    onRequireSubscription?: () => void;
 };
 
 export default function FeaturedCarousel({
     posts,
     loading = false,
+    isSubscribed = false,
+    onRequireSubscription,
 }: FeaturedCarouselProps) {
     const navigation = useNavigation<any>();
     const [activeIndex, setActiveIndex] = useState(0);
@@ -60,6 +64,19 @@ export default function FeaturedCarousel({
         if (diffHours < 1) return "Just now";
         if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
         return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    };
+
+    const handleOpenPost = (post: Post) => {
+        const isBlog = post.content_type === "blog";
+
+        if (isBlog && !isSubscribed) {
+            onRequireSubscription?.();
+            return;
+        }
+
+        navigation.navigate("ArticleScreen", {
+            slug: post.slug,
+        });
     };
 
     if (loading) {
@@ -92,11 +109,7 @@ export default function FeaturedCarousel({
                     <View style={styles.cardContainer}>
                         <Pressable
                             style={styles.card}
-                            onPress={() =>
-                                navigation.navigate("ArticleScreen", {
-                                    slug: item.slug,
-                                })
-                            }
+                            onPress={() => handleOpenPost(item)}
                         >
                             <View style={styles.imageSection}>
                                 <Image
