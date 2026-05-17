@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     View,
     TextInput,
@@ -8,11 +8,22 @@ import {
     StyleSheet,
     ActivityIndicator,
     Platform,
+    Modal,
+    Pressable,
+    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
+import {
+    initializeIAP,
+    getBlogsSubscriptionProduct,
+    buyBlogsSubscription,
+    setupPurchaseListeners,
+    cleanupIAP,
+} from "../services/iap";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -52,6 +63,126 @@ export default function SearchScreen() {
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+
+    const getToken = async () => {
+        return await AsyncStorage.getItem("token");
+    };
+
+    const fetchEntitlements = async () => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) return;
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (data?.success) {
+                setIsSubscribed(!!data?.entitlements?.isSubscribed);
+            }
+        } catch (error) {
+            console.log("Search entitlement fetch error:", error);
+        }
+    };
+
+    const loadBlogSubscription = async () => {
+        try {
+            await initializeIAP();
+
+            const product = await getBlogsSubscriptionProduct();
+            setSubscriptionProduct(product);
+        } catch (error) {
+            console.log("Search blog subscription load error:", error);
+        }
+    };
+
+    const activateBlogSubscriptionOnBackend = async () => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) {
+                throw new Error("Missing token or API base URL");
+            }
+
+            const response = await fetch(
+                `${API_BASE_URL}/api/auth/me/activate-blog-subscription`,
+                {
+                    method: "PATCH",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to activate subscription");
+            }
+
+            setIsSubscribed(true);
+            setPaywallVisible(false);
+
+            Alert.alert("Subscribed 🎉", "You now have access to Just Move blogs.");
+        } catch (error) {
+            console.log("Activate search blog subscription error:", error);
+
+            Alert.alert(
+                "Purchase Complete",
+                "Purchase worked, but saving the subscription to your account failed."
+            );
+        } finally {
+            setLoadingSubscription(false);
+        }
+    };
+
+    const handleSubscribePress = async () => {
+        try {
+            setLoadingSubscription(true);
+            await buyBlogsSubscription();
+        } catch (error) {
+            setLoadingSubscription(false);
+            console.log("Search blog subscription request error:", error);
+
+            Alert.alert(
+                "Subscription Failed",
+                "Something went wrong while starting the subscription."
+            );
+        }
+    };
+
+    useEffect(() => {
+        fetchEntitlements();
+        loadBlogSubscription();
+
+        setupPurchaseListeners({
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async () => {
+                await activateBlogSubscriptionOnBackend();
+            },
+            onPurchaseError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Search subscription listener error:", error);
+            },
+        });
+
+        return () => {
+            cleanupIAP();
+        };
+    }, []);
+
     const handleSearch = async (text: string) => {
         setQuery(text);
 
@@ -64,13 +195,8 @@ export default function SearchScreen() {
             setLoading(true);
 
             const url = `${API_BASE_URL}/api/posts/search?q=${encodeURIComponent(text)}`;
-            console.log("SEARCH URL:", url);
-
             const res = await fetch(url);
             const data = await res.json();
-
-            console.log("SEARCH STATUS:", res.status);
-            console.log("SEARCH DATA:", data);
 
             setResults(Array.isArray(data.data) ? data.data : []);
         } catch (err) {
@@ -79,6 +205,19 @@ export default function SearchScreen() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleOpenResult = (item: any) => {
+        const isBlog = item.content_type === "blog";
+
+        if (isBlog && !isSubscribed) {
+            setPaywallVisible(true);
+            return;
+        }
+
+        navigation.navigate("ArticleScreen", {
+            slug: item.slug,
+        });
     };
 
     return (
@@ -123,11 +262,7 @@ export default function SearchScreen() {
                         <TouchableOpacity
                             style={styles.resultItem}
                             activeOpacity={0.8}
-                            onPress={() =>
-                                navigation.navigate("ArticleScreen", {
-                                    slug: item.slug,
-                                })
-                            }
+                            onPress={() => handleOpenResult(item)}
                         >
                             <View style={styles.metaRow}>
                                 {!!item.content_type && (
@@ -180,6 +315,72 @@ export default function SearchScreen() {
                     <Ionicons name="home" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
             </View>
+
+            <Modal
+                visible={paywallVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setPaywallVisible(false)}
+            >
+                <View style={styles.paywallOverlay}>
+                    <Pressable
+                        style={styles.paywallBackdrop}
+                        onPress={() => setPaywallVisible(false)}
+                    />
+
+                    <View style={styles.paywallCard}>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setPaywallVisible(false)}
+                        >
+                            <Text style={styles.closeButtonText}>×</Text>
+                        </TouchableOpacity>
+
+                        <Text style={styles.paywallEmoji}>♟️</Text>
+
+                        <Text style={styles.paywallTitle}>
+                            Support Just Move Blogs
+                        </Text>
+
+                        <Text style={styles.paywallSubtitle}>
+                            Help support independent chess journalism and the future of
+                            modern chess media.
+                        </Text>
+
+                        <View style={styles.priceBox}>
+                            <Text style={styles.freeTrialText}>1 Month Free</Text>
+                            <Text style={styles.priceText}>
+                                Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
+                            </Text>
+                        </View>
+
+                        <View style={styles.benefitsBox}>
+                            <Text style={styles.benefitText}>✓ Exclusive blogs and stories</Text>
+                            <Text style={styles.benefitText}>✓ Support independent chess coverage</Text>
+                            <Text style={styles.benefitText}>✓ Help grow modern chess media</Text>
+                        </View>
+
+                        <TouchableOpacity
+                            style={styles.subscribeButton}
+                            activeOpacity={0.9}
+                            onPress={handleSubscribePress}
+                            disabled={loadingSubscription}
+                        >
+                            {loadingSubscription ? (
+                                <ActivityIndicator color="#050816" />
+                            ) : (
+                                <Text style={styles.subscribeButtonText}>
+                                    Start Free Month
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+
+                        <Text style={styles.paywallFinePrint}>
+                            Cancel anytime. Subscription renews yearly after the free trial.
+                        </Text>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -301,5 +502,121 @@ const styles = StyleSheet.create({
         backgroundColor: "#12203A",
         borderWidth: 1,
         borderColor: "#24406F",
+    },
+
+    paywallOverlay: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        paddingHorizontal: 26,
+    },
+    paywallBackdrop: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.82)",
+    },
+    paywallCard: {
+        width: "100%",
+        backgroundColor: "#070A16",
+        borderRadius: 28,
+        borderWidth: 1.5,
+        borderColor: "#39C0ED",
+        paddingHorizontal: 22,
+        paddingTop: 26,
+        paddingBottom: 20,
+        alignItems: "center",
+        shadowColor: "#39C0ED",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.45,
+        shadowRadius: 24,
+        elevation: 14,
+    },
+    closeButton: {
+        position: "absolute",
+        top: 12,
+        right: 14,
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        backgroundColor: "#111827",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    closeButtonText: {
+        color: "#FFFFFF",
+        fontSize: 26,
+        lineHeight: 28,
+        fontWeight: "700",
+    },
+    paywallEmoji: {
+        fontSize: 42,
+        marginBottom: 10,
+    },
+    paywallTitle: {
+        color: "#FFFFFF",
+        fontSize: 23,
+        fontWeight: "900",
+        textAlign: "center",
+        marginBottom: 8,
+    },
+    paywallSubtitle: {
+        color: "#C9D4E5",
+        fontSize: 14,
+        lineHeight: 21,
+        fontWeight: "700",
+        textAlign: "center",
+        marginBottom: 16,
+    },
+    priceBox: {
+        width: "100%",
+        backgroundColor: "#101827",
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: "#1E4660",
+        paddingVertical: 14,
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    freeTrialText: {
+        color: "#39C0ED",
+        fontSize: 26,
+        fontWeight: "900",
+    },
+    priceText: {
+        color: "#FFFFFF",
+        fontSize: 13,
+        fontWeight: "800",
+        marginTop: 4,
+        opacity: 0.9,
+    },
+    benefitsBox: {
+        width: "100%",
+        marginBottom: 18,
+    },
+    benefitText: {
+        color: "#FFFFFF",
+        fontSize: 13.5,
+        fontWeight: "800",
+        marginBottom: 8,
+    },
+    subscribeButton: {
+        width: "100%",
+        height: 50,
+        borderRadius: 16,
+        backgroundColor: "#39C0ED",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 12,
+    },
+    subscribeButtonText: {
+        color: "#050816",
+        fontSize: 15,
+        fontWeight: "900",
+    },
+    paywallFinePrint: {
+        color: "#7E96A5",
+        fontSize: 11,
+        lineHeight: 16,
+        textAlign: "center",
+        fontWeight: "600",
     },
 });
