@@ -1023,7 +1023,7 @@ const styles = StyleSheet.create({
 
     rankNumber: {
         width: 30,
-        color: "#F4D03F",
+        color: "#ffffff",
         fontSize: 17,
         fontWeight: "900",
         marginRight: 7,

@@ -1,5 +1,7 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import BottomTabs from "./src/navigation/BottomTabs";
 import ArticleScreen from "./src/screens/ArticleScreen";
 import { StatusBar } from "expo-status-bar";
@@ -23,7 +25,8 @@ import MostLikelyScreen from "./src/screens/games/mostlikely/MostLikelyScreen";
 import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScreen";
 import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
-import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen"
+import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
+
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -63,109 +66,52 @@ export default function App() {
 
     if (!initialRoute) {
         return (
-            <View
-                style={{
-                    flex: 1,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    backgroundColor: "#000",
-                }}
-            >
-                <StatusBar style="light" />
-                <ActivityIndicator size="large" color="#fff" />
-            </View>
+            <SafeAreaProvider>
+                <View
+                    style={{
+                        flex: 1,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        backgroundColor: "#000",
+                    }}
+                >
+                    <StatusBar style="light" />
+                    <ActivityIndicator size="large" color="#fff" />
+                </View>
+            </SafeAreaProvider>
         );
     }
 
     return (
-        <NotificationsProvider>
-            <NavigationContainer>
-                <StatusBar style="light" />
-                <Stack.Navigator
-                    initialRouteName={initialRoute}
-                    screenOptions={{ headerShown: false }}
-                >
-                    <Stack.Screen
-                        name="GoogleSignIn"
-                        component={GoogleSignInScreen}
-                    />
-                    <Stack.Screen name="MainTabs" component={BottomTabs} />
-                    <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
-                    <Stack.Screen
-                        name="EventDetailScreen"
-                        component={EventDetailScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name="Search"
-                        component={SearchScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name="Menu"
-                        component={MenuScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen name="ReviewerLogin" component={ReviewerLoginScreen} />
-                    <Stack.Screen
-                        name="Notifications"
-                        component={NotificationsScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen name="ContactUs" component={ContactUsScreen} />
-                    <Stack.Screen
-                        name="EventsScreen"
-                        component={EventsScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name="GameHome"
-                        component={GameHomeScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="CharadesSetup"
-                        component={CharadesSetupScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="CharadesPlay"
-                        component={CharadesPlayScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="MostLikely"
-                        component={MostLikelyScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="ImpostorSetup"
-                        component={ImpostorSetupScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="ImpostorReveal"
-                        component={ImpostorRevealScreen}
-                        options={{ headerShown: false }}
-                    />
-
-                    <Stack.Screen
-                        name="JustMoveClock"
-                        component={JustMoveClockScreen}
-                        options={{ headerShown: false }}
-                    />
-                    <Stack.Screen
-                        name="GamesPaywall"
-                        component={GamesPaywallScreen}
-                        options={{ headerShown: false }}
-                    />
-                </Stack.Navigator>
-            </NavigationContainer>
-        </NotificationsProvider>
+        <SafeAreaProvider>
+            <NotificationsProvider>
+                <NavigationContainer>
+                    <StatusBar style="light" />
+                    <Stack.Navigator
+                        initialRouteName={initialRoute}
+                        screenOptions={{ headerShown: false }}
+                    >
+                        <Stack.Screen name="GoogleSignIn" component={GoogleSignInScreen} />
+                        <Stack.Screen name="MainTabs" component={BottomTabs} />
+                        <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
+                        <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
+                        <Stack.Screen name="Search" component={SearchScreen} />
+                        <Stack.Screen name="Menu" component={MenuScreen} />
+                        <Stack.Screen name="ReviewerLogin" component={ReviewerLoginScreen} />
+                        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                        <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+                        <Stack.Screen name="EventsScreen" component={EventsScreen} />
+                        <Stack.Screen name="GameHome" component={GameHomeScreen} />
+                        <Stack.Screen name="CharadesSetup" component={CharadesSetupScreen} />
+                        <Stack.Screen name="CharadesPlay" component={CharadesPlayScreen} />
+                        <Stack.Screen name="MostLikely" component={MostLikelyScreen} />
+                        <Stack.Screen name="ImpostorSetup" component={ImpostorSetupScreen} />
+                        <Stack.Screen name="ImpostorReveal" component={ImpostorRevealScreen} />
+                        <Stack.Screen name="JustMoveClock" component={JustMoveClockScreen} />
+                        <Stack.Screen name="GamesPaywall" component={GamesPaywallScreen} />
+                    </Stack.Navigator>
+                </NavigationContainer>
+            </NotificationsProvider>
+        </SafeAreaProvider>
     );
 }

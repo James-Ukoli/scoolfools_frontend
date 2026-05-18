@@ -66,17 +66,22 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 function formatTimeAgo(dateString: string) {
-    const now = new Date().getTime();
-    const postTime = new Date(dateString).getTime();
-    const diffMs = now - postTime;
+    const now = new Date();
+    const postDate = new Date(dateString);
 
+    const diffMs = now.getTime() - postDate.getTime();
     const minutes = Math.floor(diffMs / 1000 / 60);
     const hours = Math.floor(diffMs / 1000 / 60 / 60);
     const days = Math.floor(diffMs / 1000 / 60 / 60 / 24);
 
     if (minutes < 60) return `${Math.max(minutes, 1)}m ago`;
     if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
+    if (days <= 6) return `${days}d ago`;
+
+    return postDate.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+    });
 }
 
 function getCategoryBadgeStyle(category: string) {
