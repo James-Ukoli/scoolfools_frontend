@@ -5,6 +5,7 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -103,7 +104,7 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 20,
+        paddingBottom: Platform.OS === "android" ? 110 : 28,
         justifyContent: "space-between",
     },
     topRow: {
@@ -179,6 +180,7 @@ const styles = StyleSheet.create({
     bottomButtonWrap: {
         alignItems: "center",
         paddingTop: 16,
+        paddingBottom: Platform.OS === "android" ? 0 : 0,
     },
     homeButton: {
         width: 54,

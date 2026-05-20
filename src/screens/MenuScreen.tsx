@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 140,
+        paddingBottom: Platform.OS === "android" ? 210 : 150,
     },
     card: {
         backgroundColor: "#050816",
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 18,
+        bottom: Platform.OS === "android" ? 78 : 28,
         alignItems: "center",
         justifyContent: "center",
     },

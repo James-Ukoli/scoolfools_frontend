@@ -27,6 +27,7 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../../services/iap";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -75,7 +76,7 @@ export default function GameHomeScreen() {
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
     const [product, setProduct] = useState<any>(null);
-
+    const [showConfetti, setShowConfetti] = useState(false);
     const bannerScale = useRef(new Animated.Value(1)).current;
     const bannerGlow = useRef(new Animated.Value(0)).current;
     const modalScale = useRef(new Animated.Value(0.92)).current;
@@ -137,7 +138,7 @@ export default function GameHomeScreen() {
 
             setGamesPackagePurchased(true);
             closePaywall();
-
+            setShowConfetti(true);
             Alert.alert("Unlocked 🎉", "All Party Games are now unlocked.");
         } catch (error) {
             console.log("Unlock backend sync error:", error);
@@ -535,6 +536,16 @@ export default function GameHomeScreen() {
                     </Animated.View>
                 </View>
             </Modal>
+            {showConfetti && (
+                <ConfettiCannon
+                    count={160}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut
+                    explosionSpeed={350}
+                    fallSpeed={2600}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </GameScreenWrapper>
     );
 }
@@ -619,7 +630,7 @@ const styles = StyleSheet.create({
     },
 
     scrollContent: {
-        paddingBottom: 140,
+        paddingBottom: Platform.OS === "android" ? 210 : 150,
     },
 
     gameCard: {
@@ -684,7 +695,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 18,
+        bottom: Platform.OS === "android" ? 78 : 28,
         alignItems: "center",
         justifyContent: "center",
     },

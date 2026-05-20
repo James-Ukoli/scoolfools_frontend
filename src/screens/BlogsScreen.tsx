@@ -26,6 +26,7 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 type Post = {
     _id: string;
@@ -108,7 +109,7 @@ export default function BlogsScreen({ navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
     const [visibleStoriesCount, setVisibleStoriesCount] = useState(INITIAL_VISIBLE_STORIES);
     const [loadingMore, setLoadingMore] = useState(false);
-
+    const [showConfetti, setShowConfetti] = useState(false);
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
@@ -200,6 +201,7 @@ export default function BlogsScreen({ navigation }: any) {
 
             setIsSubscribed(true);
             setPaywallVisible(false);
+            setShowConfetti(true);
 
             Alert.alert("Subscribed 🎉", "You now have access to Just Move blogs.");
         } catch (error) {
@@ -583,6 +585,16 @@ export default function BlogsScreen({ navigation }: any) {
                     </View>
                 </View>
             </Modal>
+            {showConfetti && (
+                <ConfettiCannon
+                    count={140}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut
+                    explosionSpeed={350}
+                    fallSpeed={2600}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -692,7 +704,7 @@ const styles = StyleSheet.create({
         borderRadius: 0,
     },
     featuredImageArea: {
-        height: 230,
+        height: 240,
         backgroundColor: "#1A1A1A",
         justifyContent: "flex-end",
     },

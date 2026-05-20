@@ -86,7 +86,7 @@ export default function ArticleScreen() {
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const rippleAnim1 = useRef(new Animated.Value(0)).current;
     const rippleAnim2 = useRef(new Animated.Value(0)).current;
-
+    const scrollRef = useRef<ScrollView>(null);
     const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
     const rippleLoop1Ref = useRef<Animated.CompositeAnimation | null>(null);
     const rippleLoop2Ref = useRef<Animated.CompositeAnimation | null>(null);
@@ -512,6 +512,7 @@ export default function ArticleScreen() {
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
             <ScrollView
+                ref={scrollRef}
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
@@ -593,7 +594,12 @@ export default function ArticleScreen() {
                     </ScrollView>
                 </View>
             )}
-
+            <Pressable
+                onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+                style={styles.scrollTopArrow}
+            >
+                <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
+            </Pressable>
             <Animated.View
                 style={[
                     styles.ttsButtonWrapper,
@@ -680,7 +686,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#050816",
     },
     contentContainer: {
-        paddingBottom: vs(120),
+        paddingBottom: Platform.OS === "android" ? vs(190) : vs(120),
     },
     loadingContainer: {
         flex: 1,
@@ -953,7 +959,7 @@ const styles = StyleSheet.create({
     ttsButtonWrapper: {
         position: "absolute",
         right: s(20),
-        bottom: vs(24),
+        bottom: Platform.OS === "android" ? vs(86) : vs(24),
         width: s(64),
         height: s(64),
         justifyContent: "center",
@@ -988,5 +994,12 @@ const styles = StyleSheet.create({
         height: s(60),
         borderRadius: s(30),
         backgroundColor: "#3CF2FF",
+    },
+
+    scrollTopArrow: {
+        position: "absolute",
+        left: s(22),
+        bottom: Platform.OS === "android" ? vs(100) : vs(36),
+        zIndex: 999,
     },
 });

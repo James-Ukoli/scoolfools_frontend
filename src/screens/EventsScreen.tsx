@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 120,
+        paddingBottom: Platform.OS === "android" ? 210 : 120,
     },
     loadingContainer: {
         flex: 1,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: 18,
+        bottom: Platform.OS === "android" ? 78 : 18,
         alignItems: "center",
         justifyContent: "center",
     },
