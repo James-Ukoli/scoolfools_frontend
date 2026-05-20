@@ -1,16 +1,20 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import { Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HomeScreen from "../screens/HomeScreen";
 import TrendingScreen from "../screens/TrendingScreen";
 import BlogsScreen from "../screens/BlogsScreen";
 import RankingsScreen from "../screens/RankingsScreen";
-import AlertsScreen from "../screens/AlertsScreen"; // 👈 ADD THIS
+import AlertsScreen from "../screens/AlertsScreen";
 
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabs() {
+    const insets = useSafeAreaInsets();
+
     return (
         <Tab.Navigator
             initialRouteName="Home"
@@ -22,18 +26,26 @@ export default function BottomTabs() {
                     backgroundColor: "#050816",
                     borderTopColor: "#12203A",
                     borderTopWidth: 1,
-                    height: 60,
+
+                    height: Platform.OS === "android"
+                        ? 72 + insets.bottom
+                        : 64 + insets.bottom,
+
                     paddingTop: 6,
-                    paddingBottom: 4,
+
+                    paddingBottom: Platform.OS === "android"
+                        ? Math.max(insets.bottom, 18)
+                        : Math.max(insets.bottom, 8),
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
                     fontWeight: "600",
                     marginTop: 2,
                 },
+                tabBarIconStyle: {
+                    marginTop: 2,
+                },
                 tabBarIcon: ({ color, focused }) => {
-
-                    // 🔥 ALERTS (NEW LEFT TAB)
                     if (route.name === "Alerts") {
                         return (
                             <Ionicons
@@ -88,7 +100,6 @@ export default function BottomTabs() {
                 },
             })}
         >
-            {/* 👇 ORDER MATTERS — LEFT TO RIGHT */}
             <Tab.Screen name="Alerts" component={AlertsScreen} />
             <Tab.Screen name="Trending" component={TrendingScreen} />
             <Tab.Screen name="Home" component={HomeScreen} />
