@@ -1,12 +1,11 @@
 import {
   initConnection,
   endConnection,
-  getProducts,
-  requestPurchase,
   purchaseUpdatedListener,
   purchaseErrorListener,
   finishTransaction,
   fetchProducts,
+  requestPurchase,
 } from "react-native-iap";
 import { Platform } from "react-native";
 
@@ -72,7 +71,10 @@ export const buyGamesPack = async () => {
       type: "in-app",
     });
 
-    console.log("FULL GAME PRODUCT OBJECT:", JSON.stringify(products?.[0], null, 2));
+    console.log(
+      "FULL GAME PRODUCT OBJECT:",
+      JSON.stringify(products?.[0], null, 2)
+    );
 
     if (!products?.[0]) {
       throw new Error("Game product not found");
@@ -169,11 +171,9 @@ export const setupPurchaseListeners = ({
       }
 
       if (productId === BLOGS_SUBSCRIPTION_PRODUCT_ID) {
-        await finishTransaction({
-          purchase,
-          isConsumable: false,
-        });
-
+        // IMPORTANT:
+        // Do NOT finish the subscription transaction here anymore.
+        // HomeScreen will verify with backend first, then finishTransaction.
         onBlogsSubscriptionSuccess?.(purchase);
         return;
       }

@@ -1,3 +1,5 @@
+// HomeScreen.tsx
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ScrollView,
@@ -25,6 +27,7 @@ import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
+import { finishTransaction } from "react-native-iap";
 
 import { s, vs, ms } from "react-native-size-matters";
 
@@ -119,34 +122,57 @@ export default function HomeScreen() {
         }
     };
 
-    const activateBlogSubscriptionOnBackend = async () => {
+    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
         try {
             const token = await getToken();
 
             if (!token || !API_BASE_URL) {
                 throw new Error("Missing token or API base URL");
             }
+            console.log("VERIFY FUNCTION HIT");
+            console.log("PURCHASE SENT TO BACKEND:", purchase);
+            console.log("API_BASE_URL:", API_BASE_URL);
+            console.log("TOKEN EXISTS:", !!token);
+            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    platform: Platform.OS === "ios" ? "ios" : "android",
+                    productId: purchase?.productId || "jms_599_1y",
 
-            const response = await fetch(
-                `${API_BASE_URL}/api/auth/me/activate-blog-subscription`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+                    // iOS
+                    transactionId:
+                        purchase?.transactionId ||
+                        purchase?.transactionIdIOS ||
+                        purchase?.id ||
+                        null,
+
+                    // Android
+                    purchaseToken: purchase?.purchaseToken || null,
+                }),
+            });
 
             const data = await response.json();
 
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to activate subscription");
-            }
+            console.log("VERIFY RESPONSE STATUS:", response.status);
+            console.log("VERIFY RESPONSE DATA:", data);
 
-            setIsSubscribed(true);
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to verify subscription");
+            }
+            await finishTransaction({
+                purchase,
+                isConsumable: false,
+            });
+
+            setIsSubscribed(!!data.isSubscribed);
             setPaywallVisible(false);
             setShowConfetti(true);
+
+            await fetchEntitlements();
             await fetchSupporterProgress();
 
             Alert.alert(
@@ -154,11 +180,11 @@ export default function HomeScreen() {
                 "Welcome to Just Move Supporters ♟️🔥"
             );
         } catch (error) {
-            console.log("Activate home blog subscription error:", error);
+            console.log("Verify home blog subscription error:", error);
 
             Alert.alert(
                 "Purchase Complete",
-                "Purchase worked, but saving the subscription to your account failed."
+                "Purchase worked, but verifying the subscription with your account failed."
             );
         } finally {
             setLoadingSubscription(false);
@@ -218,14 +244,18 @@ export default function HomeScreen() {
         fetchHomeData();
         fetchEntitlements();
         fetchSupporterProgress();
-        loadBlogSubscription();
+        // loadBlogSubscription();
 
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
-            onBlogsSubscriptionSuccess: async () => {
-                await activateBlogSubscriptionOnBackend();
+
+            // IMPORTANT:
+            // Your services/iap file must pass the purchase object here.
+            onBlogsSubscriptionSuccess: async (purchase: any) => {
+                await verifyBlogSubscriptionOnBackend(purchase);
             },
+
             onPurchaseError: (error: any) => {
                 console.log("Home subscription listener error:", error);
                 setLoadingSubscription(false);
@@ -276,19 +306,22 @@ export default function HomeScreen() {
                         posts={featuredPosts}
                         loading={loadingHome}
                         isSubscribed={isSubscribed}
-                        onRequireSubscription={() => setPaywallVisible(true)}
+                        onRequireSubscription={async () => {
+                            setPaywallVisible(true);
+                            await loadBlogSubscription();
+                        }}
                     />
 
                     <SupportGrowthBanner
                         supporterCount={supporterCount}
                         isSubscribed={isSubscribed}
-                        onOpenBlogPaywall={() => setPaywallVisible(true)}
+                        onOpenBlogPaywall={async () => {
+                            setPaywallVisible(true);
+                            await loadBlogSubscription();
+                        }}
                     />
 
-                    <EventCountdownCard
-                        event={countdownEvent}
-                        loading={loadingHome}
-                    />
+                    <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
                     <View style={styles.sectionHeaderWrap}>
                         <Text style={styles.sectionTitle2}>
@@ -301,7 +334,10 @@ export default function HomeScreen() {
                         posts={featuredStories}
                         loading={loadingHome}
                         isSubscribed={isSubscribed}
-                        onRequireSubscription={() => setPaywallVisible(true)}
+                        onRequireSubscription={async () => {
+                            setPaywallVisible(true);
+                            await loadBlogSubscription();
+                        }}
                     />
 
                     <PartyGamesPromo
@@ -333,18 +369,14 @@ export default function HomeScreen() {
 
                         <Text style={styles.paywallEmoji}>♟️</Text>
 
-                        <Text style={styles.paywallTitle}>
-                            Support Just Move
-                        </Text>
+                        <Text style={styles.paywallTitle}>Support Just Move</Text>
 
                         <Text style={styles.paywallSubtitle}>
                             Help support independent chess journalism and modern chess media.
                         </Text>
 
                         <View style={styles.priceBox}>
-                            <Text style={styles.freeTrialText}>
-                                1 Month Free
-                            </Text>
+                            <Text style={styles.freeTrialText}>1 Month Free</Text>
 
                             <Text style={styles.priceText}>
                                 Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
@@ -366,12 +398,11 @@ export default function HomeScreen() {
                             )}
                         </TouchableOpacity>
 
-                        <Text style={styles.paywallFinePrint}>
-                            Cancel anytime.
-                        </Text>
+                        <Text style={styles.paywallFinePrint}>Cancel anytime.</Text>
                     </View>
                 </View>
             </Modal>
+
             {showConfetti && (
                 <ConfettiCannon
                     count={140}
@@ -451,11 +482,7 @@ function SupportGrowthBanner({
     return (
         <View style={styles.supportMissionCard}>
             <View style={styles.supportTopRow}>
-                <Ionicons
-                    name="rocket"
-                    size={18}
-                    color="#39C0ED"
-                />
+                <Ionicons name="rocket" size={18} color="#39C0ED" />
 
                 <Text style={styles.supportMissionTitle}>
                     Building the Future of Chess Media ♟️
@@ -468,14 +495,7 @@ function SupportGrowthBanner({
 
             <View style={styles.progressOuterWrap}>
                 <View style={styles.progressBarWrap}>
-                    <Animated.View
-                        style={[
-                            styles.progressFill,
-                            {
-                                width,
-                            },
-                        ]}
-                    />
+                    <Animated.View style={[styles.progressFill, { width }]} />
                 </View>
             </View>
 
@@ -484,9 +504,7 @@ function SupportGrowthBanner({
                     {supporterCount.toLocaleString()} Supporters
                 </Text>
 
-                <Text style={styles.progressGoal}>
-                    Goal: 50,000
-                </Text>
+                <Text style={styles.progressGoal}>Goal: 50,000</Text>
             </View>
 
             {!isSubscribed ? (
@@ -495,41 +513,18 @@ function SupportGrowthBanner({
                     onPress={onOpenBlogPaywall}
                     activeOpacity={0.9}
                 >
-                    <Ionicons
-                        name="flash"
-                        size={18}
-                        color="#050816"
-                    />
+                    <Ionicons name="flash" size={18} color="#050816" />
 
-                    <Text style={styles.supportSubscribeText}>
-                        Start Free Month
-                    </Text>
+                    <Text style={styles.supportSubscribeText}>Start Free Month</Text>
                 </TouchableOpacity>
             ) : (
-                <Animated.View
-                    style={[
-                        styles.supportActionsRow,
-                        {
-                            opacity: glowAnim,
-                        },
-                    ]}
-                >
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={handleSharePress}
-                    >
-                        <Text style={styles.shareGlowText}>
-                            Share App
-                        </Text>
+                <Animated.View style={[styles.supportActionsRow, { opacity: glowAnim }]}>
+                    <TouchableOpacity activeOpacity={0.8} onPress={handleSharePress}>
+                        <Text style={styles.shareGlowText}>Share App</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={handleRatePress}
-                    >
-                        <Text style={styles.rateGlowText}>
-                            Rate & Review
-                        </Text>
+                    <TouchableOpacity activeOpacity={0.8} onPress={handleRatePress}>
+                        <Text style={styles.rateGlowText}>Rate & Review</Text>
                     </TouchableOpacity>
                 </Animated.View>
             )}
@@ -546,15 +541,9 @@ function PartyGamesPromo({ navigation, gamesPackagePurchased }: any) {
         >
             <View style={styles.partyGamesTopRow}>
                 <View style={styles.partyGamesLeft}>
-                    <Ionicons
-                        name="game-controller"
-                        size={20}
-                        color="#C084FF"
-                    />
+                    <Ionicons name="game-controller" size={20} color="#C084FF" />
 
-                    <Text style={styles.partyGamesTitle}>
-                        Party Games 🎉
-                    </Text>
+                    <Text style={styles.partyGamesTitle}>Party Games 🎉</Text>
                 </View>
 
                 <View style={styles.inlineGamesRow}>

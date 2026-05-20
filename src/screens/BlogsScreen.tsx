@@ -26,6 +26,7 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
+import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
 
 type Post = {
@@ -174,7 +175,7 @@ export default function BlogsScreen({ navigation }: any) {
         }
     };
 
-    const activateBlogSubscriptionOnBackend = async () => {
+    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
         try {
             const token = await getToken();
 
@@ -182,43 +183,68 @@ export default function BlogsScreen({ navigation }: any) {
                 throw new Error("Missing token or API base URL");
             }
 
-            const response = await fetch(
-                `${API_BASE_URL}/api/auth/me/activate-blog-subscription`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    platform: Platform.OS === "ios" ? "ios" : "android",
+
+                    productId:
+                        purchase?.productId ||
+                        purchase?.productIdIOS ||
+                        "jms_599_1y",
+
+                    transactionId:
+                        purchase?.transactionId ||
+                        purchase?.transactionIdIOS ||
+                        purchase?.id ||
+                        null,
+
+                    purchaseToken:
+                        purchase?.purchaseToken ||
+                        purchase?.purchaseTokenAndroid ||
+                        null,
+                }),
+            });
 
             const data = await response.json();
-
+            console.log("BLOG VERIFY RESPONSE STATUS:", response.status);
+            console.log("BLOG VERIFY RESPONSE DATA:", data);
             if (!response.ok) {
-                throw new Error(data.message || "Failed to activate subscription");
+                throw new Error(data.message || "Failed to verify subscription");
             }
 
-            setIsSubscribed(true);
+            await finishTransaction({
+                purchase,
+                isConsumable: false,
+            });
+
+            setIsSubscribed(!!data.isSubscribed);
             setPaywallVisible(false);
             setShowConfetti(true);
 
+            await fetchEntitlements();
+
             Alert.alert("Subscribed 🎉", "You now have access to Just Move blogs.");
         } catch (error) {
-            console.log("Activate blog subscription error:", error);
+            console.log("Verify blog subscription error:", error);
 
             Alert.alert(
                 "Purchase Complete",
-                "Purchase worked, but saving the subscription to your account failed."
+                "Purchase worked, but verifying the subscription with your account failed."
             );
         } finally {
             setLoadingSubscription(false);
         }
     };
-
     const handleSubscribePress = async () => {
         try {
             setLoadingSubscription(true);
+
+            await initializeIAP();
             await buyBlogsSubscription();
         } catch (error) {
             setLoadingSubscription(false);
@@ -234,13 +260,13 @@ export default function BlogsScreen({ navigation }: any) {
     useEffect(() => {
         fetchBlogPosts();
         fetchEntitlements();
-        loadBlogSubscription();
+        // loadBlogSubscription();
 
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
-            onBlogsSubscriptionSuccess: async () => {
-                await activateBlogSubscriptionOnBackend();
+            onBlogsSubscriptionSuccess: async (purchase: any) => {
+                await verifyBlogSubscriptionOnBackend(purchase);
             },
             onPurchaseError: (error: any) => {
                 setLoadingSubscription(false);
@@ -283,6 +309,7 @@ export default function BlogsScreen({ navigation }: any) {
     const handleOpenPost = (post: Post) => {
         if (!isSubscribed) {
             setPaywallVisible(true);
+            loadBlogSubscription();
             return;
         }
 
@@ -360,7 +387,10 @@ export default function BlogsScreen({ navigation }: any) {
                     <TouchableOpacity
                         activeOpacity={0.9}
                         style={styles.supportBanner}
-                        onPress={() => setPaywallVisible(true)}
+                        onPress={() => {
+                            setPaywallVisible(true);
+                            loadBlogSubscription();
+                        }}
                     >
                         <Text style={styles.supportBannerTitle}>
                             Support Just Move Blogs ♟️
