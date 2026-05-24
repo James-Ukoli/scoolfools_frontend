@@ -109,6 +109,22 @@ function getTickerConfig(topicRaw?: string) {
         };
     }
 
+    if (topic === "event") {
+        return {
+            label: "EVENT",
+            color: "#39C0ED",
+            icon: (
+                <Ionicons
+                    name="calendar-outline"
+                    size={15}
+                    color="#39C0ED"
+                />
+            ),
+        };
+    }
+
+
+
     return {
         label: "RESULTS",
         color: "#FFD84D",
@@ -161,7 +177,7 @@ export default function AlertSportsTicker({
                 .filter((item) => {
                     const topic = (item.topic || item.type || "").toLowerCase();
 
-                    return topic === "breaking" || topic === "results";
+                    return topic === "breaking" || topic === "results" || topic === "event"
                 })
                 .sort((a, b) => {
                     const aTime = new Date(a.createdAt || a.updatedAt || 0).getTime();

@@ -26,8 +26,20 @@ import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScree
 import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
+import { jwtDecode } from "jwt-decode";
 
 const Stack = createNativeStackNavigator();
+
+const isTokenExpired = (token: string) => {
+    try {
+        const decoded: any = jwtDecode(token);
+        if (!decoded?.exp) return true;
+
+        return decoded.exp < Date.now() / 1000;
+    } catch {
+        return true;
+    }
+};
 
 export default function App() {
     const [initialRoute, setInitialRoute] = useState<"GoogleSignIn" | "MainTabs" | null>(null);
@@ -50,9 +62,10 @@ export default function App() {
 
                 const token = await AsyncStorage.getItem("token");
 
-                if (token) {
+                if (token && !isTokenExpired(token)) {
                     setInitialRoute("MainTabs");
                 } else {
+                    await AsyncStorage.multiRemove(["token", "user"]);
                     setInitialRoute("GoogleSignIn");
                 }
             } catch (error) {

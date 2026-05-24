@@ -70,6 +70,29 @@ export default function HomeScreen() {
         return await AsyncStorage.getItem("token");
     };
 
+    const handleExpiredSession = async () => {
+        try {
+            await AsyncStorage.multiRemove(["token", "user"]);
+
+            setIsSubscribed(false);
+            setGamesPackagePurchased(false);
+            setPaywallVisible(false);
+            setLoadingSubscription(false);
+
+            Alert.alert(
+                "Session Expired",
+                "Please log in again before subscribing or restoring purchases."
+            );
+
+            navigation.reset({
+                index: 0,
+                routes: [{ name: "GoogleSignIn" }],
+            });
+        } catch (error) {
+            console.log("Expired session cleanup error:", error);
+        }
+    };
+
     const fetchSupporterProgress = async () => {
         try {
             if (!API_BASE_URL) return;
@@ -101,6 +124,11 @@ export default function HomeScreen() {
                 },
             });
 
+            if (response.status === 401) {
+                await handleExpiredSession();
+                return;
+            }
+
             const data = await response.json();
 
             if (data?.success) {
@@ -109,6 +137,34 @@ export default function HomeScreen() {
             }
         } catch (error) {
             console.log("Home entitlement fetch error:", error);
+        }
+    };
+
+    const ensureValidSessionBeforePurchase = async () => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) {
+                await handleExpiredSession();
+                return false;
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.status === 401) {
+                await handleExpiredSession();
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            console.log("Session precheck error:", error);
+            return true;
         }
     };
 
@@ -128,12 +184,15 @@ export default function HomeScreen() {
             const token = await getToken();
 
             if (!token || !API_BASE_URL) {
-                throw new Error("Missing token or API base URL");
+                await handleExpiredSession();
+                return;
             }
+
             console.log("VERIFY FUNCTION HIT");
             console.log("PURCHASE SENT TO BACKEND:", purchase);
             console.log("API_BASE_URL:", API_BASE_URL);
             console.log("TOKEN EXISTS:", !!token);
+
             const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
                 method: "POST",
                 headers: {
@@ -144,17 +203,20 @@ export default function HomeScreen() {
                     platform: Platform.OS === "ios" ? "ios" : "android",
                     productId: purchase?.productId || "jms_599_1y",
 
-                    // iOS
                     transactionId:
                         purchase?.transactionId ||
                         purchase?.transactionIdIOS ||
                         purchase?.id ||
                         null,
 
-                    // Android
                     purchaseToken: purchase?.purchaseToken || null,
                 }),
             });
+
+            if (response.status === 401) {
+                await handleExpiredSession();
+                return;
+            }
 
             const data = await response.json();
 
@@ -164,6 +226,7 @@ export default function HomeScreen() {
             if (!response.ok) {
                 throw new Error(data.message || "Failed to verify subscription");
             }
+
             await finishTransaction({
                 purchase,
                 isConsumable: false,
@@ -176,16 +239,13 @@ export default function HomeScreen() {
             await fetchEntitlements();
             await fetchSupporterProgress();
 
-            Alert.alert(
-                "Subscribed 🎉",
-                "Welcome to Just Move Supporters ♟️🔥"
-            );
+            Alert.alert("Subscribed 🎉", "Welcome to Just Move Supporters ♟️🔥");
         } catch (error) {
             console.log("Verify home blog subscription error:", error);
 
             Alert.alert(
                 "Purchase Complete",
-                "Purchase worked, but verifying the subscription with your account failed."
+                "Purchase worked, but verifying the subscription with your account failed. Please log out, log back in, and restore purchases."
             );
         } finally {
             setLoadingSubscription(false);
@@ -195,10 +255,23 @@ export default function HomeScreen() {
     const handleSubscribePress = async () => {
         try {
             setLoadingSubscription(true);
+
+            const sessionIsValid = await ensureValidSessionBeforePurchase();
+
+            if (!sessionIsValid) {
+                setLoadingSubscription(false);
+                return;
+            }
+
             await buyBlogsSubscription();
-        } catch (error) {
+        } catch (error: any) {
             setLoadingSubscription(false);
             console.log("Home blog subscription request error:", error);
+
+            if (error?.message === "SESSION_EXPIRED") {
+                await handleExpiredSession();
+                return;
+            }
 
             Alert.alert(
                 "Subscription Failed",
@@ -221,8 +294,7 @@ export default function HomeScreen() {
 
             const allFeaturedPosts = (postsJson.data || []).sort((a: any, b: any) => {
                 return (
-                    new Date(b.created_at).getTime() -
-                    new Date(a.created_at).getTime()
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
                 );
             });
 
@@ -245,14 +317,11 @@ export default function HomeScreen() {
         fetchHomeData();
         fetchEntitlements();
         fetchSupporterProgress();
-        // loadBlogSubscription();
 
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
 
-            // IMPORTANT:
-            // Your services/iap file must pass the purchase object here.
             onBlogsSubscriptionSuccess: async (purchase: any) => {
                 await verifyBlogSubscriptionOnBackend(purchase);
             },
@@ -347,7 +416,6 @@ export default function HomeScreen() {
                         gamesPackagePurchased={gamesPackagePurchased}
                     />
                 </ScrollView>
-
             </View>
 
             <Modal
@@ -395,9 +463,7 @@ export default function HomeScreen() {
                             {loadingSubscription ? (
                                 <ActivityIndicator color="#050816" />
                             ) : (
-                                <Text style={styles.subscribeButtonText}>
-                                    Start Free Month
-                                </Text>
+                                <Text style={styles.subscribeButtonText}>Start Free Month</Text>
                             )}
                         </TouchableOpacity>
 
