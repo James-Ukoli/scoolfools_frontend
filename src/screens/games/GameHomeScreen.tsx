@@ -75,6 +75,7 @@ export default function GameHomeScreen() {
     const [gamesPackagePurchased, setGamesPackagePurchased] = useState(false);
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
+    const [checkingEntitlements, setCheckingEntitlements] = useState(true);
     const [product, setProduct] = useState<any>(null);
     const [showConfetti, setShowConfetti] = useState(false);
     const bannerScale = useRef(new Animated.Value(1)).current;
@@ -106,11 +107,13 @@ export default function GameHomeScreen() {
 
             const data = await response.json();
 
-            if (data?.success && data?.entitlements?.gamesPackagePurchased) {
-                setGamesPackagePurchased(true);
-            }
+            setGamesPackagePurchased(
+                !!data?.success && !!data?.entitlements?.gamesPackagePurchased
+            );
         } catch (error) {
             console.log("Fetch entitlements error:", error);
+        } finally {
+            setCheckingEntitlements(false);
         }
     };
 
@@ -358,6 +361,24 @@ export default function GameHomeScreen() {
         outputRange: [6, 18],
     });
 
+    if (checkingEntitlements) {
+        return (
+            <GameScreenWrapper>
+                <View
+                    style={{
+                        flex: 1,
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    <ActivityIndicator size="large" color="#FFD166" />
+                </View>
+            </GameScreenWrapper>
+        );
+    }
+
+
+
     return (
         <GameScreenWrapper>
             <View style={styles.topRow}>
@@ -548,6 +569,7 @@ export default function GameHomeScreen() {
             )}
         </GameScreenWrapper>
     );
+
 }
 
 function FeatureRow({ icon, text }: { icon: any; text: string }) {

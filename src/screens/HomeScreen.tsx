@@ -27,6 +27,7 @@ import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
+import AlertSportsTicker from "../components/AlertSportsTicker";
 import { finishTransaction } from "react-native-iap";
 
 import { s, vs, ms } from "react-native-size-matters";
@@ -52,7 +53,7 @@ export default function HomeScreen() {
     const [featuredPosts, setFeaturedPosts] = useState<any[]>([]);
     const [featuredStories, setFeaturedStories] = useState<any[]>([]);
     const [countdownEvent, setCountdownEvent] = useState<any>(null);
-
+    const [alertsRefreshKey, setAlertsRefreshKey] = useState(0);
     const [loadingHome, setLoadingHome] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
@@ -275,6 +276,7 @@ export default function HomeScreen() {
             await fetchEntitlements();
             await fetchSupporterProgress();
         } finally {
+            setAlertsRefreshKey((prev) => prev + 1);
             setRefreshing(false);
         }
     }, [fetchHomeData]);
@@ -312,6 +314,8 @@ export default function HomeScreen() {
                         }}
                     />
 
+                    <AlertSportsTicker refreshKey={alertsRefreshKey} />
+
                     <SupportGrowthBanner
                         supporterCount={supporterCount}
                         isSubscribed={isSubscribed}
@@ -324,9 +328,7 @@ export default function HomeScreen() {
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle2}>
-                            More Featured Stories...
-                        </Text>
+                        <Text style={styles.sectionTitle2}>More Featured Stories...</Text>
                         <View style={styles.sectionAccentLine} />
                     </View>
 
@@ -345,6 +347,7 @@ export default function HomeScreen() {
                         gamesPackagePurchased={gamesPackagePurchased}
                     />
                 </ScrollView>
+
             </View>
 
             <Modal
