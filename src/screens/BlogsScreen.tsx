@@ -53,8 +53,9 @@ type PostsApiResponse = {
 const BLOG_CATEGORIES = [
     "All",
     "Culture",
-    "Entertainment",
+    "Hot Takes",
     "Future of Chess",
+    "Entertainment",
     "Community",
     "Education",
 ];
@@ -91,11 +92,14 @@ function getCategoryBadgeStyle(category: string) {
         case "Culture":
             return { backgroundColor: "#4A1F5E", borderColor: "#9B5DE5" };
         case "Entertainment":
+
             return { backgroundColor: "#6A1B2E", borderColor: "#FF5C8A" };
         case "Future of Chess":
             return { backgroundColor: "#0E3C4D", borderColor: "#39C0ED" };
         case "Community":
             return { backgroundColor: "#165B36", borderColor: "#35D07F" };
+        case "Hot Takes":
+            return { backgroundColor: "#000000", borderColor: "#ff0000", color: "#ff0000" };
         case "Education":
             return { backgroundColor: "#6A5200", borderColor: "#F4D03F" };
         default:

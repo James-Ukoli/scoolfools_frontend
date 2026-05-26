@@ -44,6 +44,7 @@ const TRENDING_CATEGORIES = [
     "Pros",
     "Online",
     "Rising Stars",
+    "Breaking News",
 ];
 
 const INITIAL_VISIBLE_STORIES = 6;
@@ -94,6 +95,11 @@ function getCategoryBadgeStyle(category: string) {
             return {
                 backgroundColor: "#183A63",
                 borderColor: "#4D9BFF",
+            };
+        case "Breaking News":
+            return {
+                backgroundColor: "#ff0084",
+                borderColor: "#ff6ee9",
             };
         case "Rising Stars":
             return {

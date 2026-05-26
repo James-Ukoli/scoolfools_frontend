@@ -159,16 +159,12 @@ export const setupPurchaseListeners = ({
 
       const productId = purchase.productId;
 
-      if (productId === GAMES_PACK_PRODUCT_ID) {
-        await finishTransaction({
-          purchase,
-          isConsumable: false,
-        });
-
-        onPurchaseSuccess?.(purchase);
-        onGamesPackSuccess?.(purchase);
-        return;
-      }
+if (productId === GAMES_PACK_PRODUCT_ID) {
+  // Do NOT finish here anymore.
+  // GameHomeScreen will verify with backend first, then finishTransaction.
+  onGamesPackSuccess?.(purchase);
+  return;
+}
 
       if (productId === BLOGS_SUBSCRIPTION_PRODUCT_ID) {
         // IMPORTANT:

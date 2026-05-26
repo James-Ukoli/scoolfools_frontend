@@ -17,9 +17,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
+import { finishTransaction } from "react-native-iap";
+import ConfettiCannon from "react-native-confetti-cannon";
+
 import GameBackButton from "../../components/GameBackButton";
 import GameHomeButton from "../../components/GameHomeButton";
 import GameScreenWrapper from "../../components/GameScreenWrapper";
+
 import {
     initializeIAP,
     getGamesPackProduct,
@@ -27,7 +31,6 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../../services/iap";
-import ConfettiCannon from "react-native-confetti-cannon";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -78,6 +81,7 @@ export default function GameHomeScreen() {
     const [checkingEntitlements, setCheckingEntitlements] = useState(true);
     const [product, setProduct] = useState<any>(null);
     const [showConfetti, setShowConfetti] = useState(false);
+
     const bannerScale = useRef(new Animated.Value(1)).current;
     const bannerGlow = useRef(new Animated.Value(0)).current;
     const modalScale = useRef(new Animated.Value(0.92)).current;
@@ -117,7 +121,7 @@ export default function GameHomeScreen() {
         }
     };
 
-    const unlockGamesOnBackend = async () => {
+    const verifyGamePurchaseOnBackend = async (purchase: any) => {
         try {
             const token = await getToken();
 
@@ -125,30 +129,51 @@ export default function GameHomeScreen() {
                 throw new Error("Missing token or API base URL");
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/auth/me/unlock-games`, {
-                method: "PATCH",
+            const response = await fetch(`${API_BASE_URL}/api/games/verify`, {
+                method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     Authorization: `Bearer ${token}`,
                 },
+                body: JSON.stringify({
+                    platform: Platform.OS === "ios" ? "ios" : "android",
+                    productId: purchase?.productId || "jmpg_499_1t",
+
+                    transactionId:
+                        purchase?.transactionId ||
+                        purchase?.transactionIdIOS ||
+                        purchase?.id ||
+                        null,
+
+                    purchaseToken: purchase?.purchaseToken || null,
+                }),
             });
 
             const data = await response.json();
 
+            console.log("GAME VERIFY STATUS:", response.status);
+            console.log("GAME VERIFY DATA:", data);
+
             if (!response.ok) {
-                throw new Error(data.message || "Failed to unlock games");
+                throw new Error(data.message || "Failed to verify game purchase");
             }
+
+            await finishTransaction({
+                purchase,
+                isConsumable: false,
+            });
 
             setGamesPackagePurchased(true);
             closePaywall();
             setShowConfetti(true);
+
             Alert.alert("Unlocked 🎉", "All Party Games are now unlocked.");
         } catch (error) {
-            console.log("Unlock backend sync error:", error);
+            console.log("Verify game purchase error:", error);
 
             Alert.alert(
                 "Purchase Complete",
-                "Purchase worked, but saving the unlock to your account failed."
+                "Purchase worked, but saving the unlock to your account failed. Please try Restore Purchase."
             );
         } finally {
             setLoadingPurchase(false);
@@ -225,16 +250,17 @@ export default function GameHomeScreen() {
         fetchEntitlements();
 
         setupPurchaseListeners({
-            onPurchaseSuccess: async () => {
-                await unlockGamesOnBackend();
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async (purchase: any) => {
+                await verifyGamePurchaseOnBackend(purchase);
             },
-            onGamesPackSuccess: async () => { },
             onBlogsSubscriptionSuccess: async () => { },
             onPurchaseError: (error: any) => {
                 setLoadingPurchase(false);
                 console.log("Purchase error listener:", error);
             },
         });
+
         return () => {
             unloadSounds();
             cleanupIAP();
@@ -377,8 +403,6 @@ export default function GameHomeScreen() {
         );
     }
 
-
-
     return (
         <GameScreenWrapper>
             <View style={styles.topRow}>
@@ -407,9 +431,7 @@ export default function GameHomeScreen() {
                         </View>
 
                         <View style={styles.unlockTextWrap}>
-                            <Text style={styles.unlockBannerText}>
-                                Unlock all Party Games
-                            </Text>
+                            <Text style={styles.unlockBannerText}>Unlock all Party Games</Text>
                             <Text style={styles.unlockBannerSubtext}>
                                 One-time purchase • {product?.localizedPrice || "$4.99"}
                             </Text>
@@ -436,34 +458,19 @@ export default function GameHomeScreen() {
                         onPress={() => handleGamePress(game.route, game.sound)}
                     >
                         <View style={styles.gameLeft}>
-                            <View
-                                style={[
-                                    styles.iconBubble,
-                                    { borderColor: game.color },
-                                ]}
-                            >
-                                <Ionicons
-                                    name={game.icon as any}
-                                    size={24}
-                                    color={game.color}
-                                />
+                            <View style={[styles.iconBubble, { borderColor: game.color }]}>
+                                <Ionicons name={game.icon as any} size={24} color={game.color} />
                             </View>
 
                             <View style={styles.gameTextWrap}>
                                 <Text style={styles.gameTitle}>{game.title}</Text>
 
-                                <Text style={styles.gameDescription}>
-                                    {game.description}
-                                </Text>
+                                <Text style={styles.gameDescription}>{game.description}</Text>
                             </View>
                         </View>
 
                         <Ionicons
-                            name={
-                                gamesPackagePurchased
-                                    ? "chevron-forward"
-                                    : "lock-closed"
-                            }
+                            name={gamesPackagePurchased ? "chevron-forward" : "lock-closed"}
                             size={24}
                             color={gamesPackagePurchased ? "#8A8F98" : "#FFD166"}
                         />
@@ -540,9 +547,7 @@ export default function GameHomeScreen() {
                             ) : (
                                 <>
                                     <Ionicons name="lock-open" size={20} color="#050816" />
-                                    <Text style={styles.unlockButtonText}>
-                                        Unlock All Games
-                                    </Text>
+                                    <Text style={styles.unlockButtonText}>Unlock All Games</Text>
                                 </>
                             )}
                         </TouchableOpacity>
@@ -557,6 +562,7 @@ export default function GameHomeScreen() {
                     </Animated.View>
                 </View>
             </Modal>
+
             {showConfetti && (
                 <ConfettiCannon
                     count={160}
@@ -569,7 +575,6 @@ export default function GameHomeScreen() {
             )}
         </GameScreenWrapper>
     );
-
 }
 
 function FeatureRow({ icon, text }: { icon: any; text: string }) {
