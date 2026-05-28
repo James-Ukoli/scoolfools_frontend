@@ -7,12 +7,14 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { impostorWords } from "../../../../assets/data/impostor";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type RouteParams = {
     ImpostorReveal: {
@@ -37,6 +39,12 @@ const IMPOSTOR_GUESS_SECONDS = 15;
 export default function ImpostorRevealScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RouteParams, "ImpostorReveal">>();
+    const insets = useSafeAreaInsets();
+
+    const bottomSafePadding =
+        Platform.OS === "android"
+            ? Math.max(insets.bottom + 50, 76)
+            : insets.bottom + 34;
 
     const players = route.params?.players || 4;
     const guessTimeSeconds = route.params?.guessTimeSeconds || 120;
@@ -341,7 +349,7 @@ export default function ImpostorRevealScreen() {
     };
 
     const renderRevealPhase = () => (
-        <View style={styles.center}>
+        <View style={[styles.center, { paddingBottom: bottomSafePadding }]}>
             <Text style={styles.playerText}>Player {currentPlayer}</Text>
 
             <Text style={styles.instruction}>
@@ -399,7 +407,7 @@ export default function ImpostorRevealScreen() {
         const isDiscussion = phase === "discussion";
 
         return (
-            <View style={styles.center}>
+            <View style={[styles.center, { paddingBottom: bottomSafePadding }]}>
                 <Text style={styles.title}>
                     {isDiscussion ? "Find the Impostor" : "Emergency Vote"}
                 </Text>
@@ -445,7 +453,7 @@ export default function ImpostorRevealScreen() {
     };
 
     const renderVotePhase = () => (
-        <View style={styles.voteScreen}>
+        <View style={[styles.voteScreen, { paddingBottom: bottomSafePadding }]}>
             <Text style={styles.title}>Vote Now</Text>
 
             <Text style={styles.subtitle}>
@@ -478,7 +486,7 @@ export default function ImpostorRevealScreen() {
     );
 
     const renderImpostorGuessPhase = () => (
-        <View style={styles.center}>
+        <View style={[styles.center, { paddingBottom: bottomSafePadding }]}>
             <Text style={styles.title}>Final Chance</Text>
 
             <Text style={styles.subtitle}>
@@ -537,7 +545,7 @@ export default function ImpostorRevealScreen() {
         const crewWon = winner === "crew";
 
         return (
-            <View style={styles.center}>
+            <View style={[styles.center, { paddingBottom: bottomSafePadding }]}>
                 <Animated.View
                     style={[
                         styles.resultCard,
@@ -606,7 +614,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        paddingBottom: 60,
     },
     playerText: {
         color: "#FFFFFF",
@@ -739,7 +746,6 @@ const styles = StyleSheet.create({
     },
     voteScreen: {
         flex: 1,
-        paddingBottom: 20,
     },
     voteScroll: {
         flex: 1,
@@ -747,7 +753,7 @@ const styles = StyleSheet.create({
     },
     voteGrid: {
         gap: 12,
-        paddingBottom: 30,
+        paddingBottom: 90,
     },
     voteButton: {
         height: 58,

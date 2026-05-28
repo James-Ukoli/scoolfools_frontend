@@ -6,9 +6,12 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
+
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { justMoveClockConfig } from "../../../../assets/data/justMoveClock";
@@ -18,6 +21,8 @@ type Player = 1 | 2;
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function JustMoveClockScreen() {
+    const insets = useSafeAreaInsets();
+
     const [activePlayer, setActivePlayer] = useState<Player>(1);
     const [timeLeft, setTimeLeft] = useState(0);
     const [running, setRunning] = useState(false);
@@ -36,6 +41,13 @@ export default function JustMoveClockScreen() {
     const pulseAnim = useRef(new Animated.Value(0)).current;
     const modalScale = useRef(new Animated.Value(0.85)).current;
     const modalOpacity = useRef(new Animated.Value(0)).current;
+
+    const clockSafeStyle = {
+        paddingBottom:
+            Platform.OS === "android"
+                ? Math.max(insets.bottom + 26, 44)
+                : insets.bottom + 18,
+    };
 
     const getRandomSeconds = () => {
         const { minSeconds, maxSeconds } = justMoveClockConfig;
@@ -332,7 +344,7 @@ export default function JustMoveClockScreen() {
                 <Text style={styles.screenTitle}>Just Move Clock</Text>
             </View>
 
-            <View style={styles.clockWrap}>
+            <View style={[styles.clockWrap, clockSafeStyle]}>
                 {renderPlayerClock(2)}
 
                 <View style={styles.middleControls}>
@@ -421,7 +433,6 @@ const styles = StyleSheet.create({
     clockWrap: {
         flex: 1,
         justifyContent: "space-between",
-        paddingBottom: 18,
     },
     playerPanel: {
         flex: 1,

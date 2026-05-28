@@ -5,13 +5,21 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
 import { Audio } from "expo-av";
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { mostLikelyPrompts } from "../../../../assets/data/mostlikely";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function MostLikelyScreen() {
+    const insets = useSafeAreaInsets();
+
+    const bottomSafePadding =
+        Platform.OS === "android"
+            ? Math.max(insets.bottom + 50, 80)
+            : insets.bottom + 34;
     const [deck, setDeck] = useState<number[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [prompt, setPrompt] = useState("");
@@ -140,8 +148,12 @@ export default function MostLikelyScreen() {
                 <GameBackButton />
                 <Text style={styles.screenTitle}>Most Likely</Text>
             </View>
-
-            <View style={styles.center}>
+            <View
+                style={[
+                    styles.center,
+                    { paddingBottom: bottomSafePadding },
+                ]}
+            >
                 <Text style={styles.kicker}>Chess Party Mode</Text>
 
                 <TouchableOpacity
@@ -203,7 +215,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        paddingBottom: 60,
     },
     kicker: {
         color: "#3CF2FF",

@@ -12,7 +12,10 @@ import {
     Pressable,
     Alert,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -58,6 +61,7 @@ function formatBadgeLabel(value?: string) {
 
 export default function SearchScreen() {
     const navigation = useNavigation<any>();
+    const insets = useSafeAreaInsets();
 
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
@@ -308,9 +312,19 @@ export default function SearchScreen() {
                 />
 
                 <TouchableOpacity
-                    style={styles.homeButton}
+                    style={[
+                        styles.homeButton,
+                        {
+                            bottom:
+                                Platform.OS === "android"
+                                    ? Math.max(insets.bottom + 22, 38)
+                                    : insets.bottom + 20,
+                        },
+                    ]}
                     activeOpacity={0.85}
-                    onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+                    onPress={() =>
+                        navigation.navigate("MainTabs", { screen: "Home" })
+                    }
                 >
                     <Ionicons name="home" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -427,7 +441,7 @@ const styles = StyleSheet.create({
     },
     listContent: {
         paddingTop: 8,
-        paddingBottom: 90,
+        paddingBottom: Platform.OS === "android" ? 140 : 110,
     },
     resultItem: {
         paddingVertical: 14,
@@ -493,7 +507,6 @@ const styles = StyleSheet.create({
     homeButton: {
         position: "absolute",
         right: 18,
-        bottom: 20,
         width: 48,
         height: 48,
         borderRadius: 24,

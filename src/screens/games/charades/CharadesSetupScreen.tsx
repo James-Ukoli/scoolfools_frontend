@@ -1,14 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    Platform,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { Audio } from "expo-av";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 
 export default function CharadesSetupScreen() {
     const navigation = useNavigation<any>();
+    const insets = useSafeAreaInsets();
 
     const [roundTimeSeconds, setRoundTimeSeconds] = useState(60);
     const [totalRounds, setTotalRounds] = useState(5);
@@ -88,7 +96,17 @@ export default function CharadesSetupScreen() {
                 <Text style={styles.screenTitle}>Charades</Text>
             </View>
 
-            <View style={styles.center}>
+            <View
+                style={[
+                    styles.center,
+                    {
+                        paddingBottom:
+                            Platform.OS === "android"
+                                ? Math.max(insets.bottom + 70, 90)
+                                : insets.bottom + 50,
+                    },
+                ]}
+            >
                 <Text style={styles.title}>Game Setup</Text>
 
                 <Text style={styles.subtitle}>
@@ -190,7 +208,6 @@ const styles = StyleSheet.create({
     center: {
         flex: 1,
         justifyContent: "center",
-        paddingBottom: 50,
     },
 
     title: {

@@ -68,6 +68,55 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
+function FadeInBlock({
+    index,
+    children,
+}: {
+    index: number;
+    children: React.ReactNode;
+}) {
+    const opacity = useRef(new Animated.Value(0)).current;
+    const translateY = useRef(new Animated.Value(22)).current;
+    const scale = useRef(new Animated.Value(0.985)).current;
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(opacity, {
+                toValue: 1,
+                duration: 560,
+                delay: index * 75,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(translateY, {
+                toValue: 0,
+                duration: 560,
+                delay: index * 75,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+            Animated.timing(scale, {
+                toValue: 1,
+                duration: 560,
+                delay: index * 75,
+                easing: Easing.out(Easing.cubic),
+                useNativeDriver: true,
+            }),
+        ]).start();
+    }, [index, opacity, scale, translateY]);
+
+    return (
+        <Animated.View
+            style={{
+                opacity,
+                transform: [{ translateY }, { scale }],
+            }}
+        >
+            {children}
+        </Animated.View>
+    );
+}
+
 export default function ArticleScreen() {
     const route = useRoute<RouteProp<ArticleRouteParams, "ArticleScreen">>();
     const navigation = useNavigation<any>();
@@ -91,6 +140,51 @@ export default function ArticleScreen() {
     const rippleLoop1Ref = useRef<Animated.CompositeAnimation | null>(null);
     const rippleLoop2Ref = useRef<Animated.CompositeAnimation | null>(null);
     const rippleDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const screenFade = useRef(new Animated.Value(0)).current;
+    const heroFade = useRef(new Animated.Value(0)).current;
+    const heroTranslate = useRef(new Animated.Value(18)).current;
+    const headerFade = useRef(new Animated.Value(0)).current;
+    const headerTranslate = useRef(new Animated.Value(18)).current;
+
+    useEffect(() => {
+        Animated.sequence([
+            Animated.timing(screenFade, {
+                toValue: 1,
+                duration: 280,
+                easing: Easing.out(Easing.ease),
+                useNativeDriver: true,
+            }),
+            Animated.parallel([
+                Animated.timing(heroFade, {
+                    toValue: 1,
+                    duration: 620,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heroTranslate, {
+                    toValue: 0,
+                    duration: 620,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(headerFade, {
+                    toValue: 1,
+                    duration: 640,
+                    delay: 130,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(headerTranslate, {
+                    toValue: 0,
+                    duration: 640,
+                    delay: 130,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+            ]),
+        ]).start();
+    }, [headerFade, headerTranslate, heroFade, heroTranslate, screenFade]);
 
     useEffect(() => {
         const fetchArticle = async () => {
@@ -313,6 +407,7 @@ export default function ArticleScreen() {
             stopSpeakingAnimation();
         };
     }, []);
+
     useEffect(() => {
         try {
             if (playerStatus?.playing) {
@@ -375,25 +470,26 @@ export default function ArticleScreen() {
             setIsGeneratingNarration(false);
         }
     };
+
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
             case "header":
                 return (
-                    <Text key={block._id} style={styles.blockHeader}>
+                    <Text style={styles.blockHeader}>
                         {block.input}
                     </Text>
                 );
 
             case "subheader":
                 return (
-                    <Text key={block._id} style={styles.subheader}>
+                    <Text style={styles.subheader}>
                         {block.input}
                     </Text>
                 );
 
             case "paragraph":
                 return (
-                    <Text key={block._id} style={styles.paragraph}>
+                    <Text style={styles.paragraph}>
                         {block.input}
                     </Text>
                 );
@@ -401,7 +497,6 @@ export default function ArticleScreen() {
             case "image":
                 return (
                     <Pressable
-                        key={block._id}
                         style={styles.mediaBlock}
                         onPress={() => setPreviewImage(block.input)}
                     >
@@ -416,14 +511,14 @@ export default function ArticleScreen() {
 
             case "caption":
                 return (
-                    <Text key={block._id} style={styles.caption}>
+                    <Text style={styles.caption}>
                         {block.input}
                     </Text>
                 );
 
             case "quote":
                 return (
-                    <View key={block._id} style={styles.quoteContainer}>
+                    <View style={styles.quoteContainer}>
                         <View style={styles.quoteAccent} />
                         <Text style={styles.quoteText}>{block.input}</Text>
                     </View>
@@ -432,7 +527,6 @@ export default function ArticleScreen() {
             case "link":
                 return (
                     <Pressable
-                        key={block._id}
                         style={styles.linkCard}
                         onPress={() => openExternalLink(block.input)}
                     >
@@ -445,7 +539,7 @@ export default function ArticleScreen() {
 
             case "pgn":
                 return (
-                    <View key={block._id} style={styles.pgnContainer}>
+                    <View style={styles.pgnContainer}>
                         <Text style={styles.pgnLabel}>PGN</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             <Text style={styles.pgnText}>{block.input}</Text>
@@ -461,7 +555,6 @@ export default function ArticleScreen() {
 
                 return (
                     <Pressable
-                        key={block._id}
                         style={styles.videoPreviewCard}
                         onPress={() => openExternalLink(block.input)}
                     >
@@ -479,6 +572,7 @@ export default function ArticleScreen() {
 
                         <View style={styles.videoOverlay}>
                             <Ionicons name="play-circle" size={56} color="#FFFFFF" />
+                            <Text style={styles.videoOverlayText}>WATCH</Text>
                         </View>
                     </Pressable>
                 );
@@ -493,7 +587,10 @@ export default function ArticleScreen() {
         return (
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#3CF2FF" />
+                    <View style={styles.loadingOrb}>
+                        <ActivityIndicator size="small" color="#3CF2FF" />
+                    </View>
+                    <Text style={styles.loadingText}>Loading article feed...</Text>
                 </View>
             </SafeAreaView>
         );
@@ -511,166 +608,222 @@ export default function ArticleScreen() {
 
     return (
         <SafeAreaView edges={["top"]} style={styles.safeArea}>
-            <ScrollView
-                ref={scrollRef}
-                style={styles.container}
-                contentContainerStyle={styles.contentContainer}
-                showsVerticalScrollIndicator={false}
-            >
-                <View style={styles.topRow}>
-                    <View style={styles.leftActions}>
-                        <Pressable
-                            style={styles.backButton}
-                            onPress={() => navigation.goBack()}
+            <Animated.View style={[styles.screen, { opacity: screenFade }]}>
+                <ScrollView
+                    ref={scrollRef}
+                    style={styles.container}
+                    contentContainerStyle={styles.contentContainer}
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.topRow}>
+                        <View style={styles.leftActions}>
+                            <Pressable
+                                style={styles.backButton}
+                                onPress={() => navigation.goBack()}
+                            >
+                                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                            </Pressable>
+
+                            {!!post.category && (
+                                <View style={styles.categoryChip}>
+                                    <Text style={styles.categoryChipText}>{post.category}</Text>
+                                </View>
+                            )}
+
+                            {!!post.content_type && (
+                                <View style={styles.typeChip}>
+                                    <Text style={styles.typeChipText}>{post.content_type}</Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <Pressable style={styles.shareButton} onPress={handleShare}>
+                            <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+                        </Pressable>
+                    </View>
+
+                    {!!post.cover_image_url && (
+                        <Animated.View
+                            style={[
+                                styles.heroShell,
+                                {
+                                    opacity: heroFade,
+                                    transform: [{ translateY: heroTranslate }],
+                                },
+                            ]}
                         >
-                            <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                            <Image
+                                source={{ uri: post.cover_image_url }}
+                                style={styles.heroImage}
+                                resizeMode="contain"
+                            />
+                            <View pointerEvents="none" style={styles.heroGlow} />
+                        </Animated.View>
+                    )}
+
+                    <Animated.View
+                        style={[
+                            styles.headerSection,
+                            {
+                                opacity: headerFade,
+                                transform: [{ translateY: headerTranslate }],
+                            },
+                        ]}
+                    >
+
+
+                        <Text style={styles.title}>{post.title}</Text>
+
+                        {!!post.summary && <Text style={styles.summary}>{post.summary}</Text>}
+
+                        <View style={styles.metaCard}>
+                            <Ionicons name="person-circle-outline" size={17} color="#3CF2FF" />
+                            <Text style={styles.metaText}>
+                                {post.author || "Just Move"} · {displayDate}
+                            </Text>
+                        </View>
+
+                        <Pressable
+                            onPress={handleToggleNarration}
+                            style={({ pressed }) => [
+                                styles.aiChip,
+                                isPlaying && styles.aiChipActive,
+                                pressed && styles.aiChipPressed,
+                            ]}
+                        >
+                            {isGeneratingNarration ? (
+                                <ActivityIndicator color="#3CF2FF" size="small" />
+                            ) : (
+                                <Ionicons
+                                    name={isPlaying ? "volume-high" : "sparkles-outline"}
+                                    size={14}
+                                    color="#3CF2FF"
+                                />
+                            )}
+
+                            <Text style={styles.aiDisclosure}>
+                                {isGeneratingNarration
+                                    ? "Preparing narration..."
+                                    : isPlaying
+                                        ? "Narration playing"
+                                        : "Tap for AI narration"}
+                            </Text>
+                        </Pressable>
+                    </Animated.View>
+
+                    <View style={styles.articleBody}>
+                        {blocks.map((block, index) => (
+                            <FadeInBlock key={block._id} index={index + 4}>
+                                {renderBlock(block)}
+                            </FadeInBlock>
+                        ))}
+                    </View>
+                </ScrollView>
+
+                {previewImage && (
+                    <View style={styles.imagePreviewOverlay}>
+                        <Pressable
+                            style={styles.closePreview}
+                            onPress={() => setPreviewImage(null)}
+                        >
+                            <Ionicons name="close" size={30} color="#fff" />
                         </Pressable>
 
-                        {!!post.category && (
-                            <View style={styles.categoryChip}>
-                                <Text style={styles.categoryChipText}>{post.category}</Text>
-                            </View>
-                        )}
-
-                        {!!post.content_type && (
-                            <View style={styles.typeChip}>
-                                <Text style={styles.typeChipText}>{post.content_type}</Text>
-                            </View>
-                        )}
+                        <ScrollView
+                            style={{ flex: 1, width: "100%" }}
+                            contentContainerStyle={styles.zoomContainer}
+                            maximumZoomScale={3}
+                            minimumZoomScale={1}
+                            centerContent
+                        >
+                            <Image
+                                source={{ uri: previewImage }}
+                                style={styles.previewImage}
+                                resizeMode="contain"
+                            />
+                        </ScrollView>
                     </View>
-
-                    <Pressable style={styles.shareButton} onPress={handleShare}>
-                        <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
-                    </Pressable>
-                </View>
-
-                {!!post.cover_image_url && (
-                    <Image
-                        source={{ uri: post.cover_image_url }}
-                        style={styles.heroImage}
-                    />
-                )}
-
-                <View style={styles.headerSection}>
-                    <Text style={styles.title}>{post.title}</Text>
-
-                    {!!post.summary && <Text style={styles.summary}>{post.summary}</Text>}
-
-                    <View style={styles.metaRow}>
-                        <Text style={styles.metaText}>
-                            {post.author || "Just Move"} · {displayDate}
-                        </Text>
-                    </View>
-
-                    <Text style={styles.aiDisclosure}>
-                        AI audio narration available
-                    </Text>
-                </View>
-
-                <View style={styles.articleBody}>{blocks.map(renderBlock)}</View>
-            </ScrollView>
-
-            {previewImage && (
-                <View style={styles.imagePreviewOverlay}>
-                    <Pressable
-                        style={styles.closePreview}
-                        onPress={() => setPreviewImage(null)}
-                    >
-                        <Ionicons name="close" size={30} color="#fff" />
-                    </Pressable>
-
-                    <ScrollView
-                        style={{ flex: 1, width: "100%" }}
-                        contentContainerStyle={styles.zoomContainer}
-                        maximumZoomScale={3}
-                        minimumZoomScale={1}
-                        centerContent
-                    >
-                        <Image
-                            source={{ uri: previewImage }}
-                            style={styles.previewImage}
-                            resizeMode="contain"
-                        />
-                    </ScrollView>
-                </View>
-            )}
-            <Pressable
-                onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-                style={styles.scrollTopArrow}
-            >
-                <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
-            </Pressable>
-            <Animated.View
-                style={[
-                    styles.ttsButtonWrapper,
-                    {
-                        transform: [{ scale: pulseAnim }],
-                    },
-                ]}
-            >
-                {isPlaying && (
-                    <>
-                        <Animated.View
-                            pointerEvents="none"
-                            style={[
-                                styles.ttsRipple,
-                                {
-                                    opacity: rippleAnim1.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [0.35, 0],
-                                    }),
-                                    transform: [
-                                        {
-                                            scale: rippleAnim1.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: [1, 1.9],
-                                            }),
-                                        },
-                                    ],
-                                },
-                            ]}
-                        />
-                        <Animated.View
-                            pointerEvents="none"
-                            style={[
-                                styles.ttsRipple,
-                                {
-                                    opacity: rippleAnim2.interpolate({
-                                        inputRange: [0, 1],
-                                        outputRange: [0.24, 0],
-                                    }),
-                                    transform: [
-                                        {
-                                            scale: rippleAnim2.interpolate({
-                                                inputRange: [0, 1],
-                                                outputRange: [1, 2.15],
-                                            }),
-                                        },
-                                    ],
-                                },
-                            ]}
-                        />
-                    </>
                 )}
 
                 <Pressable
-                    onPress={handleToggleNarration}
-                    style={({ pressed }) => [
-                        styles.ttsButton,
-                        (isPlaying || isGeneratingNarration) && styles.ttsButtonActive,
-                        pressed && styles.ttsButtonPressed,
+                    onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+                    style={styles.scrollTopArrow}
+                >
+                    <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
+                </Pressable>
+
+                <Animated.View
+                    style={[
+                        styles.ttsButtonWrapper,
+                        {
+                            transform: [{ scale: pulseAnim }],
+                        },
                     ]}
                 >
-                    {isGeneratingNarration ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                    ) : (
-                        <Ionicons
-                            name={isPlaying ? "volume-high" : "volume-medium"}
-                            size={24}
-                            color="#FFFFFF"
-                        />
+                    {isPlaying && (
+                        <>
+                            <Animated.View
+                                pointerEvents="none"
+                                style={[
+                                    styles.ttsRipple,
+                                    {
+                                        opacity: rippleAnim1.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0.35, 0],
+                                        }),
+                                        transform: [
+                                            {
+                                                scale: rippleAnim1.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [1, 1.9],
+                                                }),
+                                            },
+                                        ],
+                                    },
+                                ]}
+                            />
+                            <Animated.View
+                                pointerEvents="none"
+                                style={[
+                                    styles.ttsRipple,
+                                    {
+                                        opacity: rippleAnim2.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: [0.24, 0],
+                                        }),
+                                        transform: [
+                                            {
+                                                scale: rippleAnim2.interpolate({
+                                                    inputRange: [0, 1],
+                                                    outputRange: [1, 2.15],
+                                                }),
+                                            },
+                                        ],
+                                    },
+                                ]}
+                            />
+                        </>
                     )}
-                </Pressable>
+
+                    <Pressable
+                        onPress={handleToggleNarration}
+                        style={({ pressed }) => [
+                            styles.ttsButton,
+                            (isPlaying || isGeneratingNarration) && styles.ttsButtonActive,
+                            pressed && styles.ttsButtonPressed,
+                        ]}
+                    >
+                        {isGeneratingNarration ? (
+                            <ActivityIndicator color="#FFFFFF" size="small" />
+                        ) : (
+                            <Ionicons
+                                name={isPlaying ? "volume-high" : "volume-medium"}
+                                size={24}
+                                color="#FFFFFF"
+                            />
+                        )}
+                    </Pressable>
+                </Animated.View>
             </Animated.View>
         </SafeAreaView>
     );
@@ -679,11 +832,15 @@ export default function ArticleScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#050816",
+        backgroundColor: "#000000",
+    },
+    screen: {
+        flex: 1,
+        backgroundColor: "#000000",
     },
     container: {
         flex: 1,
-        backgroundColor: "#050816",
+        backgroundColor: "#000000",
     },
     contentContainer: {
         paddingBottom: Platform.OS === "android" ? vs(190) : vs(120),
@@ -692,11 +849,35 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
+        backgroundColor: "#000000",
+    },
+    loadingOrb: {
+        width: s(54),
+        height: s(54),
+        borderRadius: s(27),
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "#06131D",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.45)",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.35,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
+    },
+    loadingText: {
+        color: "#A7F7FF",
+        fontSize: ms(12),
+        fontWeight: "800",
+        marginTop: vs(12),
+        letterSpacing: 1,
+        textTransform: "uppercase",
     },
     errorText: {
         color: "#FFFFFF",
         fontSize: ms(16),
-        fontWeight: "600",
+        fontWeight: "700",
     },
     topRow: {
         flexDirection: "row",
@@ -704,7 +885,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: s(16),
         paddingTop: vs(6),
-        paddingBottom: vs(10),
+        paddingBottom: vs(12),
     },
     leftActions: {
         flexDirection: "row",
@@ -713,18 +894,23 @@ const styles = StyleSheet.create({
         flexShrink: 1,
     },
     backButton: {
-        width: s(38),
-        height: s(38),
-        borderRadius: s(19),
+        width: s(39),
+        height: s(39),
+        borderRadius: s(19.5),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#121C31",
+        backgroundColor: "#070B12",
         borderWidth: 1,
-        borderColor: "#21385F",
+        borderColor: "rgba(60,242,255,0.32)",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.18,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 5,
     },
     categoryChip: {
-        backgroundColor: "#0F1B35",
-        borderColor: "#1C335D",
+        backgroundColor: "#050D15",
+        borderColor: "rgba(60,242,255,0.35)",
         borderWidth: 1,
         paddingHorizontal: s(12),
         paddingVertical: vs(6),
@@ -732,179 +918,267 @@ const styles = StyleSheet.create({
     },
     categoryChipText: {
         color: "#3CF2FF",
-        fontSize: ms(12),
-        fontWeight: "700",
+        fontSize: ms(11.5),
+        fontWeight: "900",
+        letterSpacing: 0.6,
+        textTransform: "uppercase",
     },
     typeChip: {
-        backgroundColor: "#0D1629",
-        borderColor: "#21446E",
+        backgroundColor: "#070B12",
+        borderColor: "rgba(255,255,255,0.18)",
         borderWidth: 1,
         paddingHorizontal: s(12),
         paddingVertical: vs(6),
         borderRadius: s(999),
     },
     typeChipText: {
-        color: "#8CCBFF",
-        fontSize: ms(12),
-        fontWeight: "700",
+        color: "#FFFFFF",
+        fontSize: ms(11.5),
+        fontWeight: "800",
         textTransform: "capitalize",
+        letterSpacing: 0.5,
     },
     shareButton: {
-        width: s(38),
-        height: s(38),
-        borderRadius: s(19),
+        width: s(39),
+        height: s(39),
+        borderRadius: s(19.5),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#121C31",
+        backgroundColor: "#070B12",
         borderWidth: 1,
-        borderColor: "#21385F",
+        borderColor: "rgba(255,255,255,0.18)",
+    },
+    heroShell: {
+        width: "100%",
+        paddingHorizontal: s(12),
+        marginTop: vs(2),
+        marginBottom: vs(4),
     },
     heroImage: {
         width: "100%",
-        height: vs(215),
-        backgroundColor: "#10182B",
+        height: vs(255),
+        borderRadius: s(22),
+        backgroundColor: "#020304",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.22)",
+    },
+    heroGlow: {
+        position: "absolute",
+        left: s(26),
+        right: s(26),
+        bottom: -vs(8),
+        height: vs(20),
+        backgroundColor: "rgba(60,242,255,0.11)",
+        borderRadius: s(999),
     },
     headerSection: {
-        paddingHorizontal: s(16),
-        paddingTop: vs(16),
+        paddingHorizontal: s(17),
+        paddingTop: vs(18),
+    },
+    liveSignalRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: vs(10),
+    },
+    signalDot: {
+        width: s(8),
+        height: s(8),
+        borderRadius: s(4),
+        backgroundColor: "#3CF2FF",
+        marginRight: s(8),
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    signalText: {
+        color: "#7DF7FF",
+        fontSize: ms(10.5),
+        fontWeight: "900",
+        letterSpacing: 1.2,
     },
     title: {
         color: "#FFFFFF",
-        fontSize: ms(28),
-        lineHeight: ms(34),
+        fontSize: ms(30),
+        lineHeight: ms(37),
         fontWeight: "900",
-        marginBottom: vs(10),
+        marginBottom: vs(11),
+        letterSpacing: 0.35,
+        textShadowColor: "rgba(60,242,255,0.36)",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 14,
     },
     summary: {
-        color: "#B8C2D6",
-        fontSize: ms(15),
-        lineHeight: ms(22),
-        marginBottom: vs(12),
+        color: "#D7E3F5",
+        fontSize: ms(15.5),
+        lineHeight: ms(24),
+        marginBottom: vs(14),
+        fontWeight: "500",
     },
-    metaRow: {
+    metaCard: {
         flexDirection: "row",
         alignItems: "center",
+        alignSelf: "flex-start",
+        backgroundColor: "#050A10",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.12)",
+        borderRadius: s(999),
+        paddingHorizontal: s(11),
+        paddingVertical: vs(7),
         marginBottom: vs(8),
+        gap: s(6),
     },
     metaText: {
-        color: "#7E8AA3",
+        color: "#B7C7D9",
         fontSize: ms(12),
-        fontWeight: "600",
+        fontWeight: "700",
+    },
+    aiChip: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        backgroundColor: "rgba(60,242,255,0.08)",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.25)",
+        borderRadius: s(999),
+        paddingHorizontal: s(10),
+        paddingVertical: vs(6),
+        gap: s(6),
     },
     aiDisclosure: {
-        color: "#6FB8FF",
-        fontSize: ms(11),
-        fontWeight: "700",
-        marginTop: vs(2),
-        marginBottom: vs(2),
+        color: "#9AFBFF",
+        fontSize: ms(10.5),
+        fontWeight: "900",
         textTransform: "uppercase",
-        letterSpacing: 0.6,
+        letterSpacing: 0.8,
     },
     articleBody: {
-        paddingHorizontal: s(16),
-        paddingTop: vs(12),
+        paddingHorizontal: s(17),
+        paddingTop: vs(18),
     },
     blockHeader: {
         color: "#FFFFFF",
         fontSize: ms(24),
-        lineHeight: ms(30),
+        lineHeight: ms(31),
         fontWeight: "900",
-        marginTop: vs(18),
-        marginBottom: vs(10),
+        marginTop: vs(22),
+        marginBottom: vs(11),
+        letterSpacing: 0.35,
+        textShadowColor: "rgba(60,242,255,0.25)",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
     },
     subheader: {
-        color: "#FFFFFF",
+        color: "#EAFDFF",
         fontSize: ms(20),
-        lineHeight: ms(26),
-        fontWeight: "800",
-        marginTop: vs(18),
+        lineHeight: ms(27),
+        fontWeight: "900",
+        marginTop: vs(20),
         marginBottom: vs(10),
+        letterSpacing: 0.25,
     },
     paragraph: {
-        color: "#D8DEEA",
-        fontSize: ms(16),
-        lineHeight: ms(27),
-        marginBottom: vs(14),
+        color: "#F2F6FF",
+        fontSize: ms(16.2),
+        lineHeight: ms(28),
+        marginBottom: vs(16),
+        fontWeight: "500",
+        letterSpacing: 0.1,
     },
     mediaBlock: {
-        marginTop: vs(12),
-        marginBottom: vs(8),
+        marginTop: vs(14),
+        marginBottom: vs(10),
+        borderRadius: s(20),
+        overflow: "hidden",
+        backgroundColor: "#03070D",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.18)",
     },
     blockImage: {
         width: "100%",
-        height: vs(240),
-        borderRadius: s(18),
-        backgroundColor: "#10182B",
+        height: vs(250),
+        borderRadius: s(20),
+        backgroundColor: "#03070D",
     },
     caption: {
-        color: "#8E9AB2",
-        fontSize: ms(12),
-        lineHeight: ms(17),
-        marginBottom: vs(14),
-        marginTop: vs(4),
+        color: "#96A6BA",
+        fontSize: ms(12.5),
+        lineHeight: ms(18),
+        marginBottom: vs(15),
+        marginTop: vs(5),
+        fontWeight: "600",
     },
     quoteContainer: {
         flexDirection: "row",
-        backgroundColor: "#0B1222",
-        borderRadius: s(18),
-        paddingVertical: vs(14),
-        paddingHorizontal: s(14),
-        marginVertical: vs(12),
+        backgroundColor: "#050A10",
+        borderRadius: s(20),
+        paddingVertical: vs(15),
+        paddingHorizontal: s(15),
+        marginVertical: vs(13),
         borderWidth: 1,
-        borderColor: "#15233F",
+        borderColor: "rgba(60,242,255,0.22)",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 5,
     },
     quoteAccent: {
         width: s(4),
         borderRadius: s(999),
         backgroundColor: "#3CF2FF",
         marginRight: s(12),
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.7,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
     },
     quoteText: {
         flex: 1,
-        color: "#F1F5FF",
+        color: "#F8FCFF",
         fontSize: ms(16),
-        lineHeight: ms(24),
+        lineHeight: ms(25),
         fontStyle: "italic",
-        fontWeight: "600",
+        fontWeight: "700",
     },
     pgnContainer: {
-        backgroundColor: "#0C1220",
-        borderRadius: s(18),
+        backgroundColor: "#04080E",
+        borderRadius: s(20),
         padding: s(14),
-        marginVertical: vs(12),
+        marginVertical: vs(13),
         borderWidth: 1,
-        borderColor: "#1A2743",
+        borderColor: "rgba(60,242,255,0.2)",
     },
     pgnLabel: {
         color: "#3CF2FF",
         fontSize: ms(12),
-        fontWeight: "800",
+        fontWeight: "900",
         marginBottom: vs(8),
-        letterSpacing: 0.5,
+        letterSpacing: 1,
     },
     pgnText: {
         color: "#E6ECF8",
         fontSize: ms(13),
         lineHeight: ms(20),
-        fontFamily: "Courier",
+        fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
     },
     linkCard: {
         flexDirection: "row",
         alignItems: "center",
         gap: s(8),
-        backgroundColor: "#0D1629",
+        backgroundColor: "#050A10",
         borderWidth: 1,
-        borderColor: "#193155",
-        borderRadius: s(16),
+        borderColor: "rgba(60,242,255,0.24)",
+        borderRadius: s(18),
         paddingHorizontal: s(14),
-        paddingVertical: vs(12),
-        marginVertical: vs(10),
+        paddingVertical: vs(13),
+        marginVertical: vs(11),
     },
     linkText: {
         flex: 1,
-        color: "#CFE9FF",
+        color: "#DDFBFF",
         fontSize: ms(14),
-        fontWeight: "600",
+        fontWeight: "800",
     },
     imagePreviewOverlay: {
         position: "absolute",
@@ -933,12 +1207,14 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     videoPreviewCard: {
-        height: vs(220),
-        borderRadius: s(18),
+        height: vs(225),
+        borderRadius: s(20),
         overflow: "hidden",
-        marginVertical: vs(12),
-        backgroundColor: "#11192C",
+        marginVertical: vs(13),
+        backgroundColor: "#04080E",
         position: "relative",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.2)",
     },
     videoPreviewImage: {
         width: "100%",
@@ -948,13 +1224,20 @@ const styles = StyleSheet.create({
         ...StyleSheet.absoluteFillObject,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "rgba(0,0,0,0.18)",
+        backgroundColor: "rgba(0,0,0,0.28)",
+    },
+    videoOverlayText: {
+        color: "#FFFFFF",
+        fontSize: ms(11),
+        fontWeight: "900",
+        letterSpacing: 1.5,
+        marginTop: vs(5),
     },
     videoFallback: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#11192C",
+        backgroundColor: "#04080E",
     },
     ttsButtonWrapper: {
         position: "absolute",
@@ -970,23 +1253,24 @@ const styles = StyleSheet.create({
         width: s(60),
         height: s(60),
         borderRadius: s(30),
-        backgroundColor: "#14233F",
+        backgroundColor: "#050B12",
         borderWidth: 1.5,
-        borderColor: "#274E7A",
+        borderColor: "rgba(60,242,255,0.45)",
         justifyContent: "center",
         alignItems: "center",
         shadowColor: "#3CF2FF",
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 7,
+        shadowOpacity: 0.32,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
     },
     ttsButtonActive: {
-        backgroundColor: "#17304F",
+        backgroundColor: "#06202B",
         borderColor: "#3CF2FF",
     },
     ttsButtonPressed: {
         opacity: 0.88,
+        transform: [{ scale: 0.97 }],
     },
     ttsRipple: {
         position: "absolute",
@@ -995,11 +1279,31 @@ const styles = StyleSheet.create({
         borderRadius: s(30),
         backgroundColor: "#3CF2FF",
     },
-
     scrollTopArrow: {
         position: "absolute",
         left: s(22),
         bottom: Platform.OS === "android" ? vs(100) : vs(36),
         zIndex: 999,
+        width: s(44),
+        height: s(44),
+        borderRadius: s(22),
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(5,10,16,0.82)",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.14)",
+    },
+    aiChipPressed: {
+        opacity: 0.75,
+        transform: [{ scale: 0.98 }],
+    },
+    aiChipActive: {
+        backgroundColor: "rgba(60,242,255,0.15)",
+        borderColor: "rgba(60,242,255,0.65)",
+        shadowColor: "#3CF2FF",
+        shadowOpacity: 0.35,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 7,
     },
 });

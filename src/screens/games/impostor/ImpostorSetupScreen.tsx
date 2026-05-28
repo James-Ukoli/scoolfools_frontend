@@ -5,16 +5,23 @@ import {
     Text,
     TouchableOpacity,
     View,
+    Platform,
 } from "react-native";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ImpostorSetupScreen() {
     const navigation = useNavigation<any>();
+    const insets = useSafeAreaInsets();
 
+    const bottomSafePadding =
+        Platform.OS === "android"
+            ? Math.max(insets.bottom + 50, 80)
+            : insets.bottom + 34;
     const [players, setPlayers] = useState(10);
     const [guessTimeSeconds, setGuessTimeSeconds] = useState(120);
     const [votingTimeSeconds, setVotingTimeSeconds] = useState(30);
@@ -116,7 +123,10 @@ export default function ImpostorSetupScreen() {
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: bottomSafePadding },
+                ]}
                 showsVerticalScrollIndicator={false}
             >
                 <Text style={styles.title}>Game Setup</Text>
@@ -238,7 +248,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     scrollContent: {
-        paddingBottom: 30,
+        flexGrow: 1,
     },
     title: {
         color: "#FFFFFF",

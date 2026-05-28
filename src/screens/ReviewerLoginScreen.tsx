@@ -62,7 +62,7 @@ export default function ReviewerLoginScreen({ navigation }: any) {
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
                 <View>
-                    <Text style={styles.title}>Reviewer Login</Text>
+                    <Text style={styles.title}>Login</Text>
                     <Text style={styles.subtitle}>
                         Sign in with the review credentials provided for Google Play.
                     </Text>

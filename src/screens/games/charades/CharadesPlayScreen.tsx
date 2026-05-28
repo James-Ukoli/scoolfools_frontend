@@ -1,8 +1,17 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+    Animated,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+    Platform,
+} from "react-native";
 import { RouteProp, useRoute } from "@react-navigation/native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
+
 import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { charadesWords } from "../../../../assets/data/charades";
@@ -22,6 +31,7 @@ type RouteParams = {
 
 export default function CharadesPlayScreen() {
     const route = useRoute<RouteProp<RouteParams, "CharadesPlay">>();
+    const insets = useSafeAreaInsets();
 
     const roundTimeSeconds = route.params?.roundTimeSeconds || 60;
     const totalRounds = route.params?.totalRounds || 5;
@@ -51,6 +61,13 @@ export default function CharadesPlayScreen() {
 
     const winnerScale = useRef(new Animated.Value(0.85)).current;
     const winnerOpacity = useRef(new Animated.Value(0)).current;
+
+    const centerSafeStyle = {
+        paddingBottom:
+            Platform.OS === "android"
+                ? Math.max(insets.bottom + 50, 76)
+                : insets.bottom + 28,
+    };
 
     useEffect(() => {
         pickNewWord();
@@ -387,7 +404,7 @@ export default function CharadesPlayScreen() {
             </View>
 
             {gameOver ? (
-                <View style={styles.center}>
+                <View style={[styles.center, centerSafeStyle]}>
                     <Animated.View
                         style={[
                             styles.gameOverCard,
@@ -412,7 +429,7 @@ export default function CharadesPlayScreen() {
                     </Animated.View>
                 </View>
             ) : (
-                <View style={styles.center}>
+                <View style={[styles.center, centerSafeStyle]}>
                     <Text style={styles.roundText}>
                         Round {round} of {totalRounds} • Team {currentTeam}
                     </Text>
