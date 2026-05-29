@@ -26,6 +26,7 @@ import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScree
 import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
+import TVScreen from "./src/screens/TVScreen";
 import { jwtDecode } from "jwt-decode";
 
 const Stack = createNativeStackNavigator();
@@ -122,6 +123,7 @@ export default function App() {
                         <Stack.Screen name="ImpostorReveal" component={ImpostorRevealScreen} />
                         <Stack.Screen name="JustMoveClock" component={JustMoveClockScreen} />
                         <Stack.Screen name="GamesPaywall" component={GamesPaywallScreen} />
+                        <Stack.Screen name="TVScreen" component={TVScreen} />
                     </Stack.Navigator>
                 </NavigationContainer>
             </NotificationsProvider>

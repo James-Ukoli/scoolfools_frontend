@@ -1,12 +1,13 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import HomeScreen from "../screens/HomeScreen";
 import TrendingScreen from "../screens/TrendingScreen";
-import BlogsScreen from "../screens/BlogsScreen";
+import TVScreen from "../screens/TVScreen";
 import RankingsScreen from "../screens/RankingsScreen";
 import AlertsScreen from "../screens/AlertsScreen";
 
@@ -26,16 +27,12 @@ export default function BottomTabs() {
                     backgroundColor: "#050816",
                     borderTopColor: "#12203A",
                     borderTopWidth: 1,
-
-                    height: Platform.OS === "android"
-                        ? 72 + insets.bottom
-                        : 64 + insets.bottom,
-
+                    height: Platform.OS === "android" ? 72 + insets.bottom : 64 + insets.bottom,
                     paddingTop: 6,
-
-                    paddingBottom: Platform.OS === "android"
-                        ? Math.max(insets.bottom, 18)
-                        : Math.max(insets.bottom, 8),
+                    paddingBottom:
+                        Platform.OS === "android"
+                            ? Math.max(insets.bottom, 18)
+                            : Math.max(insets.bottom, 8),
                 },
                 tabBarLabelStyle: {
                     fontSize: 11,
@@ -47,53 +44,23 @@ export default function BottomTabs() {
                 },
                 tabBarIcon: ({ color, focused }) => {
                     if (route.name === "Alerts") {
-                        return (
-                            <Ionicons
-                                name={focused ? "megaphone" : "megaphone-outline"}
-                                size={22}
-                                color={color}
-                            />
-                        );
+                        return <Ionicons name={focused ? "megaphone" : "megaphone-outline"} size={22} color={color} />;
                     }
 
                     if (route.name === "Trending") {
-                        return (
-                            <FontAwesome6
-                                name="arrow-trend-up"
-                                size={20}
-                                color={color}
-                            />
-                        );
+                        return <Ionicons name={focused ? "newspaper" : "newspaper-outline"} size={22} color={color} />;
                     }
 
                     if (route.name === "Home") {
-                        return (
-                            <Ionicons
-                                name={focused ? "home" : "home-outline"}
-                                size={22}
-                                color={color}
-                            />
-                        );
+                        return <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />;
                     }
 
-                    if (route.name === "Blogs") {
-                        return (
-                            <Ionicons
-                                name={focused ? "book" : "book-outline"}
-                                size={22}
-                                color={color}
-                            />
-                        );
+                    if (route.name === "TV") {
+                        return <MaterialCommunityIcons name="television-play" size={24} color={color} />;
                     }
 
                     if (route.name === "Rankings") {
-                        return (
-                            <FontAwesome6
-                                name="ranking-star"
-                                size={20}
-                                color={color}
-                            />
-                        );
+                        return <FontAwesome6 name="ranking-star" size={20} color={color} />;
                     }
 
                     return null;
@@ -101,9 +68,17 @@ export default function BottomTabs() {
             })}
         >
             <Tab.Screen name="Alerts" component={AlertsScreen} />
-            <Tab.Screen name="Trending" component={TrendingScreen} />
+
+            <Tab.Screen
+                name="Trending"
+                component={TrendingScreen}
+                options={{
+                    tabBarLabel: "News",
+                }}
+            />
+
             <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Blogs" component={BlogsScreen} />
+            <Tab.Screen name="TV" component={TVScreen} />
             <Tab.Screen name="Rankings" component={RankingsScreen} />
         </Tab.Navigator>
     );
