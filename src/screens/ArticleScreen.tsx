@@ -23,6 +23,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { s, vs, ms } from "react-native-size-matters";
 import * as WebBrowser from "expo-web-browser";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import YoutubePlayer from "react-native-youtube-iframe";
 
 type PostBlock = {
     _id: string;
@@ -549,32 +550,37 @@ export default function ArticleScreen() {
 
             case "video": {
                 const youtubeId = getYoutubeId(block.input);
-                const thumbnailUrl = youtubeId
-                    ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`
-                    : null;
 
-                return (
-                    <Pressable
-                        style={styles.videoPreviewCard}
-                        onPress={() => openExternalLink(block.input)}
-                    >
-                        {thumbnailUrl ? (
-                            <Image
-                                source={{ uri: thumbnailUrl }}
-                                style={styles.videoPreviewImage}
-                                resizeMode="cover"
-                            />
-                        ) : (
+                if (!youtubeId) {
+                    return (
+                        <Pressable
+                            style={styles.videoPreviewCard}
+                            onPress={() => openExternalLink(block.input)}
+                        >
                             <View style={styles.videoFallback}>
                                 <Ionicons name="play-circle-outline" size={42} color="#FFFFFF" />
+                                <Text style={styles.videoOverlayText}>OPEN VIDEO</Text>
                             </View>
-                        )}
+                        </Pressable>
+                    );
+                }
 
-                        <View style={styles.videoOverlay}>
-                            <Ionicons name="play-circle" size={56} color="#FFFFFF" />
-                            <Text style={styles.videoOverlayText}>WATCH</Text>
-                        </View>
-                    </Pressable>
+                return (
+                    <View style={styles.articleVideoCard}>
+                        <YoutubePlayer
+                            height={vs(210)}
+                            width={s(340)}
+                            videoId={youtubeId}
+                            play={false}
+                            webViewStyle={styles.youtubeWebView}
+                            initialPlayerParams={{
+                                controls: true,
+                                modestbranding: true,
+                                rel: false,
+                                playsinline: true,
+                            }}
+                        />
+                    </View>
                 );
             }
 
@@ -1305,5 +1311,19 @@ const styles = StyleSheet.create({
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
         elevation: 7,
+    },
+    articleVideoCard: {
+        width: "100%",
+        height: vs(210),
+        borderRadius: s(18),
+        overflow: "hidden",
+        marginVertical: vs(13),
+        backgroundColor: "#000000",
+        borderWidth: 1,
+        borderColor: "rgba(60,242,255,0.2)",
+    },
+
+    youtubeWebView: {
+        backgroundColor: "#000000",
     },
 });

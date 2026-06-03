@@ -45,7 +45,7 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-const SUPPORTER_GOAL = 50000;
+const SUPPORTER_MILESTONES = [100, 1000, 10000, 50000];
 
 export default function HomeScreen() {
     const navigation = useNavigation<any>();
@@ -97,10 +97,7 @@ export default function HomeScreen() {
         try {
             if (!API_BASE_URL) return;
 
-            const response = await fetch(
-                `${API_BASE_URL}/api/auth/supporter-progress`
-            );
-
+            const response = await fetch(`${API_BASE_URL}/api/auth/supporter-progress`);
             const data = await response.json();
 
             if (data?.success) {
@@ -188,11 +185,6 @@ export default function HomeScreen() {
                 return;
             }
 
-            console.log("VERIFY FUNCTION HIT");
-            console.log("PURCHASE SENT TO BACKEND:", purchase);
-            console.log("API_BASE_URL:", API_BASE_URL);
-            console.log("TOKEN EXISTS:", !!token);
-
             const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
                 method: "POST",
                 headers: {
@@ -202,13 +194,11 @@ export default function HomeScreen() {
                 body: JSON.stringify({
                     platform: Platform.OS === "ios" ? "ios" : "android",
                     productId: purchase?.productId || "jms_599_1y",
-
                     transactionId:
                         purchase?.transactionId ||
                         purchase?.transactionIdIOS ||
                         purchase?.id ||
                         null,
-
                     purchaseToken: purchase?.purchaseToken || null,
                 }),
             });
@@ -219,9 +209,6 @@ export default function HomeScreen() {
             }
 
             const data = await response.json();
-
-            console.log("VERIFY RESPONSE STATUS:", response.status);
-            console.log("VERIFY RESPONSE DATA:", data);
 
             if (!response.ok) {
                 throw new Error(data.message || "Failed to verify subscription");
@@ -280,6 +267,29 @@ export default function HomeScreen() {
         }
     };
 
+    const handleRatePress = async () => {
+        try {
+            const available = await StoreReview.isAvailableAsync();
+
+            if (available) {
+                await StoreReview.requestReview();
+            }
+        } catch (error) {
+            console.log("Review popup error:", error);
+        }
+    };
+
+    const handleSharePress = async () => {
+        try {
+            await Share.share({
+                message:
+                    "Follow chess like a sport on Just Move ♟️🔥 https://linktr.ee/justmovechess",
+            });
+        } catch (error) {
+            console.log("Share error:", error);
+        }
+    };
+
     const fetchHomeData = useCallback(async () => {
         try {
             if (!API_BASE_URL) return;
@@ -321,11 +331,9 @@ export default function HomeScreen() {
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
-
             onBlogsSubscriptionSuccess: async (purchase: any) => {
                 await verifyBlogSubscriptionOnBackend(purchase);
             },
-
             onPurchaseError: (error: any) => {
                 console.log("Home subscription listener error:", error);
                 setLoadingSubscription(false);
@@ -415,6 +423,13 @@ export default function HomeScreen() {
                         navigation={navigation}
                         gamesPackagePurchased={gamesPackagePurchased}
                     />
+
+                    {isSubscribed && (
+                        <SupporterBottomActions
+                            onSharePress={handleSharePress}
+                            onRatePress={handleRatePress}
+                        />
+                    )}
                 </ScrollView>
             </View>
 
@@ -492,32 +507,19 @@ function SupportGrowthBanner({
     onOpenBlogPaywall,
 }: any) {
     const progressAnim = useRef(new Animated.Value(0)).current;
-    const glowAnim = useRef(new Animated.Value(0.6)).current;
 
-    const progress = Math.min(supporterCount / SUPPORTER_GOAL, 1);
+    const currentGoal =
+        SUPPORTER_MILESTONES.find((goal) => supporterCount < goal) || 50000;
+
+    const progress = Math.min(supporterCount / currentGoal, 1);
 
     useEffect(() => {
         Animated.timing(progressAnim, {
             toValue: progress,
-            duration: 1800,
+            duration: 1500,
             easing: Easing.out(Easing.exp),
             useNativeDriver: false,
         }).start();
-
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(glowAnim, {
-                    toValue: 1,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(glowAnim, {
-                    toValue: 0.55,
-                    duration: 1200,
-                    useNativeDriver: true,
-                }),
-            ])
-        ).start();
     }, [progress]);
 
     const width = progressAnim.interpolate({
@@ -525,47 +527,23 @@ function SupportGrowthBanner({
         outputRange: ["0%", "100%"],
     });
 
-    const handleRatePress = async () => {
-        try {
-            const available = await StoreReview.isAvailableAsync();
-
-            if (available) {
-                await StoreReview.requestReview();
-            }
-        } catch (error) {
-            console.log("Review popup error:", error);
-        }
-    };
-
-    const handleSharePress = async () => {
-        try {
-            await Share.share({
-                message:
-                    "Follow chess like a sport on Just Move ♟️🔥 https://linktr.ee/justmovechess",
-            });
-        } catch (error) {
-            console.log("Share error:", error);
-        }
-    };
-
     return (
         <View style={styles.supportMissionCard}>
             <View style={styles.supportTopRow}>
-                <Ionicons name="rocket" size={18} color="#39C0ED" />
+                <Ionicons name="rocket" size={17} color="#39C0ED" />
 
                 <Text style={styles.supportMissionTitle}>
-                    Building the Future of Chess Media ♟️
+                    Just Move Supporters ♟️
                 </Text>
             </View>
 
             <Text style={styles.supportMissionSubtitle}>
-                Help Just Move reach 50,000 supporters.
+                {isSubscribed
+                    ? "Thank you for helping us push chess forward."
+                    : "Help us build the future of chess media."}
             </Text>
-
-            <View style={styles.progressOuterWrap}>
-                <View style={styles.progressBarWrap}>
-                    <Animated.View style={[styles.progressFill, { width }]} />
-                </View>
+            <View style={styles.progressBarWrap}>
+                <Animated.View style={[styles.progressFill, { width }]} />
             </View>
 
             <View style={styles.progressMetaRow}>
@@ -573,29 +551,20 @@ function SupportGrowthBanner({
                     {supporterCount.toLocaleString()} Supporters
                 </Text>
 
-                <Text style={styles.progressGoal}>Goal: 50,000</Text>
+                <Text style={styles.progressGoal}>
+                    Goal: {currentGoal.toLocaleString()}
+                </Text>
             </View>
 
-            {!isSubscribed ? (
+            {!isSubscribed && (
                 <TouchableOpacity
                     style={styles.supportSubscribeButton}
                     onPress={onOpenBlogPaywall}
                     activeOpacity={0.9}
                 >
-                    <Ionicons name="flash" size={18} color="#050816" />
-
+                    <Ionicons name="flash" size={16} color="#050816" />
                     <Text style={styles.supportSubscribeText}>Start Free Month</Text>
                 </TouchableOpacity>
-            ) : (
-                <Animated.View style={[styles.supportActionsRow, { opacity: glowAnim }]}>
-                    <TouchableOpacity activeOpacity={0.8} onPress={handleSharePress}>
-                        <Text style={styles.shareGlowText}>Share App</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity activeOpacity={0.8} onPress={handleRatePress}>
-                        <Text style={styles.rateGlowText}>Rate & Review</Text>
-                    </TouchableOpacity>
-                </Animated.View>
             )}
         </View>
     );
@@ -629,6 +598,34 @@ function PartyGamesPromo({ navigation, gamesPackagePurchased }: any) {
                     : "Fun social games for chess friends, clubs, and tournaments."}
             </Text>
         </TouchableOpacity>
+    );
+}
+
+function SupporterBottomActions({ onSharePress, onRatePress }: any) {
+    return (
+        <View style={styles.bottomActionsCard}>
+            <Text style={styles.bottomActionsTitle}>Support Just Move</Text>
+
+            <View style={styles.bottomActionsRow}>
+                <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={styles.bottomShareButton}
+                    onPress={onSharePress}
+                >
+                    <Ionicons name="share-social" size={17} color="#050816" />
+                    <Text style={styles.bottomShareText}>Share App</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                    activeOpacity={0.85}
+                    style={styles.bottomRateButton}
+                    onPress={onRatePress}
+                >
+                    <Ionicons name="star" size={17} color="#050816" />
+                    <Text style={styles.bottomRateText}>Rate & Review</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 }
 
@@ -676,42 +673,36 @@ const styles = StyleSheet.create({
 
     supportMissionCard: {
         backgroundColor: "#07111F",
-        borderRadius: 22,
-        borderWidth: 1,
-        borderColor: "#39C0ED",
-        paddingVertical: 14,
-        paddingHorizontal: 14,
-        marginBottom: 18,
+        borderRadius: 20,
+        paddingVertical: 10,
+        paddingHorizontal: 13,
+        marginBottom: 16,
     },
 
     supportTopRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 8,
-        marginBottom: 6,
+        gap: 7,
+        marginBottom: 4,
     },
 
     supportMissionTitle: {
         color: "#FFF",
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: "900",
         flex: 1,
     },
 
     supportMissionSubtitle: {
         color: "#BFD8E8",
-        fontSize: 12,
-        marginBottom: 12,
-    },
-
-    progressOuterWrap: {
-        alignItems: "center",
-        marginTop: 4,
+        fontSize: 11.5,
+        marginBottom: 9,
+        fontWeight: "700",
     },
 
     progressBarWrap: {
-        width: "72%",
-        height: 8,
+        width: "100%",
+        height: 7,
         backgroundColor: "#0E1625",
         borderRadius: 999,
         overflow: "hidden",
@@ -721,7 +712,6 @@ const styles = StyleSheet.create({
         height: "100%",
         backgroundColor: "#39C0ED",
         borderRadius: 999,
-
         shadowColor: "#39C0ED",
         shadowOpacity: 0.9,
         shadowRadius: 10,
@@ -729,74 +719,42 @@ const styles = StyleSheet.create({
             width: 0,
             height: 0,
         },
-
         elevation: 10,
     },
 
     progressMetaRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 10,
+        marginTop: 8,
     },
 
     progressCount: {
         color: "#FFF",
         fontWeight: "800",
-        fontSize: 12,
+        fontSize: 11.5,
     },
 
     progressGoal: {
         color: "#9FB7C7",
         fontWeight: "700",
-        fontSize: 12,
+        fontSize: 11.5,
     },
 
     supportSubscribeButton: {
         backgroundColor: "#39C0ED",
-        height: 42,
-        borderRadius: 14,
+        height: 36,
+        borderRadius: 13,
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 13,
+        marginTop: 10,
         flexDirection: "row",
-        gap: 8,
+        gap: 7,
     },
 
     supportSubscribeText: {
         color: "#050816",
         fontWeight: "900",
-        fontSize: 14,
-    },
-
-    supportActionsRow: {
-        flexDirection: "row",
-        justifyContent: "center",
-        gap: 30,
-        marginTop: 18,
-    },
-
-    shareGlowText: {
-        color: "#7CFF7C",
-        fontSize: 15,
-        fontWeight: "900",
-        textShadowColor: "#7CFF7C",
-        textShadowRadius: 12,
-        textShadowOffset: {
-            width: 0,
-            height: 0,
-        },
-    },
-
-    rateGlowText: {
-        color: "#C084FF",
-        fontSize: 15,
-        fontWeight: "900",
-        textShadowColor: "#C084FF",
-        textShadowRadius: 12,
-        textShadowOffset: {
-            width: 0,
-            height: 0,
-        },
+        fontSize: 13,
     },
 
     partyGamesCard: {
@@ -837,6 +795,60 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 8,
         lineHeight: 16,
+    },
+
+    bottomActionsCard: {
+        marginTop: 18,
+        backgroundColor: "#07111F",
+        borderRadius: 18,
+        paddingVertical: 13,
+        paddingHorizontal: 13,
+    },
+
+    bottomActionsTitle: {
+        color: "#FFFFFF",
+        fontSize: 13,
+        fontWeight: "900",
+        marginBottom: 10,
+    },
+
+    bottomActionsRow: {
+        flexDirection: "row",
+        gap: 10,
+    },
+
+    bottomShareButton: {
+        flex: 1,
+        height: 42,
+        borderRadius: 14,
+        backgroundColor: "#35D07F",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: 7,
+    },
+
+    bottomRateButton: {
+        flex: 1,
+        height: 42,
+        borderRadius: 14,
+        backgroundColor: "#C084FF",
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: 7,
+    },
+
+    bottomShareText: {
+        color: "#050816",
+        fontSize: 12.5,
+        fontWeight: "900",
+    },
+
+    bottomRateText: {
+        color: "#050816",
+        fontSize: 12.5,
+        fontWeight: "900",
     },
 
     paywallOverlay: {

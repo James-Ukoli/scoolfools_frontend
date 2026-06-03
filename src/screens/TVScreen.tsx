@@ -21,6 +21,7 @@ import AppHeader from "../components/AppHeader";
 
 type StreamType = "Live" | "Podcast" | "Video" | "Highlight";
 type LiveStatus = "upcoming" | "live" | "ended";
+type TVMode = "watch" | "listen";
 
 type RawTVItem = {
     _id?: string;
@@ -72,8 +73,6 @@ const PLAYER_HEIGHT = PLAYER_WIDTH * 0.5625;
 
 const BROADCAST_COLORS = ["#22D3EE", "#FACC15", "#FB923C", "#A855F7", "#22C55E"];
 
-const CONTENT_TYPES: StreamType[] = ["Live", "Podcast", "Video", "Highlight"];
-
 const getBroadcastColor = (index: number) => {
     return BROADCAST_COLORS[index % BROADCAST_COLORS.length];
 };
@@ -105,6 +104,42 @@ const getNewestByCreatedAt = (items: StreamItem[]) => {
     return [...items].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
+};
+
+const getTypeBadgeStyle = (type: StreamType) => {
+    if (type === "Live") {
+        return {
+            backgroundColor: "#0F172A",
+            borderColor: "#22D3EE",
+            color: "#67E8F9",
+        };
+    }
+
+    if (type === "Podcast") {
+        return {
+            backgroundColor: "#1B112A",
+            borderColor: "#A855F7",
+            color: "#D8B4FE",
+        };
+    }
+
+    if (type === "Video") {
+        return {
+            backgroundColor: "#082F49",
+            borderColor: "#22D3EE",
+            color: "#67E8F9",
+        };
+    }
+
+    return {
+        backgroundColor: "#3A2A09",
+        borderColor: "#FACC15",
+        color: "#FACC15",
+    };
+};
+
+const getDisplayType = (type: StreamType) => {
+    return type === "Live" ? "Broadcast" : type;
 };
 
 const getStatusLabel = (item?: StreamItem | null) => {
@@ -183,13 +218,14 @@ export default function TVScreen() {
     const navigation = useNavigation<any>();
 
     const [streams, setStreams] = useState<StreamItem[]>([]);
-    const [selectedType, setSelectedType] = useState<StreamType>("Live");
+    const [selectedMode, setSelectedMode] = useState<TVMode>("watch");
     const [selectedStream, setSelectedStream] = useState<StreamItem | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const slideAnim = useRef(new Animated.Value(0)).current;
+    const sscAnim = useRef(new Animated.Value(0)).current;
     const glowAnim = useRef(new Animated.Value(0)).current;
     const titleScrollAnim = useRef(new Animated.Value(0)).current;
     const tickerAnim = useRef(new Animated.Value(0)).current;
@@ -226,8 +262,8 @@ export default function TVScreen() {
                     if (stillExists) return stillExists;
                 }
 
-                const newestLive = sortedItems.find((item) => item.type === "Live");
-                return newestLive || sortedItems[0] || null;
+                const newestWatch = sortedItems.find((item) => item.type !== "Podcast");
+                return newestWatch || sortedItems[0] || null;
             });
         } catch (error) {
             console.log("Error fetching TV content:", error);
@@ -271,15 +307,12 @@ export default function TVScreen() {
         const animation = Animated.loop(
             Animated.sequence([
                 Animated.delay(1200),
-
                 Animated.timing(titleScrollAnim, {
                     toValue: -160,
                     duration: 7000,
                     useNativeDriver: true,
                 }),
-
                 Animated.delay(800),
-
                 Animated.timing(titleScrollAnim, {
                     toValue: 0,
                     duration: 1000,
@@ -319,29 +352,20 @@ export default function TVScreen() {
         outputRange: [0.18, 0.38],
     });
 
+    const sscTranslate = sscAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0%", "100%"],
+    });
+
     const filteredStreams = useMemo(() => {
         const newest = getNewestByCreatedAt(
-            streams.filter((item) => item.type === selectedType)
+            streams.filter((item) =>
+                selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
+            )
         );
 
-        if (selectedType !== "Live") {
-            return newest.slice(0, 3);
-        }
-
-        const groupedByTitle: StreamItem[] = [];
-
-        newest.forEach((item) => {
-            const alreadyAdded = groupedByTitle.some(
-                (existing) => existing.title === item.title
-            );
-
-            if (!alreadyAdded) {
-                groupedByTitle.push(item);
-            }
-        });
-
-        return groupedByTitle.slice(0, 3);
-    }, [streams, selectedType]);
+        return newest.slice(0, 3);
+    }, [streams, selectedMode]);
 
     const broadcastOptions = useMemo(() => {
         if (!selectedStream) return [];
@@ -355,7 +379,16 @@ export default function TVScreen() {
         );
     }, [streams, selectedStream]);
 
-    const animateSwitch = (nextType: StreamType) => {
+    const animateSwitch = (nextMode: TVMode) => {
+        const nextValue = nextMode === "watch" ? 0 : 1;
+
+        Animated.spring(sscAnim, {
+            toValue: nextValue,
+            useNativeDriver: false,
+            tension: 75,
+            friction: 9,
+        }).start();
+
         Animated.parallel([
             Animated.timing(fadeAnim, {
                 toValue: 0,
@@ -368,13 +401,15 @@ export default function TVScreen() {
                 useNativeDriver: true,
             }),
         ]).start(() => {
-            setSelectedType(nextType);
+            setSelectedMode(nextMode);
 
-            const newestForType = getNewestByCreatedAt(
-                streams.filter((item) => item.type === nextType)
+            const newestForMode = getNewestByCreatedAt(
+                streams.filter((item) =>
+                    nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
+                )
             )[0];
 
-            if (newestForType) setSelectedStream(newestForType);
+            if (newestForMode) setSelectedStream(newestForMode);
 
             slideAnim.setValue(-14);
 
@@ -391,13 +426,6 @@ export default function TVScreen() {
                 }),
             ]).start();
         });
-    };
-
-    const getIconName = (type: StreamType) => {
-        if (type === "Live") return "television-play";
-        if (type === "Podcast") return "headphones";
-        if (type === "Video") return "movie-open-play";
-        return "lightning-bolt";
     };
 
     const handlePromoPress = (type: "blogs" | "games") => {
@@ -438,18 +466,6 @@ export default function TVScreen() {
                     />
                 }
             >
-                <View style={styles.heroHeader}>
-                    <View style={styles.pageTitleRow}>
-                        <MaterialCommunityIcons
-                            name="television-play"
-                            size={30}
-                            color="#ffffff"
-                        />
-
-                        <Text style={styles.pageTitle}>TV</Text>
-                    </View>
-                </View>
-
                 {streams.length === 0 || !selectedStream ? (
                     <View style={styles.emptyWrap}>
                         <MaterialCommunityIcons
@@ -464,6 +480,61 @@ export default function TVScreen() {
                     </View>
                 ) : (
                     <>
+                        <View style={styles.sscOuter}>
+                            <Animated.View
+                                style={[
+                                    styles.sscSlider,
+                                    {
+                                        transform: [{ translateX: sscTranslate }],
+                                    },
+                                ]}
+                            />
+
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                style={styles.sscButton}
+                                onPress={() => {
+                                    if (selectedMode !== "watch") animateSwitch("watch");
+                                }}
+                            >
+                                <MaterialCommunityIcons
+                                    name="play-circle"
+                                    size={18}
+                                    color={selectedMode === "watch" ? "#22C55E" : "#A7A7B7"}
+                                />
+                                <Text
+                                    style={[
+                                        styles.sscText,
+                                        selectedMode === "watch" && styles.sscTextActiveWatch,
+                                    ]}
+                                >
+                                    Watch
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                activeOpacity={0.9}
+                                style={styles.sscButton}
+                                onPress={() => {
+                                    if (selectedMode !== "listen") animateSwitch("listen");
+                                }}
+                            >
+                                <MaterialCommunityIcons
+                                    name="headphones"
+                                    size={18}
+                                    color={selectedMode === "listen" ? "#A855F7" : "#A7A7B7"}
+                                />
+                                <Text
+                                    style={[
+                                        styles.sscText,
+                                        selectedMode === "listen" && styles.sscTextActiveListen,
+                                    ]}
+                                >
+                                    Listen
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+
                         <ScrollView
                             horizontal
                             showsHorizontalScrollIndicator={false}
@@ -559,7 +630,11 @@ export default function TVScreen() {
                                     <View style={styles.tvInfoBar}>
                                         <View style={styles.tvIconCircle}>
                                             <MaterialCommunityIcons
-                                                name="broadcast"
+                                                name={
+                                                    selectedStream.type === "Podcast"
+                                                        ? "headphones"
+                                                        : "broadcast"
+                                                }
                                                 size={22}
                                                 color="#FFFFFF"
                                             />
@@ -615,39 +690,6 @@ export default function TVScreen() {
                             </Animated.View>
                         </View>
 
-                        <View style={styles.typeGrid}>
-                            {CONTENT_TYPES.map((type) => {
-                                const active = selectedType === type;
-
-                                return (
-                                    <TouchableOpacity
-                                        key={type}
-                                        activeOpacity={0.85}
-                                        onPress={() => {
-                                            if (selectedType !== type) animateSwitch(type);
-                                        }}
-                                        style={[styles.typeCard, active && styles.activeTypeCard]}
-                                    >
-                                        <MaterialCommunityIcons
-                                            name={getIconName(type)}
-                                            size={28}
-                                            color={active ? "#22C55E" : "#A7A7B7"}
-                                        />
-
-                                        <Text
-                                            style={[
-                                                styles.typeText,
-                                                active && styles.activeTypeText,
-                                            ]}
-                                        >
-                                            {type === "Live" ? "LIVE" : type.toUpperCase()}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-
-
                         <Animated.View
                             style={{
                                 opacity: fadeAnim,
@@ -656,9 +698,11 @@ export default function TVScreen() {
                         >
                             <View style={styles.sectionHeader}>
                                 <View>
-                                    <Text style={styles.sectionEyebrow}>NOW PLAYING</Text>
+                                    <Text style={styles.sectionEyebrow}>
+                                        {selectedMode === "watch" ? "WATCH NOW" : "LISTEN NOW"}
+                                    </Text>
                                     <Text style={styles.sectionTitle}>
-                                        {selectedType === "Live" ? "Broadcasts" : selectedType}
+                                        {selectedMode === "watch" ? "Latest Watch" : "Latest Podcasts"}
                                     </Text>
                                 </View>
                             </View>
@@ -666,13 +710,14 @@ export default function TVScreen() {
                             {filteredStreams.length === 0 ? (
                                 <View style={styles.emptyTypeWrap}>
                                     <Text style={styles.emptyTypeText}>
-                                        No {selectedType.toLowerCase()} content yet.
+                                        No {selectedMode === "watch" ? "watch" : "podcast"} content yet.
                                     </Text>
                                 </View>
                             ) : (
                                 filteredStreams.map((item) => {
                                     const active = item.id === selectedStream.id;
                                     const statusStyle = getStatusStyle(item);
+                                    const typeBadge = getTypeBadgeStyle(item.type);
 
                                     return (
                                         <TouchableOpacity
@@ -692,7 +737,11 @@ export default function TVScreen() {
                                             ) : (
                                                 <View style={styles.thumbnailFallback}>
                                                     <MaterialCommunityIcons
-                                                        name="television-play"
+                                                        name={
+                                                            item.type === "Podcast"
+                                                                ? "headphones"
+                                                                : "television-play"
+                                                        }
                                                         size={24}
                                                         color="#8A8F98"
                                                     />
@@ -700,6 +749,27 @@ export default function TVScreen() {
                                             )}
 
                                             <View style={styles.streamContent}>
+                                                <View style={styles.cardTopRow}>
+                                                    <View
+                                                        style={[
+                                                            styles.typeBadge,
+                                                            {
+                                                                backgroundColor: typeBadge.backgroundColor,
+                                                                borderColor: typeBadge.borderColor,
+                                                            },
+                                                        ]}
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                styles.typeBadgeText,
+                                                                { color: typeBadge.color },
+                                                            ]}
+                                                        >
+                                                            {getDisplayType(item.type)}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
                                                 <Text
                                                     style={styles.streamTitle}
                                                     numberOfLines={2}
@@ -720,7 +790,9 @@ export default function TVScreen() {
                                                             name={
                                                                 item.type === "Live"
                                                                     ? "access-point"
-                                                                    : "clock-outline"
+                                                                    : item.type === "Podcast"
+                                                                        ? "headphones"
+                                                                        : "clock-outline"
                                                             }
                                                             size={12}
                                                             color={statusStyle.iconColor}
@@ -744,6 +816,7 @@ export default function TVScreen() {
                         </Animated.View>
                     </>
                 )}
+
                 {/* <PromoTicker tickerAnim={tickerAnim} onPress={handlePromoPress} /> */}
             </ScrollView>
         </SafeAreaView>
@@ -777,27 +850,21 @@ function PromoTicker({
                     onPress={() => onPress("blogs")}
                     style={[styles.tickerBubble, styles.blogBubble]}
                 >
-                    <Text style={styles.tickerBubbleText}>
-                        📚 Blogs
-                    </Text>
+                    <Text style={styles.tickerBubbleText}>📚 Blogs</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={() => onPress("games")}
                     style={[styles.tickerBubble, styles.gamesBubble]}
                 >
-                    <Text style={styles.tickerBubbleText}>
-                        🎉 Party Games
-                    </Text>
+                    <Text style={styles.tickerBubbleText}>🎉 Party Games</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={() => onPress("blogs")}
                     style={[styles.tickerBubble, styles.supportBubble]}
                 >
-                    <Text style={styles.tickerBubbleText}>
-                        ⭐ Supporter
-                    </Text>
+                    <Text style={styles.tickerBubbleText}>⭐ Supporter</Text>
                 </TouchableOpacity>
             </Animated.View>
         </View>
@@ -816,30 +883,66 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingHorizontal: 16,
         paddingBottom: 42,
+        paddingTop: 12,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
     },
-    heroHeader: {
-        marginTop: 12,
-        marginBottom: 16,
-    },
-    pageTitle: {
-        color: "#FFFFFF",
-        fontSize: 34,
-        fontWeight: "900",
-        textAlign: "center",
-        letterSpacing: 1.4,
-        textTransform: "uppercase",
-    },
-    pageTitleRow: {
+
+    sscOuter: {
+        height: 48,
+        borderRadius: 999,
+        backgroundColor: "#171C1E",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+        padding: 4,
+        marginBottom: 14,
         flexDirection: "row",
+        position: "relative",
+        overflow: "hidden",
+    },
+    sscSlider: {
+        position: "absolute",
+        top: 4,
+        left: 4,
+        width: "50%",
+        height: 40,
+        borderRadius: 999,
+        backgroundColor: "#22282B",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.08)",
+    },
+    sscButton: {
+        flex: 1,
+        height: 40,
+        borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
+        flexDirection: "row",
+        gap: 6,
+        zIndex: 2,
     },
+    sscText: {
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontWeight: "900",
+        letterSpacing: 0.4,
+    },
+    sscTextActiveWatch: {
+        color: "#22C55E",
+        textShadowColor: "#22C55E",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 14,
+    },
+    sscTextActiveListen: {
+        color: "#A855F7",
+        textShadowColor: "#A855F7",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 14,
+    },
+
     broadcastScroller: {
         paddingRight: 14,
         paddingBottom: 14,
@@ -1026,36 +1129,6 @@ const styles = StyleSheet.create({
     watchInlineBadgeText: {
         color: "#D8B4FE",
     },
-    typeGrid: {
-        flexDirection: "row",
-        gap: 10,
-        marginBottom: 14,
-    },
-    typeCard: {
-        flex: 1,
-        height: 84,
-        borderRadius: 18,
-        backgroundColor: "#0B0D1A",
-        borderWidth: 1.2,
-        borderColor: "#1F2437",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    activeTypeCard: {
-        borderColor: "#22C55E",
-        backgroundColor: "#0B0D1A",
-    },
-    typeText: {
-        color: "#A7A7B7",
-        fontSize: 10,
-        fontWeight: "900",
-        textAlign: "center",
-        marginTop: 8,
-        letterSpacing: 0.3,
-    },
-    activeTypeText: {
-        color: "#FFFFFF",
-    },
 
     sectionHeader: {
         flexDirection: "row",
@@ -1072,7 +1145,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         color: "#FFFFFF",
-        fontSize: 28,
+        fontSize: 26,
         fontWeight: "900",
         textTransform: "uppercase",
         letterSpacing: 0.2,
@@ -1109,6 +1182,24 @@ const styles = StyleSheet.create({
     },
     streamContent: {
         flex: 1,
+    },
+    cardTopRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 5,
+    },
+    typeBadge: {
+        borderRadius: 999,
+        borderWidth: 1,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        alignSelf: "flex-start",
+    },
+    typeBadgeText: {
+        fontSize: 8.5,
+        fontWeight: "900",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
     },
     streamTitle: {
         color: "#FFFFFF",
@@ -1182,37 +1273,31 @@ const styles = StyleSheet.create({
         overflow: "hidden",
         marginBottom: 18,
     },
-
     planeEmoji: {
         fontSize: 30,
         marginRight: 12,
     },
-
     tickerBubble: {
         paddingHorizontal: 14,
         paddingVertical: 8,
         borderRadius: 999,
         marginRight: 10,
     },
-
     blogBubble: {
         backgroundColor: "rgba(34,211,238,0.16)",
         borderWidth: 1,
         borderColor: "rgba(34,211,238,0.28)",
     },
-
     gamesBubble: {
         backgroundColor: "rgba(250,204,21,0.16)",
         borderWidth: 1,
         borderColor: "rgba(250,204,21,0.28)",
     },
-
     supportBubble: {
         backgroundColor: "rgba(34,197,94,0.16)",
         borderWidth: 1,
         borderColor: "rgba(34,197,94,0.28)",
     },
-
     tickerBubbleText: {
         color: "#FFFFFF",
         fontSize: 12,
