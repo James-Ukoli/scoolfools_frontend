@@ -106,6 +106,43 @@ const getNewestByCreatedAt = (items: StreamItem[]) => {
     );
 };
 
+/*
+================================================================================
+🚨 HUGE JUST MOVE TV FEATURE — DO NOT REMOVE 🚨
+
+Latest Watch / Latest Podcasts MUST group videos by matching title.
+
+Why this matters:
+- One tournament round can have multiple broadcasts/sources with the SAME title.
+- Example: Chess24, ChessBase India, FIDE, etc. may all stream the same round.
+- Under "Latest Watch", that round/title should appear as ONE card, not 3 cards.
+- The broadcast/source pills above the player are where users switch between those
+  matching streams for the selected title.
+
+In short:
+✅ Latest Watch = one card per title/round
+✅ Broadcast pills = all source options for that selected title
+❌ Never let duplicate matching titles take over multiple Latest Watch slots
+================================================================================
+*/
+const normalizeTitleKey = (title: string) => {
+    return title.trim().toLowerCase().replace(/\s+/g, " ");
+};
+
+const getGroupedLatestByTitle = (items: StreamItem[]) => {
+    const grouped = new Map<string, StreamItem>();
+
+    getNewestByCreatedAt(items).forEach((item) => {
+        const key = `${item.type}-${normalizeTitleKey(item.title)}`;
+
+        if (!grouped.has(key)) {
+            grouped.set(key, item);
+        }
+    });
+
+    return Array.from(grouped.values());
+};
+
 const getTypeBadgeStyle = (type: StreamType) => {
     if (type === "Live") {
         return {
@@ -358,13 +395,26 @@ export default function TVScreen() {
     });
 
     const filteredStreams = useMemo(() => {
-        const newest = getNewestByCreatedAt(
-            streams.filter((item) =>
-                selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
-            )
+        const modeItems = streams.filter((item) =>
+            selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
         );
 
-        return newest.slice(0, 3);
+        /*
+        ============================================================================
+        🚨 KEEP THIS GROUPING LOGIC 🚨
+
+        This is the feature that prevents the same broadcast round/title from showing
+        up as 2 or 3 separate cards under Latest Watch.
+
+        The card list is grouped by title. When a user taps a grouped card, the TV
+        player selects that title. Then broadcastOptions below finds ALL matching
+        streams with that title and shows them as source pills above the player.
+
+        Do not replace this with getNewestByCreatedAt(...).slice(0, 3), or duplicate
+        sources for the same round will take over the Latest Watch section again.
+        ============================================================================
+        */
+        return getGroupedLatestByTitle(modeItems).slice(0, 3);
     }, [streams, selectedMode]);
 
     const broadcastOptions = useMemo(() => {
@@ -374,7 +424,7 @@ export default function TVScreen() {
             streams.filter(
                 (item) =>
                     item.type === selectedStream.type &&
-                    item.title === selectedStream.title
+                    normalizeTitleKey(item.title) === normalizeTitleKey(selectedStream.title)
             )
         );
     }, [streams, selectedStream]);
@@ -403,11 +453,12 @@ export default function TVScreen() {
         ]).start(() => {
             setSelectedMode(nextMode);
 
-            const newestForMode = getNewestByCreatedAt(
-                streams.filter((item) =>
-                    nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
-                )
-            )[0];
+            const modeItems = streams.filter((item) =>
+                nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
+            );
+
+            // Keep mode switching aligned with the grouped Latest Watch feature.
+            const newestForMode = getGroupedLatestByTitle(modeItems)[0];
 
             if (newestForMode) setSelectedStream(newestForMode);
 
@@ -715,7 +766,11 @@ export default function TVScreen() {
                                 </View>
                             ) : (
                                 filteredStreams.map((item) => {
-                                    const active = item.id === selectedStream.id;
+                                    const active =
+                                        item.id === selectedStream.id ||
+                                        (item.type === selectedStream.type &&
+                                            normalizeTitleKey(item.title) ===
+                                            normalizeTitleKey(selectedStream.title));
                                     const statusStyle = getStatusStyle(item);
                                     const typeBadge = getTypeBadgeStyle(item.type);
 

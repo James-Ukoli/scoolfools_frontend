@@ -143,6 +143,7 @@ export default function EventsScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [countdownTick, setCountdownTick] = useState(Date.now());
+    const [showCompleted, setShowCompleted] = useState(false);
 
     const fetchEvents = useCallback(async () => {
         try {
@@ -153,7 +154,8 @@ export default function EventsScreen({ navigation }: any) {
                 .filter((event) => event.is_published)
                 .sort(
                     (a, b) =>
-                        new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+                        new Date(a.start_at).getTime() -
+                        new Date(b.start_at).getTime()
                 );
 
             setEvents(fetchedEvents);
@@ -187,48 +189,168 @@ export default function EventsScreen({ navigation }: any) {
         }
     }, [fetchEvents]);
 
-    const { heroEvent, remainingEvents } = useMemo(() => {
-        const now = Date.now();
+    const {
+        currentEvents,
+        upcomingEvents,
+        completedThisYearEvents,
+        countdownEvent,
+    } = useMemo(() => {
+        const now = countdownTick;
+        const currentYear = new Date(now).getFullYear();
 
-        const upcomingEvents = events.filter(
-            (event) => new Date(event.start_at).getTime() >= now
-        );
-
-        const sortedUpcoming = [...upcomingEvents].sort(
+        const sorted = [...events].sort(
             (a, b) =>
-                new Date(a.start_at).getTime() - new Date(b.start_at).getTime()
+                new Date(a.start_at).getTime() -
+                new Date(b.start_at).getTime()
         );
 
-        const hero = sortedUpcoming[0] || events[0] || null;
+        const current = sorted.filter((event) => {
+            const start = new Date(event.start_at).getTime();
+            const end = new Date(event.end_at).getTime();
+            return start <= now && end >= now;
+        });
 
-        const rest = hero
-            ? events.filter((event) => event._id !== hero._id)
-            : [];
+        const upcoming = sorted.filter(
+            (event) => new Date(event.start_at).getTime() > now
+        );
+
+        const completedThisYear = sorted
+            .filter((event) => {
+                const end = new Date(event.end_at);
+                return (
+                    end.getTime() < now &&
+                    end.getFullYear() === currentYear
+                );
+            })
+            .sort(
+                (a, b) =>
+                    new Date(b.end_at).getTime() -
+                    new Date(a.end_at).getTime()
+            );
 
         return {
-            heroEvent: hero,
-            remainingEvents: rest,
+            currentEvents: current,
+            upcomingEvents: upcoming,
+            completedThisYearEvents: completedThisYear,
+            countdownEvent: upcoming[0] || null,
         };
     }, [events, countdownTick]);
 
-    const groupedEvents = useMemo(() => {
-        return groupEventsByMonth(remainingEvents);
-    }, [remainingEvents]);
-
-    const groupedEntries = useMemo(() => {
-        return Object.entries(groupedEvents).sort(
+    const groupedUpcomingEntries = useMemo(() => {
+        return Object.entries(groupEventsByMonth(upcomingEvents)).sort(
             ([, eventsA], [, eventsB]) =>
                 new Date(eventsA[0].start_at).getTime() -
                 new Date(eventsB[0].start_at).getTime()
         );
-    }, [groupedEvents]);
+    }, [upcomingEvents]);
 
-    const countdown = heroEvent
-        ? getCountdownParts(heroEvent.start_at)
+    const groupedCompletedEntries = useMemo(() => {
+        return Object.entries(groupEventsByMonth(completedThisYearEvents)).sort(
+            ([, eventsA], [, eventsB]) =>
+                new Date(eventsB[0].end_at).getTime() -
+                new Date(eventsA[0].end_at).getTime()
+        );
+    }, [completedThisYearEvents]);
+
+    const countdown = countdownEvent
+        ? getCountdownParts(countdownEvent.start_at)
         : { days: "00", hours: "00", minutes: "00", seconds: "00" };
 
     const openEvent = (event: EventItem) => {
         navigation.navigate("EventDetailScreen", { event });
+    };
+
+    const renderEventCard = (
+        event: EventItem,
+        options?: {
+            isCurrent?: boolean;
+            isCountdownEvent?: boolean;
+            isCompleted?: boolean;
+        }
+    ) => {
+        const isCurrent = options?.isCurrent;
+        const isCountdownEvent = options?.isCountdownEvent;
+        const isCompleted = options?.isCompleted;
+
+        return (
+            <TouchableOpacity
+                key={event._id}
+                style={[
+                    styles.eventCard,
+                    isCurrent && styles.currentEventCard,
+                    isCountdownEvent && styles.countdownEventCard,
+                    isCompleted && styles.completedEventCard,
+                ]}
+                activeOpacity={0.9}
+                onPress={() => openEvent(event)}
+            >
+                <Image
+                    source={{
+                        uri: event.card_image_url || event.cover_image_url,
+                    }}
+                    style={styles.eventImage}
+                    resizeMode="cover"
+                />
+
+                <View style={styles.eventContent}>
+                    {isCurrent && (
+                        <View style={styles.liveBadge}>
+                            <View style={styles.liveDot} />
+                            <Text style={styles.liveBadgeText}>Currently Happening</Text>
+                        </View>
+                    )}
+
+                    {isCountdownEvent && (
+                        <View style={styles.nextBadge}>
+                            <Ionicons name="time-outline" size={13} color="#000000" />
+                            <Text style={styles.nextBadgeText}>Next Event</Text>
+                        </View>
+                    )}
+
+                    {isCompleted && (
+                        <View style={styles.completedBadge}>
+                            <Text style={styles.completedBadgeText}>Completed</Text>
+                        </View>
+                    )}
+
+                    <Text style={styles.eventTitle} numberOfLines={2}>
+                        {event.title}
+                    </Text>
+
+                    <Text style={styles.eventDate}>
+                        {formatDateRange(event.start_at, event.end_at)}
+                    </Text>
+
+                    <Text style={styles.eventLocation} numberOfLines={2}>
+                        {event.location}
+                    </Text>
+
+                    {isCountdownEvent && (
+                        <View style={styles.countdownRow}>
+                            <View style={styles.countdownBox}>
+                                <Text style={styles.countdownNumber}>{countdown.days}</Text>
+                                <Text style={styles.countdownLabel}>Days</Text>
+                            </View>
+
+                            <View style={styles.countdownBox}>
+                                <Text style={styles.countdownNumber}>{countdown.hours}</Text>
+                                <Text style={styles.countdownLabel}>Hours</Text>
+                            </View>
+
+                            <View style={styles.countdownBox}>
+                                <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
+                                <Text style={styles.countdownLabel}>Min</Text>
+                            </View>
+
+                            <View style={styles.countdownBox}>
+                                <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
+                                <Text style={styles.countdownLabel}>Sec</Text>
+                            </View>
+                        </View>
+                    )}
+                </View>
+            </TouchableOpacity>
+        );
     };
 
     if (loading) {
@@ -278,102 +400,71 @@ export default function EventsScreen({ navigation }: any) {
                     <Text style={styles.screenTitle}>Events</Text>
                 </View>
 
-                {heroEvent ? (
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        onPress={() => openEvent(heroEvent)}
-                        style={styles.heroWrapper}
-                    >
-                        <View style={styles.heroCard}>
-                            <Image
-                                source={{ uri: heroEvent.cover_image_url }}
-                                style={styles.heroImage}
-                                resizeMode="cover"
-                                onError={() =>
-                                    console.log(
-                                        "Hero event image failed:",
-                                        heroEvent.cover_image_url
-                                    )
-                                }
-                            />
+                {currentEvents.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Currently Happening</Text>
 
-                            <View style={styles.heroInfoBox}>
-                                <Text style={styles.heroTitle} numberOfLines={2}>
-                                    {heroEvent.title}
-                                </Text>
+                        {currentEvents.map((event) =>
+                            renderEventCard(event, { isCurrent: true })
+                        )}
+                    </View>
+                )}
 
-                                <Text style={styles.heroDateRange}>
-                                    {formatDateRange(heroEvent.start_at, heroEvent.end_at)}
-                                </Text>
+                {upcomingEvents.length > 0 && (
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Upcoming</Text>
 
-                                <View style={styles.countdownRow}>
-                                    <View style={styles.countdownBox}>
-                                        <Text style={styles.countdownNumber}>{countdown.days}</Text>
-                                        <Text style={styles.countdownLabel}>Days</Text>
-                                    </View>
+                        {groupedUpcomingEntries.map(([monthLabel, monthEvents]) => (
+                            <View key={monthLabel} style={styles.monthSection}>
+                                <Text style={styles.monthTitle}>{monthLabel}</Text>
 
-                                    <View style={styles.countdownBox}>
-                                        <Text style={styles.countdownNumber}>{countdown.hours}</Text>
-                                        <Text style={styles.countdownLabel}>Hours</Text>
-                                    </View>
-
-                                    <View style={styles.countdownBox}>
-                                        <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
-                                        <Text style={styles.countdownLabel}>Minutes</Text>
-                                    </View>
-
-                                    <View style={styles.countdownBox}>
-                                        <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
-                                        <Text style={styles.countdownLabel}>Seconds</Text>
-                                    </View>
-                                </View>
+                                {monthEvents.map((event) =>
+                                    renderEventCard(event, {
+                                        isCountdownEvent:
+                                            countdownEvent?._id === event._id,
+                                    })
+                                )}
                             </View>
-                        </View>
-                    </TouchableOpacity>
-                ) : null}
-
-                {groupedEntries.map(([monthLabel, monthEvents]) => (
-                    <View key={monthLabel} style={styles.monthSection}>
-                        <Text style={styles.monthTitle}>{monthLabel}</Text>
-
-                        {monthEvents.map((event) => (
-                            <TouchableOpacity
-                                key={event._id}
-                                style={styles.eventRow}
-                                activeOpacity={0.88}
-                                onPress={() => openEvent(event)}
-                            >
-                                <Image
-                                    source={{
-                                        uri: event.card_image_url || event.cover_image_url,
-                                    }}
-                                    style={styles.eventImage}
-                                    resizeMode="cover"
-                                    onError={() =>
-                                        console.log(
-                                            "Event row image failed:",
-                                            event.card_image_url || event.cover_image_url
-                                        )
-                                    }
-                                />
-
-                                <View style={styles.eventContent}>
-                                    <Text style={styles.eventTitle} numberOfLines={2}>
-                                        {event.title}
-                                    </Text>
-
-                                    <Text style={styles.eventDate}>
-                                        {formatDateRange(event.start_at, event.end_at)}
-                                    </Text>
-
-                                    <Text style={styles.eventLocation} numberOfLines={2}>
-                                        {event.location}
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
                         ))}
                     </View>
-                ))}
+                )}
+
+                {completedThisYearEvents.length > 0 && (
+                    <View style={styles.completedSection}>
+                        <TouchableOpacity
+                            style={styles.completedToggle}
+                            activeOpacity={0.85}
+                            onPress={() => setShowCompleted((prev) => !prev)}
+                        >
+                            <View>
+                                <Text style={styles.completedToggleTitle}>
+                                    Completed This Year
+                                </Text>
+                                <Text style={styles.completedToggleSubtitle}>
+                                    {completedThisYearEvents.length} event
+                                    {completedThisYearEvents.length === 1 ? "" : "s"}
+                                </Text>
+                            </View>
+
+                            <Ionicons
+                                name={showCompleted ? "chevron-up" : "chevron-down"}
+                                size={22}
+                                color="#FFFFFF"
+                            />
+                        </TouchableOpacity>
+
+                        {showCompleted &&
+                            groupedCompletedEntries.map(([monthLabel, monthEvents]) => (
+                                <View key={monthLabel} style={styles.monthSection}>
+                                    <Text style={styles.monthTitle}>{monthLabel}</Text>
+
+                                    {monthEvents.map((event) =>
+                                        renderEventCard(event, { isCompleted: true })
+                                    )}
+                                </View>
+                            ))}
+                    </View>
+                )}
             </ScrollView>
 
             <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
@@ -433,96 +524,123 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         marginLeft: 14,
     },
-    heroWrapper: {
-        marginBottom: 28,
+    section: {
+        marginBottom: 24,
     },
-    heroCard: {
-        borderRadius: 28,
-        overflow: "hidden",
-        backgroundColor: "#0D0D0D",
-        shadowColor: "#1DA1F2",
-        shadowOpacity: 0.22,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 10,
-        borderWidth: 1,
-        borderColor: "#15233A",
-    },
-    heroImage: {
-        width: "100%",
-        height: 190,
-        backgroundColor: "#181818",
-    },
-    heroInfoBox: {
-        backgroundColor: "#0B0B0B",
-        paddingHorizontal: 18,
-        paddingTop: 16,
-        paddingBottom: 18,
-    },
-    heroTitle: {
+    sectionTitle: {
         color: "#FFFFFF",
         fontSize: 22,
         fontWeight: "900",
-        lineHeight: 28,
-        marginBottom: 10,
-    },
-    heroDateRange: {
-        color: "#F4D03F",
-        fontSize: 14,
-        fontWeight: "800",
-        marginBottom: 14,
-    },
-    countdownRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        gap: 10,
-    },
-    countdownBox: {
-        flex: 1,
-        backgroundColor: "#04152D",
-        borderRadius: 16,
-        paddingVertical: 12,
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#0E2A52",
-    },
-    countdownNumber: {
-        color: "#2EE7FF",
-        fontSize: 22,
-        fontWeight: "900",
-        marginBottom: 4,
-    },
-    countdownLabel: {
-        color: "#CAD4E3",
-        fontSize: 12,
-        fontWeight: "700",
+        marginBottom: 12,
     },
     monthSection: {
         marginBottom: 22,
     },
     monthTitle: {
         color: "#F4D03F",
-        fontSize: 24,
+        fontSize: 21,
         fontWeight: "900",
         marginBottom: 12,
     },
-    eventRow: {
+    eventCard: {
         flexDirection: "row",
         alignItems: "flex-start",
         marginBottom: 14,
+        padding: 10,
+        borderRadius: 20,
+        backgroundColor: "#080808",
+        borderWidth: 1,
+        borderColor: "#171717",
+    },
+    currentEventCard: {
+        backgroundColor: "#120707",
+        borderColor: "#FF3B30",
+        shadowColor: "#FF3B30",
+        shadowOpacity: 0.25,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
+    },
+    countdownEventCard: {
+        backgroundColor: "#071326",
+        borderColor: "#1DA1F2",
+        shadowColor: "#1DA1F2",
+        shadowOpacity: 0.22,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
+    },
+    completedEventCard: {
+        opacity: 0.78,
+        backgroundColor: "#090909",
+        borderColor: "#2A2A2A",
     },
     eventImage: {
-        width: 92,
-        height: 92,
+        width: 94,
+        height: 104,
         borderRadius: 16,
         marginRight: 12,
         backgroundColor: "#1A1A1A",
     },
     eventContent: {
         flex: 1,
-        minHeight: 92,
-        justifyContent: "space-between",
+        minHeight: 104,
+        justifyContent: "center",
         paddingVertical: 2,
+    },
+    liveBadge: {
+        alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: "#FF3B30",
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 999,
+        marginBottom: 8,
+    },
+    liveDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+        backgroundColor: "#FFFFFF",
+    },
+    liveBadgeText: {
+        color: "#FFFFFF",
+        fontSize: 11,
+        fontWeight: "900",
+        textTransform: "uppercase",
+    },
+    nextBadge: {
+        alignSelf: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        backgroundColor: "#2EE7FF",
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 999,
+        marginBottom: 8,
+    },
+    nextBadgeText: {
+        color: "#000000",
+        fontSize: 11,
+        fontWeight: "900",
+        textTransform: "uppercase",
+    },
+    completedBadge: {
+        alignSelf: "flex-start",
+        backgroundColor: "#2A2A2A",
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 999,
+        marginBottom: 8,
+    },
+    completedBadgeText: {
+        color: "#CFCFCF",
+        fontSize: 11,
+        fontWeight: "900",
+        textTransform: "uppercase",
     },
     eventTitle: {
         color: "#FFFFFF",
@@ -541,6 +659,59 @@ const styles = StyleSheet.create({
         color: "#CFCFCF",
         fontSize: 13,
         lineHeight: 17,
+    },
+    countdownRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 6,
+        marginTop: 12,
+    },
+    countdownBox: {
+        flex: 1,
+        backgroundColor: "#04152D",
+        borderRadius: 12,
+        paddingVertical: 8,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#0E2A52",
+    },
+    countdownNumber: {
+        color: "#2EE7FF",
+        fontSize: 17,
+        fontWeight: "900",
+        marginBottom: 2,
+    },
+    countdownLabel: {
+        color: "#CAD4E3",
+        fontSize: 10,
+        fontWeight: "700",
+    },
+    completedSection: {
+        marginTop: 4,
+        marginBottom: 24,
+    },
+    completedToggle: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#101010",
+        borderWidth: 1,
+        borderColor: "#242424",
+        borderRadius: 18,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        marginBottom: 14,
+    },
+    completedToggleTitle: {
+        color: "#FFFFFF",
+        fontSize: 17,
+        fontWeight: "900",
+    },
+    completedToggleSubtitle: {
+        color: "#AFAFAF",
+        fontSize: 12,
+        fontWeight: "700",
+        marginTop: 3,
     },
     fixedHomeButtonWrap: {
         position: "absolute",
