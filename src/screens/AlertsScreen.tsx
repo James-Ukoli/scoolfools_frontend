@@ -33,15 +33,8 @@ type RawAlertItem = {
     updated_at?: string;
 };
 
-type AlertItem = {
+type AlertItem = RawAlertItem & {
     id: string;
-    title: string;
-    message?: string;
-    description?: string;
-    topic?: "breaking" | "event" | "results" | "game" | "announcement" | "promotion";
-    type?: string;
-    link?: string;
-    link_url?: string;
     createdAt?: string;
     updatedAt?: string;
 };
@@ -83,11 +76,6 @@ function getTimeAgo(dateString?: string) {
     });
 }
 
-function getTopicLabel(item: AlertItem) {
-    const raw = item.topic || item.type || "announcement";
-    return raw.charAt(0).toUpperCase() + raw.slice(1);
-}
-
 function getTopicConfig(topicRaw?: string) {
     const topic = (topicRaw || "announcement").toLowerCase();
 
@@ -95,9 +83,9 @@ function getTopicConfig(topicRaw?: string) {
         return {
             label: "Breaking",
             color: "#FF4D4F",
-            bg: "#2A0F14",
-            border: "#5A1E27",
-            icon: <Ionicons name="flash" size={18} color="#FF4D4F" />,
+            bg: "#19070A",
+            border: "#3B1016",
+            icon: <Ionicons name="flash" size={15} color="#FF4D4F" />,
         };
     }
 
@@ -105,9 +93,9 @@ function getTopicConfig(topicRaw?: string) {
         return {
             label: "Event",
             color: "#3CF2FF",
-            bg: "#071A24",
-            border: "#184457",
-            icon: <Ionicons name="calendar-outline" size={18} color="#3CF2FF" />,
+            bg: "#061419",
+            border: "#12353D",
+            icon: <Ionicons name="calendar-outline" size={15} color="#3CF2FF" />,
         };
     }
 
@@ -115,12 +103,12 @@ function getTopicConfig(topicRaw?: string) {
         return {
             label: "Results",
             color: "#FFD84D",
-            bg: "#231C08",
-            border: "#5B4814",
+            bg: "#171203",
+            border: "#3E320E",
             icon: (
                 <MaterialCommunityIcons
                     name="podium-gold"
-                    size={18}
+                    size={15}
                     color="#FFD84D"
                 />
             ),
@@ -130,29 +118,29 @@ function getTopicConfig(topicRaw?: string) {
     if (topic === "game") {
         return {
             label: "Live Game",
-            color: "#8B5CF6",
-            bg: "#1A1233",
-            border: "#3A2A73",
-            icon: <FontAwesome6 name="chess-pawn" size={16} color="#8B5CF6" />,
+            color: "#A78BFA",
+            bg: "#10091F",
+            border: "#2E2051",
+            icon: <FontAwesome6 name="chess-pawn" size={13} color="#A78BFA" />,
         };
     }
 
     if (topic === "promotion") {
         return {
             label: "Promotion",
-            color: "#22C55E",
-            bg: "#0D2014",
-            border: "#1F5A34",
-            icon: <Ionicons name="pricetag-outline" size={18} color="#22C55E" />,
+            color: "#39FF14",
+            bg: "#071807",
+            border: "#1F4E19",
+            icon: <Ionicons name="pricetag-outline" size={15} color="#39FF14" />,
         };
     }
 
     return {
         label: "Announcement",
         color: "#FF8A3D",
-        bg: "#241208",
-        border: "#5E2C11",
-        icon: <Ionicons name="megaphone-outline" size={18} color="#FF8A3D" />,
+        bg: "#190C04",
+        border: "#3D1E0B",
+        icon: <Ionicons name="megaphone-outline" size={15} color="#FF8A3D" />,
     };
 }
 
@@ -161,9 +149,7 @@ function normalizeUrl(rawUrl: string) {
 
     if (!trimmed) return "";
 
-    if (/^https?:\/\//i.test(trimmed)) {
-        return trimmed;
-    }
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
     if (
         trimmed.includes("youtube.com/") ||
@@ -241,8 +227,6 @@ export default function AlertsScreen() {
                 return;
             }
 
-            console.log("Opening alert URL:", normalizedDestination);
-
             await WebBrowser.openBrowserAsync(normalizedDestination);
         } catch (error) {
             console.log("Open alert link error:", error);
@@ -265,12 +249,6 @@ export default function AlertsScreen() {
         <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <AppHeader />
 
-            {refreshing && (
-                <View style={styles.refreshIndicator}>
-                    <ActivityIndicator size="small" color="#39FF14" />
-                </View>
-            )}
-
             <ScrollView
                 style={styles.container}
                 contentContainerStyle={styles.contentContainer}
@@ -285,17 +263,9 @@ export default function AlertsScreen() {
                     />
                 }
             >
-                <View style={styles.headerRow}>
-                    <Text style={styles.headerTitle}> 🚨 Alerts 📢 🚨</Text>
-                </View>
-
                 {alerts.length === 0 ? (
                     <View style={styles.emptyWrap}>
-                        <Ionicons
-                            name="megaphone-outline"
-                            size={40}
-                            color="#8A8F98"
-                        />
+                        <Ionicons name="megaphone-outline" size={38} color="#8A8F98" />
                         <Text style={styles.emptyTitle}>No alerts yet</Text>
                         <Text style={styles.emptyText}>
                             Important updates will show up here.
@@ -304,66 +274,81 @@ export default function AlertsScreen() {
                 ) : (
                     alerts.map((item, index) => {
                         const topicConfig = getTopicConfig(item.topic || item.type);
-                        const topicLabel = topicConfig.label;
                         const timeAgo = getTimeAgo(item.createdAt);
                         const description =
                             item.description || item.message || "No description available.";
                         const destination = item.link_url || item.link;
-                        const showWatchNow =
-                            (item.topic || item.type || "").toLowerCase() === "game" &&
-                            !!destination;
+                        const isLinked = !!destination;
 
                         return (
                             <TouchableOpacity
                                 key={`${item.id}-${item.createdAt || index}`}
-                                activeOpacity={0.85}
+                                activeOpacity={0.86}
                                 onPress={() => handleOpenAlert(item)}
                                 style={styles.alertCard}
                             >
-                                <View style={styles.topMetaRow}>
-                                    <View style={styles.topicWrap}>
-                                        <View
+                                <View
+                                    style={[
+                                        styles.cornerDot,
+                                        {
+                                            backgroundColor: topicConfig.color,
+                                            shadowColor: topicConfig.color,
+                                        },
+                                    ]}
+                                />
+                                <View style={styles.metaRow}>
+                                    <View
+                                        style={[
+                                            styles.topicBadge,
+                                            {
+                                                backgroundColor: topicConfig.bg,
+                                                borderColor: topicConfig.border,
+                                            },
+                                        ]}
+                                    >
+                                        {topicConfig.icon}
+                                        <Text
                                             style={[
-                                                styles.topicIconBox,
-                                                {
-                                                    backgroundColor: topicConfig.bg,
-                                                    borderColor: topicConfig.border,
-                                                },
+                                                styles.topicText,
+                                                { color: topicConfig.color },
                                             ]}
                                         >
-                                            {topicConfig.icon}
-                                        </View>
-
-                                        <View style={styles.topicTextWrap}>
-                                            <Text
-                                                style={[styles.topicText, { color: topicConfig.color }]}
-                                                numberOfLines={1}
-                                            >
-                                                {topicLabel}
-                                            </Text>
-
-                                            {!!timeAgo && (
-                                                <Text style={styles.timeText} numberOfLines={1}>
-                                                    {timeAgo}
-                                                </Text>
-                                            )}
-                                        </View>
+                                            {topicConfig.label}
+                                        </Text>
                                     </View>
 
-                                    {showWatchNow ? (
-                                        <View style={styles.watchNowPill}>
-                                            <Text style={styles.watchNowText}>🎥 WATCH NOW</Text>
+                                    <Text style={styles.timeText}>{timeAgo}</Text>
+
+                                    {isLinked && (
+                                        <View style={styles.linkBadge}>
+                                            <Ionicons
+                                                name="open-outline"
+                                                size={12}
+                                                color="#9AA3B2"
+                                            />
+                                            <Text style={styles.linkBadgeText}>LINK</Text>
                                         </View>
-                                    ) : null}
+                                    )}
                                 </View>
 
-                                <Text style={styles.alertTitle} numberOfLines={2}>
+                                <Text style={styles.alertTitle} numberOfLines={3}>
                                     {item.title}
                                 </Text>
 
-                                <Text style={styles.alertDescription} numberOfLines={2}>
+                                <Text style={styles.alertDescription} numberOfLines={4}>
                                     {description}
                                 </Text>
+
+                                {isLinked && (
+                                    <View style={styles.tapRow}>
+                                        <Text style={styles.tapText}>Tap to open</Text>
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={14}
+                                            color="#39FF14"
+                                        />
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         );
                     })
@@ -385,109 +370,123 @@ const styles = StyleSheet.create({
         backgroundColor: "#000000",
     },
     contentContainer: {
-        paddingBottom: 30,
+        paddingHorizontal: 12,
+        paddingTop: 12,
+        paddingBottom: 34,
     },
     loadingContainer: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
     },
-    refreshIndicator: {
-        alignItems: "center",
-        justifyContent: "center",
-        paddingTop: 6,
-        paddingBottom: 2,
-    },
-    headerRow: {
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: 10,
-    },
-    headerTitle: {
-        color: "#ffffff",
-        fontSize: 24,
-        fontWeight: "900",
-        textAlign: "center",
-
-        letterSpacing: 2,
-        textTransform: "uppercase",
-        paddingHorizontal: 16, // prevents edge crowding
-
-        textShadowColor: "#ff0000",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 16,
-    },
     alertCard: {
-        backgroundColor: "#141414",
+        position: "relative",
+
+        backgroundColor: "#0E0F12",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "#1F2430",
+
         paddingHorizontal: 14,
         paddingVertical: 14,
-        borderTopWidth: 1,
-        borderTopColor: "#1E1E1E",
-        borderBottomWidth: 1,
-        borderBottomColor: "#090909",
+        marginBottom: 20,
+
+        shadowColor: "#000",
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+
+        elevation: 3,
     },
-    topMetaRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        marginBottom: 10,
+    cornerDot: {
+        position: "absolute",
+
+        top: 16,
+        right: 16,
+
+        width: 10,
+        height: 10,
+
+        borderRadius: 999,
+
+        shadowOpacity: 0.8,
+        shadowRadius: 6,
+
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+
+        elevation: 6,
     },
-    topicWrap: {
+    metaRow: {
         flexDirection: "row",
         alignItems: "center",
-        flex: 1,
-        paddingRight: 10,
+        flexWrap: "wrap",
+        marginBottom: 9,
+        gap: 8,
     },
-    topicIconBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
+    topicBadge: {
+        flexDirection: "row",
+        alignItems: "center",
         borderWidth: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        marginRight: 10,
-    },
-    topicTextWrap: {
-        flex: 1,
-        justifyContent: "center",
+        borderRadius: 999,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
     },
     topicText: {
-        fontSize: 14,
-        fontWeight: "800",
-        marginBottom: 1,
+        fontSize: 10.5,
+        fontWeight: "900",
+        letterSpacing: 1,
+        marginLeft: 5,
+        textTransform: "uppercase",
     },
     timeText: {
-        color: "#8A8F98",
+        color: "#8D96A8",
         fontSize: 12,
-        fontWeight: "500",
+        fontWeight: "700",
     },
-    watchNowPill: {
-        backgroundColor: "#1B1B1B",
-        borderWidth: 1,
-        borderColor: "#353535",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+    linkBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        backgroundColor: "#151923",
         borderRadius: 999,
-        marginLeft: 8,
+        paddingHorizontal: 7,
+        paddingVertical: 4,
     },
-    watchNowText: {
-        color: "#FFFFFF",
-        fontSize: 11,
+    linkBadgeText: {
+        color: "#9AA3B2",
+        fontSize: 9.5,
         fontWeight: "900",
-        letterSpacing: 0.3,
+        letterSpacing: 0.8,
+        marginLeft: 3,
     },
     alertTitle: {
-        color: "#FFFFFF",
+        color: "#F5F7FB",
         fontSize: 16,
-        fontWeight: "800",
+        fontWeight: "900",
         lineHeight: 22,
-        marginBottom: 6,
+        letterSpacing: 0.1,
+        marginBottom: 7,
     },
     alertDescription: {
-        color: "#C9CED6",
+        color: "#C0C6D0",
         fontSize: 14,
+        fontWeight: "500",
         lineHeight: 20,
-        paddingRight: 10,
+    },
+    tapRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        marginTop: 10,
+    },
+    tapText: {
+        color: "#39FF14",
+        fontSize: 12,
+        fontWeight: "800",
+        letterSpacing: 0.4,
+        marginRight: 3,
     },
     emptyWrap: {
         alignItems: "center",
@@ -498,7 +497,7 @@ const styles = StyleSheet.create({
     emptyTitle: {
         color: "#FFFFFF",
         fontSize: 20,
-        fontWeight: "800",
+        fontWeight: "900",
         marginTop: 12,
         marginBottom: 8,
     },
@@ -511,4 +510,4 @@ const styles = StyleSheet.create({
     bottomSpacer: {
         height: 20,
     },
-});
+}); 
