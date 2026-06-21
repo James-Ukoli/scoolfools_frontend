@@ -33,6 +33,11 @@ import { finishTransaction } from "react-native-iap";
 import { s, vs, ms } from "react-native-size-matters";
 
 import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
+
+import {
     initializeIAP,
     getBlogsSubscriptionProduct,
     buyBlogsSubscription,
@@ -49,6 +54,10 @@ const SUPPORTER_MILESTONES = [100, 1000, 10000, 50000];
 
 export default function HomeScreen() {
     const navigation = useNavigation<any>();
+
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
 
     const [featuredPosts, setFeaturedPosts] = useState<any[]>([]);
     const [featuredStories, setFeaturedStories] = useState<any[]>([]);
@@ -358,6 +367,19 @@ export default function HomeScreen() {
         }
     }, [fetchHomeData]);
 
+    if (!fontsLoaded) {
+        return (
+            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+                <View style={styles.container}>
+                    <AppHeader />
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="small" color="#2EE7FF" />
+                    </View>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
             <View style={styles.container}>
@@ -542,6 +564,7 @@ function SupportGrowthBanner({
                     ? "Thank you for helping us push chess forward."
                     : "Help us build the future of chess media."}
             </Text>
+
             <View style={styles.progressBarWrap}>
                 <Animated.View style={[styles.progressFill, { width }]} />
             </View>
@@ -640,6 +663,12 @@ const styles = StyleSheet.create({
         backgroundColor: "#000",
     },
 
+    loadingContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+    },
+
     scrollContent: {
         paddingHorizontal: s(16),
         paddingTop: vs(10),
@@ -653,15 +682,17 @@ const styles = StyleSheet.create({
     sectionTitle: {
         color: "#FFF",
         fontSize: ms(23),
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: vs(8),
+        letterSpacing: 0.4,
     },
 
     sectionTitle2: {
         color: "#FFF",
-        fontSize: ms(16),
-        fontWeight: "900",
+        fontSize: ms(18),
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: vs(8),
+        letterSpacing: 0.35,
     },
 
     sectionAccentLine: {
@@ -688,8 +719,9 @@ const styles = StyleSheet.create({
 
     supportMissionTitle: {
         color: "#FFF",
-        fontSize: 14,
-        fontWeight: "900",
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         flex: 1,
     },
 
@@ -786,8 +818,9 @@ const styles = StyleSheet.create({
 
     partyGamesTitle: {
         color: "#FFF",
-        fontSize: 15,
-        fontWeight: "900",
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
     },
 
     partyGamesSubtitle: {
@@ -807,8 +840,9 @@ const styles = StyleSheet.create({
 
     bottomActionsTitle: {
         color: "#FFFFFF",
-        fontSize: 13,
-        fontWeight: "900",
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         marginBottom: 10,
     },
 
@@ -894,10 +928,11 @@ const styles = StyleSheet.create({
 
     paywallTitle: {
         color: "#FFFFFF",
-        fontSize: 22,
-        fontWeight: "900",
+        fontSize: 24,
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
         marginBottom: 8,
+        letterSpacing: 0.4,
     },
 
     paywallSubtitle: {
@@ -918,8 +953,9 @@ const styles = StyleSheet.create({
 
     freeTrialText: {
         color: "#39C0ED",
-        fontSize: 25,
-        fontWeight: "900",
+        fontSize: 28,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
     },
 
     priceText: {

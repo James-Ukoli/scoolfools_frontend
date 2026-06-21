@@ -17,6 +17,11 @@ import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as WebBrowser from "expo-web-browser";
 import AppHeader from "../components/AppHeader";
 
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
+
 type RawAlertItem = {
     _id?: string;
     id?: string;
@@ -165,6 +170,10 @@ function normalizeUrl(rawUrl: string) {
 }
 
 export default function AlertsScreen() {
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -234,7 +243,7 @@ export default function AlertsScreen() {
         }
     };
 
-    if (loading) {
+    if (loading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
@@ -296,6 +305,7 @@ export default function AlertsScreen() {
                                         },
                                     ]}
                                 />
+
                                 <View style={styles.metaRow}>
                                     <View
                                         style={[
@@ -307,6 +317,7 @@ export default function AlertsScreen() {
                                         ]}
                                     >
                                         {topicConfig.icon}
+
                                         <Text
                                             style={[
                                                 styles.topicText,
@@ -381,42 +392,32 @@ const styles = StyleSheet.create({
     },
     alertCard: {
         position: "relative",
-
         backgroundColor: "#0E0F12",
         borderRadius: 16,
         borderWidth: 1,
         borderColor: "#1F2430",
-
         paddingHorizontal: 14,
         paddingVertical: 14,
         marginBottom: 20,
-
         shadowColor: "#000",
         shadowOpacity: 0.25,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 4 },
-
         elevation: 3,
     },
     cornerDot: {
         position: "absolute",
-
         top: 16,
         right: 16,
-
         width: 10,
         height: 10,
-
         borderRadius: 999,
-
         shadowOpacity: 0.8,
         shadowRadius: 6,
-
         shadowOffset: {
             width: 0,
             height: 0,
         },
-
         elevation: 6,
     },
     metaRow: {
@@ -435,9 +436,9 @@ const styles = StyleSheet.create({
         paddingVertical: 5,
     },
     topicText: {
-        fontSize: 10.5,
-        fontWeight: "900",
-        letterSpacing: 1,
+        fontFamily: "Rajdhani_700Bold",
+        fontSize: 11,
+        letterSpacing: 1.2,
         marginLeft: 5,
         textTransform: "uppercase",
     },
@@ -463,14 +464,14 @@ const styles = StyleSheet.create({
     },
     alertTitle: {
         color: "#F5F7FB",
-        fontSize: 16,
-        fontWeight: "900",
-        lineHeight: 22,
-        letterSpacing: 0.1,
+        fontFamily: "Rajdhani_700Bold",
+        fontSize: 18,
+        lineHeight: 20,
+        letterSpacing: 0.6,
         marginBottom: 7,
     },
     alertDescription: {
-        color: "#C0C6D0",
+        color: "#AAB2C0",
         fontSize: 14,
         fontWeight: "500",
         lineHeight: 20,
@@ -510,4 +511,4 @@ const styles = StyleSheet.create({
     bottomSpacer: {
         height: 20,
     },
-}); 
+});
