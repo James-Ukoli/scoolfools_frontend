@@ -2,7 +2,7 @@
   "expo": {
     "name": "Just Move",
     "slug": "frontend",
-    "version": "1.2.4",
+    "version": "1.2.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
@@ -29,21 +29,24 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
       "expo-notifications",
       "expo-apple-authentication",
       "react-native-iap",
       [
         "expo-build-properties",
-        {
-          "android": {
-            "kotlinVersion": "2.2.0"
-          }
-        }
+      {
+    "ios": {
+      "useFrameworks": "static",
+      "useModularHeaders": true
+    },
+    "android": {
+      "kotlinVersion": "2.2.0"
+    }
+  }
       ],
       [
         "expo-splash-screen",
@@ -64,14 +67,10 @@
       ],
       "expo-web-browser",
       "expo-audio",
-      "expo-font"
+      "expo-font",
+      "expo-asset"
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    },
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "55003675-01c3-44ff-a9ad-b129c3df579f"
       }
