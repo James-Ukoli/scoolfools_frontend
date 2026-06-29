@@ -195,8 +195,9 @@ const styles = StyleSheet.create({
     },
     title: {
         color: "#FFFFFF",
-        fontSize: ms(18),
-        fontWeight: "800",
+        fontSize: ms(20),
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         lineHeight: ms(22),
     },
     bottomSection: {
@@ -214,7 +215,8 @@ const styles = StyleSheet.create({
     timeText: {
         color: "#AAB4C3",
         fontSize: ms(12),
-        fontWeight: "600",
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
     dotsContainer: {
         flexDirection: "row",

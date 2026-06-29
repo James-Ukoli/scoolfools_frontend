@@ -19,6 +19,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
 
 import GameBackButton from "../../components/GameBackButton";
 import GameHomeButton from "../../components/GameHomeButton";
@@ -75,6 +79,10 @@ const games = [
 export default function GameHomeScreen() {
     const navigation = useNavigation<any>();
 
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const [gamesPackagePurchased, setGamesPackagePurchased] = useState(false);
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingPurchase, setLoadingPurchase] = useState(false);
@@ -86,6 +94,8 @@ export default function GameHomeScreen() {
     const bannerGlow = useRef(new Animated.Value(0)).current;
     const modalScale = useRef(new Animated.Value(0.92)).current;
     const modalOpacity = useRef(new Animated.Value(0)).current;
+    const heroFloat = useRef(new Animated.Value(0)).current;
+    const cardAnim = useRef(games.map(() => new Animated.Value(0))).current;
 
     const charadesSoundRef = useRef<Audio.Sound | null>(null);
     const mostLikelySoundRef = useRef<Audio.Sound | null>(null);
@@ -138,13 +148,11 @@ export default function GameHomeScreen() {
                 body: JSON.stringify({
                     platform: Platform.OS === "ios" ? "ios" : "android",
                     productId: purchase?.productId || "jmpg_499_1t",
-
                     transactionId:
                         purchase?.transactionId ||
                         purchase?.transactionIdIOS ||
                         purchase?.id ||
                         null,
-
                     purchaseToken: purchase?.purchaseToken || null,
                 }),
             });
@@ -268,6 +276,39 @@ export default function GameHomeScreen() {
     }, []);
 
     useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(heroFloat, {
+                    toValue: 1,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(heroFloat, {
+                    toValue: 0,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, [heroFloat]);
+
+    useEffect(() => {
+        Animated.stagger(
+            95,
+            cardAnim.map((anim) =>
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: 420,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                })
+            )
+        ).start();
+    }, [cardAnim]);
+
+    useEffect(() => {
         if (gamesPackagePurchased) return;
 
         Animated.loop(
@@ -387,16 +428,15 @@ export default function GameHomeScreen() {
         outputRange: [6, 18],
     });
 
-    if (checkingEntitlements) {
+    const heroTranslateY = heroFloat.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -5],
+    });
+
+    if (checkingEntitlements || !fontsLoaded) {
         return (
             <GameScreenWrapper>
-                <View
-                    style={{
-                        flex: 1,
-                        alignItems: "center",
-                        justifyContent: "center",
-                    }}
-                >
+                <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFD166" />
                 </View>
             </GameScreenWrapper>
@@ -407,12 +447,34 @@ export default function GameHomeScreen() {
         <GameScreenWrapper>
             <View style={styles.topRow}>
                 <GameBackButton />
-                <Text style={styles.screenTitle}>Party Games</Text>
+
+                <View style={styles.titleWrap}>
+                    <Text style={styles.eyebrow}>JUST MOVE</Text>
+                    <Text style={styles.screenTitle}>Party Games</Text>
+                </View>
             </View>
 
-            <Text style={styles.subtitle}>
-                Pick a game mode and bring chess energy to the room. ♟️🔥
-            </Text>
+            <Animated.View
+                style={[
+                    styles.heroCard,
+                    {
+                        transform: [{ translateY: heroTranslateY }],
+                    },
+                ]}
+            >
+                <View style={styles.heroIcon}>
+                    <Ionicons name="game-controller" size={28} color="#050816" />
+                </View>
+
+                <View style={styles.heroCopy}>
+                    <Text style={styles.heroTitle}>Chess After Dark</Text>
+                    <Text style={styles.subtitle}>
+                        Pick a game mode and bring chess energy to the room. ♟️🔥
+                    </Text>
+                </View>
+
+                <Text style={styles.heroEmoji}>🎉</Text>
+            </Animated.View>
 
             {!gamesPackagePurchased && (
                 <TouchableOpacity activeOpacity={0.9} onPress={openPaywall}>
@@ -447,35 +509,68 @@ export default function GameHomeScreen() {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {games.map((game) => (
-                    <TouchableOpacity
-                        key={game.title}
-                        style={[
-                            styles.gameCard,
-                            !gamesPackagePurchased && styles.lockedGameCard,
-                        ]}
-                        activeOpacity={0.85}
-                        onPress={() => handleGamePress(game.route, game.sound)}
-                    >
-                        <View style={styles.gameLeft}>
-                            <View style={[styles.iconBubble, { borderColor: game.color }]}>
-                                <Ionicons name={game.icon as any} size={24} color={game.color} />
-                            </View>
+                {games.map((game, index) => {
+                    const cardTranslateY = cardAnim[index].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [22, 0],
+                    });
 
-                            <View style={styles.gameTextWrap}>
-                                <Text style={styles.gameTitle}>{game.title}</Text>
+                    return (
+                        <Animated.View
+                            key={game.title}
+                            style={{
+                                opacity: cardAnim[index],
+                                transform: [{ translateY: cardTranslateY }],
+                            }}
+                        >
+                            <TouchableOpacity
+                                style={[
+                                    styles.gameCard,
+                                    !gamesPackagePurchased && styles.lockedGameCard,
+                                    { borderColor: `${game.color}55` },
+                                ]}
+                                activeOpacity={0.85}
+                                onPress={() => handleGamePress(game.route, game.sound)}
+                            >
+                                <View style={styles.gameLeft}>
+                                    <View
+                                        style={[
+                                            styles.iconBubble,
+                                            {
+                                                borderColor: game.color,
+                                                shadowColor: game.color,
+                                            },
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name={game.icon as any}
+                                            size={24}
+                                            color={game.color}
+                                        />
+                                    </View>
 
-                                <Text style={styles.gameDescription}>{game.description}</Text>
-                            </View>
-                        </View>
+                                    <View style={styles.gameTextWrap}>
+                                        <Text style={styles.gameTitle}>{game.title}</Text>
 
-                        <Ionicons
-                            name={gamesPackagePurchased ? "chevron-forward" : "lock-closed"}
-                            size={24}
-                            color={gamesPackagePurchased ? "#8A8F98" : "#FFD166"}
-                        />
-                    </TouchableOpacity>
-                ))}
+                                        <Text style={styles.gameDescription}>
+                                            {game.description}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Ionicons
+                                    name={
+                                        gamesPackagePurchased
+                                            ? "chevron-forward"
+                                            : "lock-closed"
+                                    }
+                                    size={24}
+                                    color={gamesPackagePurchased ? "#8A8F98" : "#FFD166"}
+                                />
+                            </TouchableOpacity>
+                        </Animated.View>
+                    );
+                })}
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
@@ -589,24 +684,86 @@ function FeatureRow({ icon, text }: { icon: any; text: string }) {
 }
 
 const styles = StyleSheet.create({
+    loadingContainer: {
+        flex: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
     topRow: {
         flexDirection: "row",
         alignItems: "center",
         marginBottom: 14,
     },
 
+    titleWrap: {
+        marginLeft: 14,
+        flex: 1,
+    },
+
+    eyebrow: {
+        color: "#FFD166",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1.8,
+    },
+
     screenTitle: {
         color: "#FFFFFF",
+        fontSize: 32,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.5,
+        marginTop: -2,
+    },
+
+    heroCard: {
+        minHeight: 92,
+        backgroundColor: "#090D14",
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: "rgba(255,209,102,0.32)",
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        marginBottom: 14,
+        flexDirection: "row",
+        alignItems: "center",
+        shadowColor: "#FFD166",
+        shadowOpacity: 0.16,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
+    },
+
+    heroIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: "#FFD166",
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+
+    heroCopy: {
+        flex: 1,
+    },
+
+    heroTitle: {
+        color: "#FFFFFF",
+        fontSize: 22,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        marginBottom: 2,
+    },
+
+    heroEmoji: {
         fontSize: 26,
-        fontWeight: "800",
-        marginLeft: 14,
+        marginLeft: 8,
     },
 
     subtitle: {
         color: "#AAB2C0",
-        fontSize: 15,
-        lineHeight: 22,
-        marginBottom: 14,
+        fontSize: 14,
+        lineHeight: 20,
     },
 
     unlockBanner: {
@@ -640,14 +797,15 @@ const styles = StyleSheet.create({
 
     unlockBannerText: {
         color: "#FFD166",
-        fontSize: 16,
-        fontWeight: "900",
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 
     unlockBannerSubtext: {
         color: "#FFFFFF",
-        fontSize: 12.5,
-        fontWeight: "700",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
         marginTop: 2,
         opacity: 0.85,
     },
@@ -661,11 +819,10 @@ const styles = StyleSheet.create({
     },
 
     gameCard: {
-        minHeight: 96,
+        minHeight: 98,
         backgroundColor: "#050816",
         borderRadius: 22,
         borderWidth: 1,
-        borderColor: "#12203A",
         paddingHorizontal: 16,
         paddingVertical: 16,
         marginBottom: 14,
@@ -675,8 +832,8 @@ const styles = StyleSheet.create({
     },
 
     lockedGameCard: {
-        borderColor: "#2A2740",
         opacity: 0.96,
+        backgroundColor: "#060714",
     },
 
     gameLeft: {
@@ -687,14 +844,17 @@ const styles = StyleSheet.create({
     },
 
     iconBubble: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#0B1220",
         borderWidth: 1.5,
         marginRight: 14,
+        shadowOpacity: 0.22,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
     },
 
     gameTextWrap: {
@@ -703,9 +863,10 @@ const styles = StyleSheet.create({
 
     gameTitle: {
         color: "#FFFFFF",
-        fontSize: 17,
-        fontWeight: "800",
-        marginBottom: 5,
+        fontSize: 20,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        marginBottom: 4,
     },
 
     gameDescription: {
@@ -782,8 +943,9 @@ const styles = StyleSheet.create({
 
     paywallTitle: {
         color: "#FFFFFF",
-        fontSize: 22,
-        fontWeight: "900",
+        fontSize: 27,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         textAlign: "center",
     },
 
@@ -809,14 +971,15 @@ const styles = StyleSheet.create({
 
     paywallPrice: {
         color: "#FFD166",
-        fontSize: 30,
-        fontWeight: "900",
+        fontSize: 34,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
     },
 
     paywallPriceSub: {
         color: "#FFFFFF",
-        fontSize: 12,
-        fontWeight: "700",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
         opacity: 0.8,
         marginTop: 2,
     },
@@ -850,8 +1013,9 @@ const styles = StyleSheet.create({
 
     featureText: {
         color: "#FFFFFF",
-        fontSize: 14,
-        fontWeight: "800",
+        fontSize: 16,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
 
     unlockButton: {
@@ -867,15 +1031,17 @@ const styles = StyleSheet.create({
 
     unlockButtonText: {
         color: "#050816",
-        fontSize: 15,
-        fontWeight: "900",
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginLeft: 8,
     },
 
     restoreText: {
         color: "#FFD166",
-        fontSize: 12.5,
-        fontWeight: "800",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
         marginBottom: 8,
     },
 

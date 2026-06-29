@@ -13,6 +13,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
 
 type Broadcaster = {
     name: string;
@@ -139,6 +143,10 @@ function groupEventsByMonth(events: EventItem[]) {
 }
 
 export default function EventsScreen({ navigation }: any) {
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const [events, setEvents] = useState<EventItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -353,7 +361,7 @@ export default function EventsScreen({ navigation }: any) {
         );
     };
 
-    if (loading) {
+    if (loading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
@@ -388,16 +396,19 @@ export default function EventsScreen({ navigation }: any) {
                     />
                 }
             >
-                <View style={styles.topRow}>
+                <View style={styles.hero}>
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
                         style={styles.backButton}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={23} color="#FFFFFF" />
                     </TouchableOpacity>
 
-                    <Text style={styles.screenTitle}>Events</Text>
+                    <View style={styles.heroTextWrap}>
+                        <Text style={styles.heroEyebrow}>JUST MOVE</Text>
+                        <Text style={styles.screenTitle}>Events</Text>
+                    </View>
                 </View>
 
                 {currentEvents.length > 0 && (
@@ -473,7 +484,7 @@ export default function EventsScreen({ navigation }: any) {
                     activeOpacity={0.85}
                     onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
                 >
-                    <Ionicons name="home" size={20} color="#FFFFFF" />
+                    <Ionicons name="home" size={21} color="#FFFFFF" />
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -502,11 +513,22 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 6,
     },
-    topRow: {
+
+    hero: {
+        minHeight: 78,
+        borderRadius: 24,
+        backgroundColor: "#070A10",
+        borderWidth: 1,
+        borderColor: "rgba(46,231,255,0.22)",
         flexDirection: "row",
         alignItems: "center",
+        paddingHorizontal: 14,
         marginTop: 6,
         marginBottom: 18,
+        shadowColor: "#2EE7FF",
+        shadowOpacity: 0.16,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 0 },
     },
     backButton: {
         width: 42,
@@ -517,20 +539,33 @@ const styles = StyleSheet.create({
         backgroundColor: "#0B1220",
         borderWidth: 1,
         borderColor: "#16233B",
+        marginRight: 13,
+    },
+    heroTextWrap: {
+        flex: 1,
+    },
+    heroEyebrow: {
+        color: "#2EE7FF",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1.8,
     },
     screenTitle: {
         color: "#FFFFFF",
-        fontSize: 26,
-        fontWeight: "800",
-        marginLeft: 14,
+        fontSize: 32,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.55,
+        marginTop: -2,
     },
+
     section: {
         marginBottom: 24,
     },
     sectionTitle: {
         color: "#FFFFFF",
-        fontSize: 22,
-        fontWeight: "900",
+        fontSize: 26,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
         marginBottom: 12,
     },
     monthSection: {
@@ -538,24 +573,26 @@ const styles = StyleSheet.create({
     },
     monthTitle: {
         color: "#F4D03F",
-        fontSize: 21,
-        fontWeight: "900",
+        fontSize: 24,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         marginBottom: 12,
     },
+
     eventCard: {
         flexDirection: "row",
         alignItems: "flex-start",
         marginBottom: 14,
         padding: 10,
         borderRadius: 20,
-        backgroundColor: "#080808",
+        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "#171717",
+        borderColor: "rgba(255,255,255,0.06)",
     },
     currentEventCard: {
         backgroundColor: "#120707",
-        borderColor: "#FF3B30",
-        shadowColor: "#FF3B30",
+        borderColor: "#EF4444",
+        shadowColor: "#EF4444",
         shadowOpacity: 0.25,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
@@ -563,9 +600,9 @@ const styles = StyleSheet.create({
     },
     countdownEventCard: {
         backgroundColor: "#071326",
-        borderColor: "#1DA1F2",
-        shadowColor: "#1DA1F2",
-        shadowOpacity: 0.22,
+        borderColor: "#2EE7FF",
+        shadowColor: "#2EE7FF",
+        shadowOpacity: 0.2,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
         elevation: 8,
@@ -588,12 +625,13 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingVertical: 2,
     },
+
     liveBadge: {
         alignSelf: "flex-start",
         flexDirection: "row",
         alignItems: "center",
         gap: 6,
-        backgroundColor: "#FF3B30",
+        backgroundColor: "#EF4444",
         paddingHorizontal: 9,
         paddingVertical: 4,
         borderRadius: 999,
@@ -607,8 +645,9 @@ const styles = StyleSheet.create({
     },
     liveBadgeText: {
         color: "#FFFFFF",
-        fontSize: 11,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         textTransform: "uppercase",
     },
     nextBadge: {
@@ -624,8 +663,9 @@ const styles = StyleSheet.create({
     },
     nextBadgeText: {
         color: "#000000",
-        fontSize: 11,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         textTransform: "uppercase",
     },
     completedBadge: {
@@ -638,21 +678,25 @@ const styles = StyleSheet.create({
     },
     completedBadgeText: {
         color: "#CFCFCF",
-        fontSize: 11,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         textTransform: "uppercase",
     },
+
     eventTitle: {
         color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "900",
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
         lineHeight: 21,
         marginBottom: 6,
     },
     eventDate: {
         color: "#F4D03F",
-        fontSize: 12,
-        fontWeight: "800",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
         marginBottom: 6,
     },
     eventLocation: {
@@ -660,6 +704,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         lineHeight: 17,
     },
+
     countdownRow: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -677,15 +722,18 @@ const styles = StyleSheet.create({
     },
     countdownNumber: {
         color: "#2EE7FF",
-        fontSize: 17,
-        fontWeight: "900",
+        fontSize: 20,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginBottom: 2,
     },
     countdownLabel: {
         color: "#CAD4E3",
-        fontSize: 10,
-        fontWeight: "700",
+        fontSize: 11,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
+
     completedSection: {
         marginTop: 4,
         marginBottom: 24,
@@ -694,25 +742,28 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: "#101010",
+        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "#242424",
-        borderRadius: 18,
+        borderColor: "rgba(255,255,255,0.08)",
+        borderRadius: 20,
         paddingHorizontal: 16,
         paddingVertical: 14,
         marginBottom: 14,
     },
     completedToggleTitle: {
         color: "#FFFFFF",
-        fontSize: 17,
-        fontWeight: "900",
+        fontSize: 20,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
     completedToggleSubtitle: {
         color: "#AFAFAF",
-        fontSize: 12,
-        fontWeight: "700",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
         marginTop: 3,
     },
+
     fixedHomeButtonWrap: {
         position: "absolute",
         left: 0,
@@ -722,18 +773,18 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     homeButton: {
-        width: 58,
-        height: 58,
-        borderRadius: 29,
+        width: 60,
+        height: 60,
+        borderRadius: 30,
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#0B1A4A",
         borderWidth: 1.5,
-        borderColor: "#1C3D8F",
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.28,
-        shadowRadius: 8,
+        borderColor: "#2EE7FF",
+        shadowColor: "#2EE7FF",
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.32,
+        shadowRadius: 12,
         elevation: 8,
     },
 });

@@ -18,6 +18,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
 import { Audio } from "expo-av";
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
 
 type MonthlyDivision = "pro" | "women";
 type QuarterlyCategory = "countries" | "colleges";
@@ -343,6 +347,10 @@ function AnimatedRankRow({ row, index }: { row: DisplayRow; index: number }) {
 export default function PowerRankingsScreen() {
     const scrollRef = useRef<ScrollView>(null);
 
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -366,6 +374,27 @@ export default function PowerRankingsScreen() {
 
     const swooshSoundRef = useRef<Audio.Sound | null>(null);
     const [soundReady, setSoundReady] = useState(false);
+
+    const heroGlow = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(heroGlow, {
+                    toValue: 1,
+                    duration: 1800,
+                    easing: Easing.inOut(Easing.quad),
+                    useNativeDriver: false,
+                }),
+                Animated.timing(heroGlow, {
+                    toValue: 0,
+                    duration: 1800,
+                    easing: Easing.inOut(Easing.quad),
+                    useNativeDriver: false,
+                }),
+            ])
+        ).start();
+    }, [heroGlow]);
 
     useEffect(() => {
         let mounted = true;
@@ -400,11 +429,6 @@ export default function PowerRankingsScreen() {
             // ignore sound errors
         }
     };
-
-    const selectedOption = useMemo(
-        () => VIEW_OPTIONS.find((option) => option.value === selectedView),
-        [selectedView]
-    );
 
     const periodTitle = useMemo(() => {
         if (isMonthlyView(selectedView)) {
@@ -535,6 +559,7 @@ export default function PowerRankingsScreen() {
             setInitialLoading(false);
         }
     }, [selectedView, fetchMonthly, fetchQuarterly]);
+
     useEffect(() => {
         fetchRankings();
     }, [fetchRankings]);
@@ -626,7 +651,17 @@ export default function PowerRankingsScreen() {
         );
     };
 
-    if (initialLoading) {
+    const animatedHeroBorder = heroGlow.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["rgba(46,231,255,0.22)", "rgba(244,208,63,0.4)"],
+    });
+
+    const animatedHeroShadow = heroGlow.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["#2EE7FF", "#F4D03F"],
+    });
+
+    if (initialLoading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
@@ -658,8 +693,20 @@ export default function PowerRankingsScreen() {
                     />
                 }
             >
-                <View style={styles.hero}>
+                <Animated.View
+                    style={[
+                        styles.hero,
+                        {
+                            borderColor: animatedHeroBorder,
+                            shadowColor: animatedHeroShadow,
+                        },
+                    ]}
+                >
+                    <Text style={styles.heroEyebrow}>JUST MOVE</Text>
                     <Text style={styles.headerTitle}>POWER RANKINGS</Text>
+                    <Text style={styles.heroSubtitle}>
+                        {getViewLabel(selectedView)} • {periodTitle}
+                    </Text>
 
                     <TouchableOpacity
                         activeOpacity={0.8}
@@ -668,7 +715,7 @@ export default function PowerRankingsScreen() {
                     >
                         <Text style={styles.infoButtonText}>i</Text>
                     </TouchableOpacity>
-                </View>
+                </Animated.View>
 
                 <View style={styles.controlsRow}>
                     <View style={styles.dropdownWrap}>
@@ -677,12 +724,13 @@ export default function PowerRankingsScreen() {
                             style={styles.dropdownButton}
                             onPress={() => setDropdownOpen((prev) => !prev)}
                         >
-                            <View>
-                                <Text style={styles.dropdownLabel}>Ranking List</Text>
-                                <Text style={styles.dropdownValue}>{getViewLabel(selectedView)}</Text>
-                            </View>
+                            <Text style={styles.dropdownValue}>
+                                {getViewLabel(selectedView)}
+                            </Text>
 
-                            <Text style={styles.dropdownArrow}>{dropdownOpen ? "⌃" : "⌄"}</Text>
+                            <Text style={styles.dropdownArrow}>
+                                {dropdownOpen ? "⌃" : "⌄"}
+                            </Text>
                         </TouchableOpacity>
 
                         {dropdownOpen && (
@@ -727,9 +775,6 @@ export default function PowerRankingsScreen() {
 
                         <View style={styles.periodValueBox}>
                             <Text style={styles.periodValueText}>{periodTitle}</Text>
-                            <Text style={styles.periodTypeText}>
-                                {selectedOption?.type === "quarterly" ? "Quarterly" : "Monthly"}
-                            </Text>
                         </View>
 
                         <TouchableOpacity style={styles.arrowButton} onPress={goForward}>
@@ -794,34 +839,53 @@ const styles = StyleSheet.create({
     hero: {
         marginTop: 10,
         marginBottom: 14,
-        height: 78,
-        borderRadius: 22,
+        minHeight: 112,
+        borderRadius: 26,
         backgroundColor: "#070A10",
-        borderWidth: 1,
-        borderColor: "#132033",
+        borderWidth: 1.2,
         alignItems: "center",
         justifyContent: "center",
-        shadowColor: "#2EE7FF",
-        shadowOpacity: 0.18,
-        shadowRadius: 14,
+        shadowOpacity: 0.24,
+        shadowRadius: 18,
         shadowOffset: { width: 0, height: 0 },
+        paddingHorizontal: 18,
+        overflow: "hidden",
+    },
+
+    heroEyebrow: {
+        color: "#2EE7FF",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 2.2,
+        marginBottom: 1,
     },
 
     headerTitle: {
         color: "#FFFFFF",
-        fontSize: 25,
-        fontWeight: "900",
+        fontSize: 30,
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
-        letterSpacing: 1.2,
+        letterSpacing: 1.1,
+        textShadowColor: "rgba(46,231,255,0.45)",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 16,
+    },
+
+    heroSubtitle: {
+        color: "#F4D03F",
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.5,
+        marginTop: 2,
     },
 
     infoButton: {
         position: "absolute",
         right: 14,
         top: 12,
-        width: 22,
-        height: 22,
-        borderRadius: 11,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         backgroundColor: "#101827",
         borderWidth: 1,
         borderColor: "#2EE7FF",
@@ -831,8 +895,8 @@ const styles = StyleSheet.create({
 
     infoButtonText: {
         color: "#2EE7FF",
-        fontSize: 13,
-        fontWeight: "900",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
         fontStyle: "italic",
     },
 
@@ -853,35 +917,27 @@ const styles = StyleSheet.create({
     dropdownButton: {
         minHeight: 54,
         borderRadius: 18,
-        backgroundColor: "#101010",
+        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "#263241",
-        paddingHorizontal: 13,
+        borderColor: "rgba(46,231,255,0.18)",
+        paddingHorizontal: 14,
         paddingVertical: 8,
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
     },
 
-    dropdownLabel: {
-        color: "#7DDFFF",
-        fontSize: 8.5,
-        fontWeight: "900",
-        letterSpacing: 1,
-        textTransform: "uppercase",
-    },
-
     dropdownValue: {
         color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "900",
-        marginTop: 2,
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
     },
 
     dropdownArrow: {
         color: "#F4D03F",
-        fontSize: 20,
-        fontWeight: "900",
+        fontSize: 22,
+        fontFamily: "Rajdhani_700Bold",
     },
 
     dropdownMenu: {
@@ -910,8 +966,9 @@ const styles = StyleSheet.create({
 
     dropdownItemText: {
         color: "#E5E7EB",
-        fontSize: 14,
-        fontWeight: "900",
+        fontSize: 16,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 
     dropdownItemTextActive: {
@@ -922,9 +979,9 @@ const styles = StyleSheet.create({
         flex: 1.15,
         minHeight: 54,
         borderRadius: 18,
-        backgroundColor: "#090909",
+        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "#202020",
+        borderColor: "rgba(244,208,63,0.18)",
         paddingHorizontal: 8,
         flexDirection: "row",
         alignItems: "center",
@@ -944,9 +1001,9 @@ const styles = StyleSheet.create({
 
     arrowText: {
         color: "#F4D03F",
-        fontSize: 22,
-        fontWeight: "900",
-        lineHeight: 24,
+        fontSize: 25,
+        fontFamily: "Rajdhani_700Bold",
+        lineHeight: 27,
     },
 
     periodValueBox: {
@@ -957,17 +1014,9 @@ const styles = StyleSheet.create({
 
     periodValueText: {
         color: "#FFFFFF",
-        fontSize: 14,
-        fontWeight: "900",
-    },
-
-    periodTypeText: {
-        color: "#8B949E",
-        fontSize: 8.5,
-        fontWeight: "900",
-        marginTop: 1,
-        textTransform: "uppercase",
-        letterSpacing: 1,
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
     },
 
     centerState: {
@@ -977,15 +1026,17 @@ const styles = StyleSheet.create({
 
     stateText: {
         color: "#CFCFCF",
-        fontSize: 12,
-        fontWeight: "800",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginTop: 8,
     },
 
     errorText: {
         color: "#FF6B6B",
-        fontSize: 12,
-        fontWeight: "800",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         textAlign: "center",
     },
 
@@ -1000,11 +1051,11 @@ const styles = StyleSheet.create({
     },
 
     rankRow: {
-        minHeight: 54,
+        minHeight: 56,
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 4,
-        paddingVertical: 6,
+        paddingVertical: 7,
         borderBottomWidth: 1,
         borderBottomColor: "#171717",
     },
@@ -1022,10 +1073,10 @@ const styles = StyleSheet.create({
     },
 
     rankNumber: {
-        width: 30,
+        width: 32,
         color: "#ffffff",
-        fontSize: 17,
-        fontWeight: "900",
+        fontSize: 20,
+        fontFamily: "Rajdhani_700Bold",
         marginRight: 7,
         textAlign: "center",
     },
@@ -1100,7 +1151,7 @@ const styles = StyleSheet.create({
     knightIconText: {
         color: "#FFFFFF",
         fontSize: 18,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
 
     nameStack: {
@@ -1109,15 +1160,16 @@ const styles = StyleSheet.create({
 
     rankName: {
         color: "#FFFFFF",
-        fontSize: 14.5,
-        fontWeight: "900",
-        lineHeight: 17,
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
+        lineHeight: 19,
         flexShrink: 1,
     },
 
     collegeName: {
-        fontSize: 13.5,
-        lineHeight: 16,
+        fontSize: 15.5,
+        lineHeight: 18,
     },
 
     goldName: {
@@ -1143,8 +1195,8 @@ const styles = StyleSheet.create({
 
     rankMeta: {
         color: "#9B9B9B",
-        fontSize: 10.5,
-        fontWeight: "900",
+        fontSize: 11.5,
+        fontFamily: "Rajdhani_700Bold",
         marginTop: 1,
         letterSpacing: 0.5,
     },
@@ -1181,9 +1233,9 @@ const styles = StyleSheet.create({
 
     movementText: {
         color: "#FFFFFF",
-        fontSize: 11,
-        fontWeight: "900",
-        letterSpacing: 0.3,
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 
     modalOverlay: {
@@ -1205,8 +1257,9 @@ const styles = StyleSheet.create({
 
     modalTitle: {
         color: "#FFFFFF",
-        fontSize: 21,
-        fontWeight: "900",
+        fontSize: 24,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginBottom: 10,
     },
 
@@ -1228,7 +1281,8 @@ const styles = StyleSheet.create({
 
     modalCloseText: {
         color: "#041014",
-        fontSize: 14,
-        fontWeight: "900",
+        fontSize: 16,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 });

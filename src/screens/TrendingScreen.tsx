@@ -29,6 +29,10 @@ import {
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
 
 type ContentTab = "trending" | "blog";
 
@@ -111,7 +115,7 @@ function getCategoryBadgeStyle(category: string) {
         case "Pros":
             return { backgroundColor: "#183A63", borderColor: "#4D9BFF" };
         case "Breaking News":
-            return { backgroundColor: "#ff0084", borderColor: "#ff6ee9" };
+            return { backgroundColor: "#450A0A", borderColor: "#DC2626" };
         case "Rising Stars":
             return { backgroundColor: "#5D2475", borderColor: "#B86EF2" };
         case "Culture":
@@ -132,6 +136,10 @@ function getCategoryBadgeStyle(category: string) {
 }
 
 export default function TrendingScreen({ navigation }: any) {
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const [activeTab, setActiveTab] = useState<ContentTab>("trending");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [posts, setPosts] = useState<Post[]>([]);
@@ -147,6 +155,7 @@ export default function TrendingScreen({ navigation }: any) {
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
 
     const slideAnim = useRef(new Animated.Value(0)).current;
+    const feedFadeAnim = useRef(new Animated.Value(1)).current;
 
     const activeColor = activeTab === "trending" ? "#A3E635" : "#39C0ED";
     const categories = activeTab === "trending" ? TRENDING_CATEGORIES : BLOG_CATEGORIES;
@@ -154,6 +163,16 @@ export default function TrendingScreen({ navigation }: any) {
     const getToken = async () => {
         return await AsyncStorage.getItem("token");
     };
+
+    const animateFeed = useCallback(() => {
+        feedFadeAnim.setValue(0);
+
+        Animated.timing(feedFadeAnim, {
+            toValue: 1,
+            duration: 420,
+            useNativeDriver: true,
+        }).start();
+    }, [feedFadeAnim]);
 
     const fetchEntitlements = async () => {
         try {
@@ -315,7 +334,12 @@ export default function TrendingScreen({ navigation }: any) {
     useEffect(() => {
         setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
         setSelectedCategory("All");
-    }, [activeTab]);
+        animateFeed();
+    }, [activeTab, animateFeed]);
+
+    useEffect(() => {
+        animateFeed();
+    }, [selectedCategory, animateFeed]);
 
     const handleTabPress = (tab: ContentTab) => {
         setActiveTab(tab);
@@ -395,7 +419,12 @@ export default function TrendingScreen({ navigation }: any) {
         outputRange: ["0%", "100%"],
     });
 
-    if (loading) {
+    const feedTranslateY = feedFadeAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: [12, 0],
+    });
+
+    if (loading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
@@ -432,14 +461,16 @@ export default function TrendingScreen({ navigation }: any) {
                     />
                 }
             >
-
-
                 <View style={styles.mainTabsOuter}>
                     <Animated.View
                         style={[
                             styles.mainTabSlider,
                             {
                                 transform: [{ translateX: sliderTranslate }],
+                                borderColor:
+                                    activeTab === "trending"
+                                        ? "rgba(163,230,53,0.45)"
+                                        : "rgba(57,192,237,0.48)",
                             },
                         ]}
                     />
@@ -522,151 +553,158 @@ export default function TrendingScreen({ navigation }: any) {
                     })}
                 </ScrollView>
 
-                {featuredPost ? (
-                    <>
-                        <TouchableOpacity
-                            activeOpacity={0.9}
-                            onPress={() => handleOpenPost(featuredPost)}
-                            style={styles.featuredWrapper}
-                        >
-                            <View
-                                style={[
-                                    styles.featuredCard,
-                                    {
-                                        borderColor:
-                                            activeTab === "trending"
-                                                ? "rgba(163,230,53,0.25)"
-                                                : "rgba(57,192,237,0.28)",
-                                        shadowColor: activeColor,
-                                    },
-                                ]}
-                            >
-                                <ImageBackground
-                                    source={{ uri: featuredPost.cover_image_url }}
-                                    style={styles.featuredImageArea}
-                                    imageStyle={styles.featuredImage}
-                                    resizeMode="cover"
-                                >
-                                    {activeTab === "blog" && !isSubscribed && (
-                                        <View style={styles.lockOverlay}>
-                                            <Text style={styles.lockText}>🔒 Supporter Blog</Text>
-                                        </View>
-                                    )}
-
-                                    <View style={styles.featuredBadgeOverlay}>
-                                        <View
-                                            style={[
-                                                styles.categoryBadge,
-                                                getCategoryBadgeStyle(featuredPost.category),
-                                            ]}
-                                        >
-                                            <Text style={styles.categoryBadgeText}>
-                                                {featuredPost.category}
-                                            </Text>
-                                        </View>
-                                    </View>
-                                </ImageBackground>
-
-                                <View style={styles.featuredInfoBox}>
-                                    <Text style={styles.featuredTitle} numberOfLines={2}>
-                                        {featuredPost.title}
-                                    </Text>
-
-                                    <Text style={styles.featuredSummary} numberOfLines={1}>
-                                        {featuredPost.summary}
-                                    </Text>
-
-                                    <Text style={styles.featuredMeta}>
-                                        {formatTimeAgo(featuredPost.created_at)}
-                                    </Text>
-                                </View>
-                            </View>
-                        </TouchableOpacity>
-
-                        {topStories.length > 0 && (
-                            <Text
-                                style={[
-                                    styles.sectionTitle,
-                                    { color: activeTab === "trending" ? "#F4D03F" : "#39C0ED" },
-                                ]}
-                            >
-                                {activeTab === "trending" ? "Top Stories" : "Latest Blogs"}
-                            </Text>
-                        )}
-
-                        {visibleTopStories.map((post) => (
+                <Animated.View
+                    style={{
+                        opacity: feedFadeAnim,
+                        transform: [{ translateY: feedTranslateY }],
+                    }}
+                >
+                    {featuredPost ? (
+                        <>
                             <TouchableOpacity
-                                key={post._id}
-                                style={styles.storyRow}
-                                activeOpacity={0.85}
-                                onPress={() => handleOpenPost(post)}
+                                activeOpacity={0.9}
+                                onPress={() => handleOpenPost(featuredPost)}
+                                style={styles.featuredWrapper}
                             >
-                                <View>
-                                    <Image
-                                        source={{ uri: post.cover_image_url }}
-                                        style={styles.storyImage}
-                                    />
+                                <View
+                                    style={[
+                                        styles.featuredCard,
+                                        {
+                                            borderColor:
+                                                activeTab === "trending"
+                                                    ? "rgba(163,230,53,0.25)"
+                                                    : "rgba(57,192,237,0.28)",
+                                            shadowColor: activeColor,
+                                        },
+                                    ]}
+                                >
+                                    <ImageBackground
+                                        source={{ uri: featuredPost.cover_image_url }}
+                                        style={styles.featuredImageArea}
+                                        imageStyle={styles.featuredImage}
+                                        resizeMode="cover"
+                                    >
+                                        {activeTab === "blog" && !isSubscribed && (
+                                            <View style={styles.lockOverlay}>
+                                                <Text style={styles.lockText}>🔒 Supporter Blog</Text>
+                                            </View>
+                                        )}
 
-                                    {activeTab === "blog" && !isSubscribed && (
-                                        <View style={styles.storyLockBadge}>
-                                            <Text style={styles.storyLockBadgeText}>🔒</Text>
+                                        <View style={styles.featuredBadgeOverlay}>
+                                            <View
+                                                style={[
+                                                    styles.categoryBadge,
+                                                    getCategoryBadgeStyle(featuredPost.category),
+                                                ]}
+                                            >
+                                                <Text style={styles.categoryBadgeText}>
+                                                    {featuredPost.category}
+                                                </Text>
+                                            </View>
                                         </View>
-                                    )}
-                                </View>
+                                    </ImageBackground>
 
-                                <View style={styles.storyContent}>
-                                    <Text style={styles.storyTitle} numberOfLines={2}>
-                                        {post.title}
-                                    </Text>
+                                    <View style={styles.featuredInfoBox}>
+                                        <Text style={styles.featuredTitle} numberOfLines={2}>
+                                            {featuredPost.title}
+                                        </Text>
 
-                                    <Text style={styles.storySummary} numberOfLines={2}>
-                                        {post.summary}
-                                    </Text>
+                                        <Text style={styles.featuredSummary} numberOfLines={1}>
+                                            {featuredPost.summary}
+                                        </Text>
 
-                                    <View style={styles.storyMetaRow}>
-                                        <View
-                                            style={[
-                                                styles.categoryBadgeSmall,
-                                                getCategoryBadgeStyle(post.category),
-                                            ]}
-                                        >
-                                            <Text style={styles.categoryBadgeSmallText}>
-                                                {post.category}
-                                            </Text>
-                                        </View>
-
-                                        <Text style={styles.storyMetaText}>
-                                            {formatTimeAgo(post.created_at)}
+                                        <Text style={styles.featuredMeta}>
+                                            {formatTimeAgo(featuredPost.created_at)}
                                         </Text>
                                     </View>
                                 </View>
                             </TouchableOpacity>
-                        ))}
 
-                        {loadingMore && (
-                            <View style={styles.loadMoreWrap}>
-                                <ActivityIndicator size="small" color={activeColor} />
-                                <Text style={styles.loadMoreText}>
-                                    Loading more {activeTab === "trending" ? "stories" : "blogs"}...
+                            {topStories.length > 0 && (
+                                <Text
+                                    style={[
+                                        styles.sectionTitle,
+                                        { color: activeTab === "trending" ? "#F4D03F" : "#39C0ED" },
+                                    ]}
+                                >
+                                    {activeTab === "trending" ? "Recent Stories" : "Latest Blogs"}
                                 </Text>
-                            </View>
-                        )}
+                            )}
 
-                        {!loadingMore && hasMoreStories && (
-                            <View style={styles.loadMoreHintWrap}>
-                                <Text style={styles.loadMoreHintText}>
-                                    Scroll for more {activeTab === "trending" ? "stories" : "blogs"}
-                                </Text>
-                            </View>
-                        )}
-                    </>
-                ) : (
-                    <View style={styles.emptyState}>
-                        <Text style={styles.emptyStateText}>
-                            No {activeTab === "trending" ? "trending posts" : "blog posts"} in this category yet.
-                        </Text>
-                    </View>
-                )}
+                            {visibleTopStories.map((post) => (
+                                <TouchableOpacity
+                                    key={post._id}
+                                    style={styles.storyRow}
+                                    activeOpacity={0.85}
+                                    onPress={() => handleOpenPost(post)}
+                                >
+                                    <View>
+                                        <Image
+                                            source={{ uri: post.cover_image_url }}
+                                            style={styles.storyImage}
+                                        />
+
+                                        {activeTab === "blog" && !isSubscribed && (
+                                            <View style={styles.storyLockBadge}>
+                                                <Text style={styles.storyLockBadgeText}>🔒</Text>
+                                            </View>
+                                        )}
+                                    </View>
+
+                                    <View style={styles.storyContent}>
+                                        <Text style={styles.storyTitle} numberOfLines={2}>
+                                            {post.title}
+                                        </Text>
+
+                                        <Text style={styles.storySummary} numberOfLines={2}>
+                                            {post.summary}
+                                        </Text>
+
+                                        <View style={styles.storyMetaRow}>
+                                            <View
+                                                style={[
+                                                    styles.categoryBadgeSmall,
+                                                    getCategoryBadgeStyle(post.category),
+                                                ]}
+                                            >
+                                                <Text style={styles.categoryBadgeSmallText}>
+                                                    {post.category}
+                                                </Text>
+                                            </View>
+
+                                            <Text style={styles.storyMetaText}>
+                                                {formatTimeAgo(post.created_at)}
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </TouchableOpacity>
+                            ))}
+
+                            {loadingMore && (
+                                <View style={styles.loadMoreWrap}>
+                                    <ActivityIndicator size="small" color={activeColor} />
+                                    <Text style={styles.loadMoreText}>
+                                        Loading more {activeTab === "trending" ? "stories" : "blogs"}...
+                                    </Text>
+                                </View>
+                            )}
+
+                            {!loadingMore && hasMoreStories && (
+                                <View style={styles.loadMoreHintWrap}>
+                                    <Text style={styles.loadMoreHintText}>
+                                        Scroll for more {activeTab === "trending" ? "stories" : "blogs"}
+                                    </Text>
+                                </View>
+                            )}
+                        </>
+                    ) : (
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyStateText}>
+                                No {activeTab === "trending" ? "trending posts" : "blog posts"} in this category yet.
+                            </Text>
+                        </View>
+                    )}
+                </Animated.View>
             </ScrollView>
 
             <Modal
@@ -770,36 +808,11 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 6,
     },
-    headerRow: {
-        marginTop: 6,
-        marginBottom: 14,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    headerTitle: {
-        fontSize: 32,
-        fontWeight: "900",
-        textAlign: "center",
-        letterSpacing: 2,
-        textTransform: "uppercase",
-        paddingHorizontal: 16,
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 16,
-    },
-    headerTitleTrending: {
-        color: "#A3E635",
-        textShadowColor: "#A3E635",
-    },
-    headerTitleBlogs: {
-        color: "#39C0ED",
-        textShadowColor: "#39C0ED",
-    },
 
     mainTabsOuter: {
-        height: 48,
+        height: 50,
         borderRadius: 999,
-        backgroundColor: "#171C1E",
+        backgroundColor: "#101417",
         borderWidth: 1,
         borderColor: "rgba(255,255,255,0.08)",
         padding: 4,
@@ -814,15 +827,14 @@ const styles = StyleSheet.create({
         top: 4,
         left: 4,
         width: "50%",
-        height: 40,
+        height: 42,
         borderRadius: 999,
-        backgroundColor: "#22282B",
+        backgroundColor: "#1B2226",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
     },
     mainTabButton: {
         flex: 1,
-        height: 40,
+        height: 42,
         borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
@@ -830,9 +842,9 @@ const styles = StyleSheet.create({
     },
     mainTabText: {
         color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "900",
-        letterSpacing: 0.4,
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.55,
     },
     mainTabTextTrendingActive: {
         color: "#A3E635",
@@ -848,17 +860,23 @@ const styles = StyleSheet.create({
     },
 
     supportBanner: {
-        backgroundColor: "#101827",
+        backgroundColor: "#07111F",
         borderColor: "#39C0ED",
         borderWidth: 1,
-        borderRadius: 18,
-        padding: 14,
+        borderRadius: 20,
+        paddingVertical: 13,
+        paddingHorizontal: 14,
         marginBottom: 14,
+        shadowColor: "#39C0ED",
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
     },
     supportBannerTitle: {
         color: "#39C0ED",
-        fontSize: 16,
-        fontWeight: "900",
+        fontSize: 19,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
         marginBottom: 4,
     },
     supportBannerText: {
@@ -867,6 +885,7 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         fontWeight: "700",
     },
+
     tabsContainer: {
         paddingBottom: 14,
         paddingRight: 10,
@@ -882,22 +901,24 @@ const styles = StyleSheet.create({
     },
     tabText: {
         color: "#EAEAEA",
-        fontSize: 12,
-        fontWeight: "800",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
     activeTabText: {
         color: "#111111",
     },
+
     featuredWrapper: {
         marginBottom: 20,
     },
     featuredCard: {
         borderRadius: 24,
         overflow: "hidden",
-        backgroundColor: "#111111",
-        borderWidth: 0.9,
-        shadowOpacity: 0.18,
-        shadowRadius: 14,
+        backgroundColor: "#090D14",
+        borderWidth: 1,
+        shadowOpacity: 0.2,
+        shadowRadius: 16,
         shadowOffset: { width: 0, height: 0 },
         elevation: 6,
     },
@@ -916,15 +937,16 @@ const styles = StyleSheet.create({
     },
     featuredInfoBox: {
         paddingHorizontal: 14,
-        paddingTop: 10,
-        paddingBottom: 10,
-        backgroundColor: "#111111",
+        paddingTop: 11,
+        paddingBottom: 12,
+        backgroundColor: "#090D14",
     },
     featuredTitle: {
         color: "#FFFFFF",
-        fontSize: 17,
-        fontWeight: "900",
-        lineHeight: 21,
+        fontSize: 22,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        lineHeight: 25,
         marginTop: 2,
     },
     featuredSummary: {
@@ -935,10 +957,12 @@ const styles = StyleSheet.create({
     },
     featuredMeta: {
         color: "#BFC7D4",
-        fontSize: 12,
-        fontWeight: "700",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
         marginTop: 8,
     },
+
     categoryBadge: {
         alignSelf: "flex-start",
         paddingHorizontal: 10,
@@ -948,18 +972,27 @@ const styles = StyleSheet.create({
     },
     categoryBadgeText: {
         color: "#FFFFFF",
-        fontSize: 11,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
+
     sectionTitle: {
-        fontSize: 24,
-        fontWeight: "900",
+        fontSize: 25,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
         marginBottom: 14,
     },
+
     storyRow: {
         flexDirection: "row",
         alignItems: "flex-start",
-        marginBottom: 16,
+        marginBottom: 14,
+        backgroundColor: "#090D14",
+        borderRadius: 18,
+        padding: 10,
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.06)",
     },
     storyImage: {
         width: 96,
@@ -976,8 +1009,9 @@ const styles = StyleSheet.create({
     },
     storyTitle: {
         color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "900",
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
         lineHeight: 21,
         marginBottom: 5,
     },
@@ -996,7 +1030,8 @@ const styles = StyleSheet.create({
     storyMetaText: {
         color: "#CFCFCF",
         fontSize: 12,
-        fontWeight: "700",
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
     },
     categoryBadgeSmall: {
         paddingHorizontal: 8,
@@ -1006,9 +1041,11 @@ const styles = StyleSheet.create({
     },
     categoryBadgeSmallText: {
         color: "#FFFFFF",
-        fontSize: 10,
-        fontWeight: "900",
+        fontSize: 10.5,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
+
     lockOverlay: {
         position: "absolute",
         top: 12,
@@ -1023,7 +1060,8 @@ const styles = StyleSheet.create({
     lockText: {
         color: "#FFFFFF",
         fontSize: 12,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
     storyLockBadge: {
         position: "absolute",
@@ -1041,6 +1079,7 @@ const styles = StyleSheet.create({
     storyLockBadgeText: {
         fontSize: 12,
     },
+
     loadMoreWrap: {
         paddingVertical: 18,
         alignItems: "center",
@@ -1048,8 +1087,9 @@ const styles = StyleSheet.create({
     },
     loadMoreText: {
         color: "#D7E8B5",
-        fontSize: 13,
-        fontWeight: "700",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
         marginTop: 8,
     },
     loadMoreHintWrap: {
@@ -1059,8 +1099,9 @@ const styles = StyleSheet.create({
     },
     loadMoreHintText: {
         color: "#9AAC76",
-        fontSize: 12,
-        fontWeight: "700",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
     emptyState: {
         paddingVertical: 60,
@@ -1068,8 +1109,9 @@ const styles = StyleSheet.create({
     },
     emptyStateText: {
         color: "#BDBDBD",
-        fontSize: 16,
-        fontWeight: "700",
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 
     paywallOverlay: {
@@ -1121,8 +1163,9 @@ const styles = StyleSheet.create({
     },
     paywallTitle: {
         color: "#FFFFFF",
-        fontSize: 23,
-        fontWeight: "900",
+        fontSize: 25,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
         textAlign: "center",
         marginBottom: 8,
     },
@@ -1146,8 +1189,9 @@ const styles = StyleSheet.create({
     },
     freeTrialText: {
         color: "#39C0ED",
-        fontSize: 26,
-        fontWeight: "900",
+        fontSize: 30,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.4,
     },
     priceText: {
         color: "#FFFFFF",
@@ -1177,8 +1221,9 @@ const styles = StyleSheet.create({
     },
     subscribeButtonText: {
         color: "#050816",
-        fontSize: 15,
-        fontWeight: "900",
+        fontSize: 16,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
     paywallFinePrint: {
         color: "#7E96A5",

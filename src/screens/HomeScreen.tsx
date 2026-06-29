@@ -413,7 +413,7 @@ export default function HomeScreen() {
                         }}
                     />
 
-                    <AlertSportsTicker refreshKey={alertsRefreshKey} />
+                    {/* <AlertSportsTicker refreshKey={alertsRefreshKey} /> */}
 
                     <SupportGrowthBanner
                         supporterCount={supporterCount}

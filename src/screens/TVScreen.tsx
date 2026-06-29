@@ -18,6 +18,10 @@ import YoutubePlayer from "react-native-youtube-iframe";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
 
 type StreamType = "Live" | "Podcast" | "Video" | "Highlight";
 type LiveStatus = "upcoming" | "live" | "ended";
@@ -106,25 +110,6 @@ const getNewestByCreatedAt = (items: StreamItem[]) => {
     );
 };
 
-/*
-================================================================================
-🚨 HUGE JUST MOVE TV FEATURE — DO NOT REMOVE 🚨
-
-Latest Watch / Latest Podcasts MUST group videos by matching title.
-
-Why this matters:
-- One tournament round can have multiple broadcasts/sources with the SAME title.
-- Example: Chess24, ChessBase India, FIDE, etc. may all stream the same round.
-- Under "Latest Watch", that round/title should appear as ONE card, not 3 cards.
-- The broadcast/source pills above the player are where users switch between those
-  matching streams for the selected title.
-
-In short:
-✅ Latest Watch = one card per title/round
-✅ Broadcast pills = all source options for that selected title
-❌ Never let duplicate matching titles take over multiple Latest Watch slots
-================================================================================
-*/
 const normalizeTitleKey = (title: string) => {
     return title.trim().toLowerCase().replace(/\s+/g, " ");
 };
@@ -254,6 +239,10 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
 export default function TVScreen() {
     const navigation = useNavigation<any>();
 
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     const [streams, setStreams] = useState<StreamItem[]>([]);
     const [selectedMode, setSelectedMode] = useState<TVMode>("watch");
     const [selectedStream, setSelectedStream] = useState<StreamItem | null>(null);
@@ -266,6 +255,8 @@ export default function TVScreen() {
     const glowAnim = useRef(new Animated.Value(0)).current;
     const titleScrollAnim = useRef(new Animated.Value(0)).current;
     const tickerAnim = useRef(new Animated.Value(0)).current;
+
+    const activeAccent = selectedMode === "watch" ? "#22C55E" : "#A855F7";
 
     const fetchTVContent = useCallback(async () => {
         try {
@@ -361,7 +352,7 @@ export default function TVScreen() {
         animation.start();
 
         return () => animation.stop();
-    }, [selectedStream]);
+    }, [selectedStream, titleScrollAnim]);
 
     useEffect(() => {
         Animated.loop(
@@ -376,17 +367,17 @@ export default function TVScreen() {
 
     const animatedBorderColor = glowAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ["#8B5CF6", "#22C55E"],
+        outputRange: ["#22D3EE", activeAccent],
     });
 
     const animatedShadowColor = glowAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: ["#8B5CF6", "#22C55E"],
+        outputRange: ["#22D3EE", activeAccent],
     });
 
     const animatedGlowOpacity = glowAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [0.18, 0.38],
+        outputRange: [0.16, 0.36],
     });
 
     const sscTranslate = sscAnim.interpolate({
@@ -399,21 +390,6 @@ export default function TVScreen() {
             selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
         );
 
-        /*
-        ============================================================================
-        🚨 KEEP THIS GROUPING LOGIC 🚨
-
-        This is the feature that prevents the same broadcast round/title from showing
-        up as 2 or 3 separate cards under Latest Watch.
-
-        The card list is grouped by title. When a user taps a grouped card, the TV
-        player selects that title. Then broadcastOptions below finds ALL matching
-        streams with that title and shows them as source pills above the player.
-
-        Do not replace this with getNewestByCreatedAt(...).slice(0, 3), or duplicate
-        sources for the same round will take over the Latest Watch section again.
-        ============================================================================
-        */
         return getGroupedLatestByTitle(modeItems).slice(0, 3);
     }, [streams, selectedMode]);
 
@@ -457,7 +433,6 @@ export default function TVScreen() {
                 nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
             );
 
-            // Keep mode switching aligned with the grouped Latest Watch feature.
             const newestForMode = getGroupedLatestByTitle(modeItems)[0];
 
             if (newestForMode) setSelectedStream(newestForMode);
@@ -488,7 +463,7 @@ export default function TVScreen() {
         navigation.navigate("GameHome");
     };
 
-    if (loading) {
+    if (loading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
                 <AppHeader />
@@ -511,8 +486,8 @@ export default function TVScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#22C55E"
-                        colors={["#22C55E"]}
+                        tintColor={activeAccent}
+                        colors={[activeAccent]}
                         progressBackgroundColor="#0B1224"
                     />
                 }
@@ -531,12 +506,21 @@ export default function TVScreen() {
                     </View>
                 ) : (
                     <>
+                        <View style={styles.topLabelRow}>
+                            <Text style={styles.topEyebrow}>JUST MOVE TV</Text>
+                            <View style={[styles.topDot, { backgroundColor: activeAccent }]} />
+                        </View>
+
                         <View style={styles.sscOuter}>
                             <Animated.View
                                 style={[
                                     styles.sscSlider,
                                     {
                                         transform: [{ translateX: sscTranslate }],
+                                        borderColor:
+                                            selectedMode === "watch"
+                                                ? "rgba(34,197,94,0.45)"
+                                                : "rgba(168,85,247,0.5)",
                                     },
                                 ]}
                             />
@@ -749,7 +733,7 @@ export default function TVScreen() {
                         >
                             <View style={styles.sectionHeader}>
                                 <View>
-                                    <Text style={styles.sectionEyebrow}>
+                                    <Text style={[styles.sectionEyebrow, { color: activeAccent }]}>
                                         {selectedMode === "watch" ? "WATCH NOW" : "LISTEN NOW"}
                                     </Text>
                                     <Text style={styles.sectionTitle}>
@@ -781,7 +765,16 @@ export default function TVScreen() {
                                             onPress={() => setSelectedStream(item)}
                                             style={[
                                                 styles.streamRow,
-                                                active && styles.activeStreamRow,
+                                                active && {
+                                                    borderColor:
+                                                        selectedMode === "watch"
+                                                            ? "rgba(34,197,94,0.4)"
+                                                            : "rgba(168,85,247,0.45)",
+                                                    backgroundColor:
+                                                        selectedMode === "watch"
+                                                            ? "rgba(34,197,94,0.04)"
+                                                            : "rgba(168,85,247,0.05)",
+                                                },
                                             ]}
                                         >
                                             {item.thumbnail ? (
@@ -825,17 +818,11 @@ export default function TVScreen() {
                                                     </View>
                                                 </View>
 
-                                                <Text
-                                                    style={styles.streamTitle}
-                                                    numberOfLines={2}
-                                                >
+                                                <Text style={styles.streamTitle} numberOfLines={2}>
                                                     {item.title}
                                                 </Text>
 
-                                                <Text
-                                                    style={styles.streamSubtitle}
-                                                    numberOfLines={1}
-                                                >
+                                                <Text style={styles.streamSubtitle} numberOfLines={1}>
                                                     {item.subtitle}
                                                 </Text>
 
@@ -946,10 +933,31 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
 
-    sscOuter: {
-        height: 48,
+    topLabelRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 10,
+    },
+    topEyebrow: {
+        color: "#FFFFFF",
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1.2,
+    },
+    topDot: {
+        width: 8,
+        height: 8,
         borderRadius: 999,
-        backgroundColor: "#171C1E",
+        shadowOpacity: 0.8,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 0 },
+    },
+
+    sscOuter: {
+        height: 50,
+        borderRadius: 999,
+        backgroundColor: "#101417",
         borderWidth: 1,
         borderColor: "rgba(255,255,255,0.08)",
         padding: 4,
@@ -963,15 +971,14 @@ const styles = StyleSheet.create({
         top: 4,
         left: 4,
         width: "50%",
-        height: 40,
+        height: 42,
         borderRadius: 999,
-        backgroundColor: "#22282B",
+        backgroundColor: "#1B2226",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
     },
     sscButton: {
         flex: 1,
-        height: 40,
+        height: 42,
         borderRadius: 999,
         alignItems: "center",
         justifyContent: "center",
@@ -981,9 +988,9 @@ const styles = StyleSheet.create({
     },
     sscText: {
         color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "900",
-        letterSpacing: 0.4,
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.55,
     },
     sscTextActiveWatch: {
         color: "#22C55E",
@@ -1013,11 +1020,12 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     broadcastPillText: {
-        fontSize: 11,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
         textTransform: "uppercase",
-        letterSpacing: 0.5,
+        letterSpacing: 0.6,
     },
+
     tvStage: {
         position: "relative",
         marginBottom: 24,
@@ -1124,15 +1132,16 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingRight: 8,
     },
-    tvTitle: {
-        color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "900",
-        width: 600,
-    },
     titleTickerContainer: {
         width: "100%",
         overflow: "hidden",
+    },
+    tvTitle: {
+        color: "#FFFFFF",
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        width: 600,
     },
     tvSubtitleRow: {
         flexDirection: "row",
@@ -1146,6 +1155,7 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         flexShrink: 1,
     },
+
     inlineStatusBadge: {
         borderRadius: 999,
         paddingHorizontal: 8,
@@ -1168,9 +1178,9 @@ const styles = StyleSheet.create({
         backgroundColor: "#1B112A",
     },
     inlineStatusBadgeText: {
-        fontSize: 9,
-        fontWeight: "900",
-        letterSpacing: 0.4,
+        fontSize: 10,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.45,
     },
     liveInlineBadgeText: {
         color: "#FFFFFF",
@@ -1192,32 +1202,28 @@ const styles = StyleSheet.create({
         marginBottom: 14,
     },
     sectionEyebrow: {
-        color: "#22C55E",
-        fontSize: 10,
-        fontWeight: "900",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
         letterSpacing: 1.8,
         marginBottom: 3,
     },
     sectionTitle: {
         color: "#FFFFFF",
-        fontSize: 26,
-        fontWeight: "900",
+        fontSize: 28,
+        fontFamily: "Rajdhani_700Bold",
         textTransform: "uppercase",
-        letterSpacing: 0.2,
+        letterSpacing: 0.35,
     },
+
     streamRow: {
         flexDirection: "row",
         alignItems: "center",
-        backgroundColor: "#080916",
+        backgroundColor: "#090D14",
         borderRadius: 20,
         padding: 11,
         marginBottom: 13,
         borderWidth: 1,
         borderColor: "rgba(255,255,255,0.06)",
-    },
-    activeStreamRow: {
-        borderColor: "rgba(34,197,94,0.35)",
-        backgroundColor: "rgba(34,197,94,0.03)",
     },
     thumbnail: {
         width: 124,
@@ -1251,15 +1257,16 @@ const styles = StyleSheet.create({
         alignSelf: "flex-start",
     },
     typeBadgeText: {
-        fontSize: 8.5,
-        fontWeight: "900",
+        fontSize: 9.5,
+        fontFamily: "Rajdhani_700Bold",
         textTransform: "uppercase",
-        letterSpacing: 0.5,
+        letterSpacing: 0.55,
     },
     streamTitle: {
         color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "900",
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
         lineHeight: 20,
         marginBottom: 4,
     },
@@ -1286,9 +1293,11 @@ const styles = StyleSheet.create({
     },
     statusBadgeText: {
         color: "#D8B4FE",
-        fontSize: 8.5,
-        fontWeight: "900",
+        fontSize: 9.5,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
+
     emptyWrap: {
         alignItems: "center",
         justifyContent: "center",
@@ -1297,8 +1306,9 @@ const styles = StyleSheet.create({
     },
     emptyTitle: {
         color: "#FFFFFF",
-        fontSize: 20,
-        fontWeight: "900",
+        fontSize: 22,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginTop: 12,
         marginBottom: 8,
     },
@@ -1319,9 +1329,11 @@ const styles = StyleSheet.create({
     },
     emptyTypeText: {
         color: "#8A8F98",
-        fontSize: 14,
-        fontWeight: "700",
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
+
     planeTickerContainer: {
         height: 48,
         justifyContent: "center",
@@ -1355,7 +1367,8 @@ const styles = StyleSheet.create({
     },
     tickerBubbleText: {
         color: "#FFFFFF",
-        fontSize: 12,
-        fontWeight: "800",
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
     },
 });

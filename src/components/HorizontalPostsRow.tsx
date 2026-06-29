@@ -166,9 +166,10 @@ const styles = StyleSheet.create({
     },
     title: {
         color: "#FFFFFF",
-        fontSize: ms(14),
-        fontWeight: "800",
-        lineHeight: ms(18),
+        fontSize: ms(16),
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        lineHeight: ms(19),
     },
     bottomSection: {
         backgroundColor: "#11192C",
@@ -185,6 +186,7 @@ const styles = StyleSheet.create({
     time: {
         color: "#AAB4C3",
         fontSize: ms(11),
-        fontWeight: "600",
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
     },
 });
