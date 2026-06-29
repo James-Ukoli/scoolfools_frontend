@@ -15,9 +15,10 @@ import {
     Easing,
     Modal,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
 import { Audio } from "expo-av";
+import LottieView from "lottie-react-native";
 import {
     useFonts,
     Rajdhani_700Bold,
@@ -346,6 +347,7 @@ function AnimatedRankRow({ row, index }: { row: DisplayRow; index: number }) {
 
 export default function PowerRankingsScreen() {
     const scrollRef = useRef<ScrollView>(null);
+    const insets = useSafeAreaInsets();
 
     const [fontsLoaded] = useFonts({
         Rajdhani_700Bold,
@@ -377,6 +379,11 @@ export default function PowerRankingsScreen() {
 
     const heroGlow = useRef(new Animated.Value(0)).current;
 
+    const [toastVisible, setToastVisible] = useState(false);
+
+    const botFloat = useRef(new Animated.Value(0)).current;
+    const toastAnim = useRef(new Animated.Value(0)).current;
+
     useEffect(() => {
         Animated.loop(
             Animated.sequence([
@@ -395,6 +402,25 @@ export default function PowerRankingsScreen() {
             ])
         ).start();
     }, [heroGlow]);
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(botFloat, {
+                    toValue: 1,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(botFloat, {
+                    toValue: 0,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, [botFloat]);
 
     useEffect(() => {
         let mounted = true;
@@ -612,6 +638,61 @@ export default function PowerRankingsScreen() {
         setQuarterlyQuarter(next.quarter);
     };
 
+    const getBiggestMoverMessage = () => {
+        if (loading) {
+            return "I’m checking the latest power rankings.";
+        }
+
+        const movers = rows.filter(
+            (row) =>
+                (row.movementType === "up" || row.movementType === "down") &&
+                typeof row.movementValue === "number" &&
+                row.movementValue > 0
+        );
+
+        if (!movers.length) {
+            return "No major movement in this ranking.";
+        }
+
+        const biggest = movers.reduce((best, current) => {
+            const bestValue = best.movementValue ?? 0;
+            const currentValue = current.movementValue ?? 0;
+
+            if (currentValue > bestValue) return current;
+            if (currentValue === bestValue && current.rank < best.rank) return current;
+
+            return best;
+        });
+
+        const spotsText = biggest.movementValue === 1 ? "spot" : "spots";
+
+        if (biggest.movementType === "up") {
+            return `Wow! ${biggest.name} climbed ${biggest.movementValue} ${spotsText}!`;
+        }
+
+        return `Wow! ${biggest.name} fell ${biggest.movementValue} ${spotsText}!`;
+    };
+
+    const showBotToast = () => {
+        setToastVisible(true);
+
+        Animated.sequence([
+            Animated.timing(toastAnim, {
+                toValue: 1,
+                duration: 260,
+                useNativeDriver: true,
+            }),
+            Animated.delay(2200),
+            Animated.timing(toastAnim, {
+                toValue: 0,
+                duration: 260,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setToastVisible(false);
+        });
+    };
+
     const renderRows = () => {
         if (loading) {
             return (
@@ -661,6 +742,11 @@ export default function PowerRankingsScreen() {
         outputRange: ["#2EE7FF", "#F4D03F"],
     });
 
+    const botTranslateY = botFloat.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -6],
+    });
+
     if (initialLoading || !fontsLoaded) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
@@ -702,11 +788,26 @@ export default function PowerRankingsScreen() {
                         },
                     ]}
                 >
-                    <Text style={styles.heroEyebrow}>JUST MOVE</Text>
+                    <TouchableOpacity
+                        activeOpacity={0.9}
+                        onPress={showBotToast}
+                        style={styles.heroBotButton}
+                    >
+                        <Animated.View
+                            style={{
+                                transform: [{ translateY: botTranslateY }],
+                            }}
+                        >
+                            <LottieView
+                                source={require("../../assets/animations/anima_bot.json")}
+                                autoPlay
+                                loop
+                                style={styles.heroBot}
+                            />
+                        </Animated.View>
+                    </TouchableOpacity>
+
                     <Text style={styles.headerTitle}>POWER RANKINGS</Text>
-                    <Text style={styles.heroSubtitle}>
-                        {getViewLabel(selectedView)} • {periodTitle}
-                    </Text>
 
                     <TouchableOpacity
                         activeOpacity={0.8}
@@ -786,6 +887,43 @@ export default function PowerRankingsScreen() {
                 {renderRows()}
             </ScrollView>
 
+            {toastVisible && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.toast,
+                        {
+                            bottom:
+                                Platform.OS === "android"
+                                    ? 10 + insets.bottom
+                                    : 5 + insets.bottom,
+                            opacity: toastAnim,
+                            transform: [
+                                {
+                                    translateY: toastAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [22, 0],
+                                    }),
+                                },
+                            ],
+                        },
+                    ]}
+                >
+                    <LottieView
+                        source={require("../../assets/animations/anima_bot.json")}
+                        autoPlay
+                        loop
+                        style={styles.toastBot}
+                    />
+
+                    <Text style={styles.toastText}>
+                        {getBiggestMoverMessage()}
+                    </Text>
+                </Animated.View>
+            )}
+
+
+
             <Modal visible={infoOpen} transparent animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
@@ -827,7 +965,7 @@ const styles = StyleSheet.create({
 
     contentContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 42,
+        paddingBottom: 118,
     },
 
     loadingContainer: {
@@ -839,7 +977,7 @@ const styles = StyleSheet.create({
     hero: {
         marginTop: 10,
         marginBottom: 14,
-        minHeight: 112,
+        minHeight: 92,
         borderRadius: 26,
         backgroundColor: "#070A10",
         borderWidth: 1.2,
@@ -848,8 +986,22 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.24,
         shadowRadius: 18,
         shadowOffset: { width: 0, height: 0 },
-        paddingHorizontal: 18,
+        paddingHorizontal: 76,
         overflow: "hidden",
+    },
+
+    heroBotButton: {
+        position: "absolute",
+        left: 12,
+        width: 62,
+        height: 62,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    heroBot: {
+        width: 62,
+        height: 62,
     },
 
     heroEyebrow: {
@@ -1285,4 +1437,78 @@ const styles = StyleSheet.create({
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
     },
+
+    floatingBotButton: {
+        position: "absolute",
+        right: 8,
+
+        width: 108,
+        height: 108,
+        borderRadius: 54,
+
+        backgroundColor: "rgba(124,58,237,0.14)",
+
+        borderWidth: 1,
+        borderColor: "rgba(167,139,250,0.35)",
+
+        alignItems: "center",
+        justifyContent: "center",
+
+        shadowColor: "#A78BFA",
+        shadowOpacity: 0.28,
+        shadowRadius: 18,
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+
+        elevation: 8,
+        zIndex: 50,
+    },
+
+    floatingBot: {
+        width: 102,
+        height: 102,
+    },
+
+    toast: {
+        position: "absolute",
+
+        left: 24,
+        right: 24,
+
+        minHeight: 48,
+
+        borderRadius: 16,
+
+        paddingHorizontal: 10,
+        paddingVertical: 9,
+
+        backgroundColor: "rgba(10,18,30,0.96)",
+
+        borderWidth: 0.4,
+        borderColor: "#39FF14",
+
+        flexDirection: "row",
+        alignItems: "center",
+
+        shadowColor: "#39FF14",
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+    },
+
+    toastBot: {
+        width: 34,
+        height: 34,
+        marginRight: 8,
+    },
+
+    toastText: {
+        flex: 1,
+        color: "#FFFFFF",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
+    },
+
 });

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     View,
     Text,
@@ -9,12 +9,15 @@ import {
     RefreshControl,
     Platform,
     Alert,
+    Animated,
+    Easing,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as WebBrowser from "expo-web-browser";
+import LottieView from "lottie-react-native";
 import AppHeader from "../components/AppHeader";
 
 import {
@@ -170,6 +173,8 @@ function normalizeUrl(rawUrl: string) {
 }
 
 export default function AlertsScreen() {
+    const insets = useSafeAreaInsets();
+
     const [fontsLoaded] = useFonts({
         Rajdhani_700Bold,
     });
@@ -177,6 +182,50 @@ export default function AlertsScreen() {
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    const [toastVisible, setToastVisible] = useState(false);
+
+    const botFloat = useRef(new Animated.Value(0)).current;
+    const toastAnim = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(botFloat, {
+                    toValue: 1,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(botFloat, {
+                    toValue: 0,
+                    duration: 1600,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        ).start();
+    }, [botFloat]);
+
+    const showBotToast = () => {
+        setToastVisible(true);
+
+        Animated.sequence([
+            Animated.timing(toastAnim, {
+                toValue: 1,
+                duration: 260,
+                useNativeDriver: true,
+            }),
+            Animated.delay(2200),
+            Animated.timing(toastAnim, {
+                toValue: 0,
+                duration: 260,
+                useNativeDriver: true,
+            }),
+        ]).start(() => {
+            setToastVisible(false);
+        });
+    };
 
     const fetchAlerts = useCallback(async () => {
         try {
@@ -242,6 +291,11 @@ export default function AlertsScreen() {
             Alert.alert("Error", "Failed to open alert link.");
         }
     };
+
+    const botTranslateY = botFloat.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, -6],
+    });
 
     if (loading || !fontsLoaded) {
         return (
@@ -367,6 +421,68 @@ export default function AlertsScreen() {
 
                 <View style={styles.bottomSpacer} />
             </ScrollView>
+
+            {toastVisible && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.toast,
+                        {
+                            bottom:
+                                Platform.OS === "android"
+                                    ? 10 + insets.bottom
+                                    : 5 + insets.bottom,
+                            opacity: toastAnim,
+                            transform: [
+                                {
+                                    translateY: toastAnim.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: [22, 0],
+                                    }),
+                                },
+                            ],
+                        },
+                    ]}
+                >
+                    <LottieView
+                        source={require("../../assets/animations/anima_bot.json")}
+                        autoPlay
+                        loop
+                        style={styles.toastBot}
+                    />
+
+                    <Text style={styles.toastText}>
+                        I’m watching the chess world for you.
+                    </Text>
+                </Animated.View>
+            )}
+
+            <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={showBotToast}
+                style={[
+                    styles.floatingBotButton,
+                    {
+                        bottom:
+                            Platform.OS === "android"
+                                ? -25 + insets.bottom
+                                : -25 + insets.bottom,
+                    },
+                ]}
+            >
+                <Animated.View
+                    style={{
+                        transform: [{ translateY: botTranslateY }],
+                    }}
+                >
+                    <LottieView
+                        source={require("../../assets/animations/anima_bot.json")}
+                        autoPlay
+                        loop
+                        style={styles.floatingBot}
+                    />
+                </Animated.View>
+            </TouchableOpacity>
         </SafeAreaView>
     );
 }
@@ -383,7 +499,7 @@ const styles = StyleSheet.create({
     contentContainer: {
         paddingHorizontal: 12,
         paddingTop: 12,
-        paddingBottom: 34,
+        paddingBottom: 118,
     },
     loadingContainer: {
         flex: 1,
@@ -498,7 +614,8 @@ const styles = StyleSheet.create({
     emptyTitle: {
         color: "#FFFFFF",
         fontSize: 20,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
         marginTop: 12,
         marginBottom: 8,
     },
@@ -510,5 +627,75 @@ const styles = StyleSheet.create({
     },
     bottomSpacer: {
         height: 20,
+    },
+
+    floatingBotButton: {
+        position: "absolute",
+        right: 8,
+
+        width: 108,
+        height: 108,
+        borderRadius: 54,
+
+        backgroundColor: "rgba(124,58,237,0.14)",
+
+        borderWidth: 1,
+        borderColor: "rgba(167,139,250,0.35)",
+
+        alignItems: "center",
+        justifyContent: "center",
+
+        shadowColor: "#A78BFA",
+        shadowOpacity: 0.28,
+        shadowRadius: 18,
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+
+        elevation: 8,
+        zIndex: 50,
+    },
+    floatingBot: {
+        width: 102,
+        height: 102,
+    },
+
+    toast: {
+        position: "absolute",
+
+        left: 18,
+        right: 125, // was 86
+
+        minHeight: 44, // was 54
+
+        borderRadius: 16,
+
+        paddingHorizontal: 6,
+        paddingVertical: 8,
+
+        backgroundColor: "rgba(10,18,30,0.96)",
+
+        borderWidth: 0.4,
+        borderColor: "#39FF14",
+
+        flexDirection: "row",
+        alignItems: "center",
+
+        shadowColor: "#39FF14",
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+    },
+    toastBot: {
+        width: 34,
+        height: 34,
+        marginRight: 8,
+    },
+    toastText: {
+        flex: 1,
+        color: "#FFFFFF",
+        fontSize: 14,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
     },
 });
