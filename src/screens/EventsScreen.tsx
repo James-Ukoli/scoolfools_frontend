@@ -13,10 +13,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import AppHeader from "../components/AppHeader";
-import {
-    useFonts,
-    Rajdhani_700Bold,
-} from "@expo-google-fonts/rajdhani";
+import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
+
+type TimeTheme = "day" | "night";
 
 type Broadcaster = {
     name: string;
@@ -90,6 +89,61 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getEventsTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            bg: "#F8FAFC",
+            card: "#FFFFFF",
+            cardAlt: "#ECFEFF",
+            text: "#07111F",
+            textSoft: "#475569",
+            muted: "#64748B",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            cyan: "#06B6D4",
+            yellow: "#FACC15",
+            red: "#EF4444",
+            completedCard: "#F1F5F9",
+            completedBadge: "#E2E8F0",
+            completedText: "#475569",
+            countdownBox: "#ECFEFF",
+            countdownBorder: "rgba(6,182,212,0.22)",
+            homeBg: "#06B6D4",
+            homeIcon: "#07111F",
+            shadow: "#06B6D4",
+            refreshBg: "#FFFFFF",
+        };
+    }
+
+    return {
+        bg: "#020617",
+        card: "#090D14",
+        cardAlt: "#07111F",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        cyan: "#22D3EE",
+        yellow: "#FACC15",
+        red: "#EF4444",
+        completedCard: "#090909",
+        completedBadge: "#2A2A2A",
+        completedText: "#CFCFCF",
+        countdownBox: "#04152D",
+        countdownBorder: "#0E2A52",
+        homeBg: "#0B1A4A",
+        homeIcon: "#FFFFFF",
+        shadow: "#22D3EE",
+        refreshBg: "#111827",
+    };
+};
+
 function formatMonthYear(dateString: string) {
     return new Date(dateString).toLocaleString("en-US", {
         month: "long",
@@ -147,6 +201,9 @@ export default function EventsScreen({ navigation }: any) {
         Rajdhani_700Bold,
     });
 
+    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const theme = getEventsTheme(themeMode);
+
     const [events, setEvents] = useState<EventItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -172,6 +229,14 @@ export default function EventsScreen({ navigation }: any) {
         } finally {
             setLoading(false);
         }
+    }, []);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
@@ -225,10 +290,7 @@ export default function EventsScreen({ navigation }: any) {
         const completedThisYear = sorted
             .filter((event) => {
                 const end = new Date(event.end_at);
-                return (
-                    end.getTime() < now &&
-                    end.getFullYear() === currentYear
-                );
+                return end.getTime() < now && end.getFullYear() === currentYear;
             })
             .sort(
                 (a, b) =>
@@ -285,9 +347,28 @@ export default function EventsScreen({ navigation }: any) {
                 key={event._id}
                 style={[
                     styles.eventCard,
-                    isCurrent && styles.currentEventCard,
-                    isCountdownEvent && styles.countdownEventCard,
-                    isCompleted && styles.completedEventCard,
+                    {
+                        backgroundColor: theme.card,
+                        borderColor: theme.border,
+                    },
+                    isCurrent && {
+                        backgroundColor:
+                            themeMode === "day" ? "#FEF2F2" : "#120707",
+                        borderColor: theme.red,
+                        shadowColor: theme.red,
+                        shadowOpacity: 0.25,
+                    },
+                    isCountdownEvent && {
+                        backgroundColor: theme.cardAlt,
+                        borderColor: theme.cyan,
+                        shadowColor: theme.shadow,
+                        shadowOpacity: 0.2,
+                    },
+                    isCompleted && {
+                        opacity: 0.78,
+                        backgroundColor: theme.completedCard,
+                        borderColor: theme.border,
+                    },
                 ]}
                 activeOpacity={0.9}
                 onPress={() => openEvent(event)}
@@ -304,56 +385,96 @@ export default function EventsScreen({ navigation }: any) {
                     {isCurrent && (
                         <View style={styles.liveBadge}>
                             <View style={styles.liveDot} />
-                            <Text style={styles.liveBadgeText}>Currently Happening</Text>
+                            <Text style={styles.liveBadgeText}>
+                                Currently Happening
+                            </Text>
                         </View>
                     )}
 
                     {isCountdownEvent && (
-                        <View style={styles.nextBadge}>
-                            <Ionicons name="time-outline" size={13} color="#000000" />
+                        <View
+                            style={[
+                                styles.nextBadge,
+                                { backgroundColor: theme.cyan },
+                            ]}
+                        >
+                            <Ionicons name="time-outline" size={13} color="#07111F" />
                             <Text style={styles.nextBadgeText}>Next Event</Text>
                         </View>
                     )}
 
                     {isCompleted && (
-                        <View style={styles.completedBadge}>
-                            <Text style={styles.completedBadgeText}>Completed</Text>
+                        <View
+                            style={[
+                                styles.completedBadge,
+                                { backgroundColor: theme.completedBadge },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.completedBadgeText,
+                                    { color: theme.completedText },
+                                ]}
+                            >
+                                Completed
+                            </Text>
                         </View>
                     )}
 
-                    <Text style={styles.eventTitle} numberOfLines={2}>
+                    <Text
+                        style={[styles.eventTitle, { color: theme.text }]}
+                        numberOfLines={2}
+                    >
                         {event.title}
                     </Text>
 
-                    <Text style={styles.eventDate}>
+                    <Text style={[styles.eventDate, { color: theme.yellow }]}>
                         {formatDateRange(event.start_at, event.end_at)}
                     </Text>
 
-                    <Text style={styles.eventLocation} numberOfLines={2}>
+                    <Text
+                        style={[styles.eventLocation, { color: theme.textSoft }]}
+                        numberOfLines={2}
+                    >
                         {event.location}
                     </Text>
 
                     {isCountdownEvent && (
                         <View style={styles.countdownRow}>
-                            <View style={styles.countdownBox}>
-                                <Text style={styles.countdownNumber}>{countdown.days}</Text>
-                                <Text style={styles.countdownLabel}>Days</Text>
-                            </View>
-
-                            <View style={styles.countdownBox}>
-                                <Text style={styles.countdownNumber}>{countdown.hours}</Text>
-                                <Text style={styles.countdownLabel}>Hours</Text>
-                            </View>
-
-                            <View style={styles.countdownBox}>
-                                <Text style={styles.countdownNumber}>{countdown.minutes}</Text>
-                                <Text style={styles.countdownLabel}>Min</Text>
-                            </View>
-
-                            <View style={styles.countdownBox}>
-                                <Text style={styles.countdownNumber}>{countdown.seconds}</Text>
-                                <Text style={styles.countdownLabel}>Sec</Text>
-                            </View>
+                            {[
+                                ["Days", countdown.days],
+                                ["Hours", countdown.hours],
+                                ["Min", countdown.minutes],
+                                ["Sec", countdown.seconds],
+                            ].map(([label, value]) => (
+                                <View
+                                    key={label}
+                                    style={[
+                                        styles.countdownBox,
+                                        {
+                                            backgroundColor: theme.countdownBox,
+                                            borderColor: theme.countdownBorder,
+                                        },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.countdownNumber,
+                                            { color: theme.cyan },
+                                        ]}
+                                    >
+                                        {value}
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.countdownLabel,
+                                            { color: theme.textSoft },
+                                        ]}
+                                    >
+                                        {label}
+                                    </Text>
+                                </View>
+                            ))}
                         </View>
                     )}
                 </View>
@@ -363,57 +484,84 @@ export default function EventsScreen({ navigation }: any) {
 
     if (loading || !fontsLoaded) {
         return (
-            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={[styles.safeArea, { backgroundColor: theme.bg }]}
+            >
                 <AppHeader />
                 <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#2EE7FF" />
+                    <ActivityIndicator size="small" color={theme.cyan} />
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+        >
             <AppHeader />
 
             {refreshing && (
                 <View style={styles.refreshIndicator}>
-                    <ActivityIndicator size="small" color="#2EE7FF" />
+                    <ActivityIndicator size="small" color={theme.cyan} />
                 </View>
             )}
 
             <ScrollView
-                style={styles.container}
+                style={[styles.container, { backgroundColor: theme.bg }]}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor="#2EE7FF"
-                        colors={["#2EE7FF"]}
-                        progressBackgroundColor="#0B1224"
+                        tintColor={theme.cyan}
+                        colors={[theme.cyan]}
+                        progressBackgroundColor={theme.refreshBg}
                     />
                 }
             >
-                <View style={styles.hero}>
+                <View
+                    style={[
+                        styles.hero,
+                        {
+                            backgroundColor: theme.card,
+                            borderColor: theme.borderStrong,
+                            shadowColor: theme.shadow,
+                        },
+                    ]}
+                >
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
-                        style={styles.backButton}
+                        style={[
+                            styles.backButton,
+                            {
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="arrow-back" size={23} color="#FFFFFF" />
+                        <Ionicons name="arrow-back" size={23} color={theme.text} />
                     </TouchableOpacity>
 
                     <View style={styles.heroTextWrap}>
-                        <Text style={styles.heroEyebrow}>JUST MOVE</Text>
-                        <Text style={styles.screenTitle}>Events</Text>
+                        <Text style={[styles.heroEyebrow, { color: theme.cyan }]}>
+                            SCOOLFOOLS
+                        </Text>
+                        <Text style={[styles.screenTitle, { color: theme.text }]}>
+                            Events
+                        </Text>
                     </View>
                 </View>
 
                 {currentEvents.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Currently Happening</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                            Currently Happening
+                        </Text>
 
                         {currentEvents.map((event) =>
                             renderEventCard(event, { isCurrent: true })
@@ -423,11 +571,15 @@ export default function EventsScreen({ navigation }: any) {
 
                 {upcomingEvents.length > 0 && (
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Upcoming</Text>
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                            Upcoming
+                        </Text>
 
                         {groupedUpcomingEntries.map(([monthLabel, monthEvents]) => (
                             <View key={monthLabel} style={styles.monthSection}>
-                                <Text style={styles.monthTitle}>{monthLabel}</Text>
+                                <Text style={[styles.monthTitle, { color: theme.yellow }]}>
+                                    {monthLabel}
+                                </Text>
 
                                 {monthEvents.map((event) =>
                                     renderEventCard(event, {
@@ -443,15 +595,31 @@ export default function EventsScreen({ navigation }: any) {
                 {completedThisYearEvents.length > 0 && (
                     <View style={styles.completedSection}>
                         <TouchableOpacity
-                            style={styles.completedToggle}
+                            style={[
+                                styles.completedToggle,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.border,
+                                },
+                            ]}
                             activeOpacity={0.85}
                             onPress={() => setShowCompleted((prev) => !prev)}
                         >
                             <View>
-                                <Text style={styles.completedToggleTitle}>
+                                <Text
+                                    style={[
+                                        styles.completedToggleTitle,
+                                        { color: theme.text },
+                                    ]}
+                                >
                                     Completed This Year
                                 </Text>
-                                <Text style={styles.completedToggleSubtitle}>
+                                <Text
+                                    style={[
+                                        styles.completedToggleSubtitle,
+                                        { color: theme.muted },
+                                    ]}
+                                >
                                     {completedThisYearEvents.length} event
                                     {completedThisYearEvents.length === 1 ? "" : "s"}
                                 </Text>
@@ -460,14 +628,21 @@ export default function EventsScreen({ navigation }: any) {
                             <Ionicons
                                 name={showCompleted ? "chevron-up" : "chevron-down"}
                                 size={22}
-                                color="#FFFFFF"
+                                color={theme.text}
                             />
                         </TouchableOpacity>
 
                         {showCompleted &&
                             groupedCompletedEntries.map(([monthLabel, monthEvents]) => (
                                 <View key={monthLabel} style={styles.monthSection}>
-                                    <Text style={styles.monthTitle}>{monthLabel}</Text>
+                                    <Text
+                                        style={[
+                                            styles.monthTitle,
+                                            { color: theme.yellow },
+                                        ]}
+                                    >
+                                        {monthLabel}
+                                    </Text>
 
                                     {monthEvents.map((event) =>
                                         renderEventCard(event, { isCompleted: true })
@@ -480,11 +655,18 @@ export default function EventsScreen({ navigation }: any) {
 
             <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
                 <TouchableOpacity
-                    style={styles.homeButton}
+                    style={[
+                        styles.homeButton,
+                        {
+                            backgroundColor: theme.homeBg,
+                            borderColor: theme.cyan,
+                            shadowColor: theme.shadow,
+                        },
+                    ]}
                     activeOpacity={0.85}
                     onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
                 >
-                    <Ionicons name="home" size={21} color="#FFFFFF" />
+                    <Ionicons name="home" size={21} color={theme.homeIcon} />
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -494,11 +676,9 @@ export default function EventsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     container: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     contentContainer: {
         paddingHorizontal: 16,
@@ -513,19 +693,15 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingVertical: 6,
     },
-
     hero: {
         minHeight: 78,
         borderRadius: 24,
-        backgroundColor: "#070A10",
         borderWidth: 1,
-        borderColor: "rgba(46,231,255,0.22)",
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 14,
         marginTop: 6,
         marginBottom: 18,
-        shadowColor: "#2EE7FF",
         shadowOpacity: 0.16,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
@@ -536,33 +712,27 @@ const styles = StyleSheet.create({
         borderRadius: 21,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1220",
         borderWidth: 1,
-        borderColor: "#16233B",
         marginRight: 13,
     },
     heroTextWrap: {
         flex: 1,
     },
     heroEyebrow: {
-        color: "#2EE7FF",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 1.8,
     },
     screenTitle: {
-        color: "#FFFFFF",
         fontSize: 32,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.55,
         marginTop: -2,
     },
-
     section: {
         marginBottom: 24,
     },
     sectionTitle: {
-        color: "#FFFFFF",
         fontSize: 26,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.45,
@@ -572,45 +742,21 @@ const styles = StyleSheet.create({
         marginBottom: 22,
     },
     monthTitle: {
-        color: "#F4D03F",
         fontSize: 24,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
         marginBottom: 12,
     },
-
     eventCard: {
         flexDirection: "row",
         alignItems: "flex-start",
         marginBottom: 14,
         padding: 10,
         borderRadius: 20,
-        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.06)",
-    },
-    currentEventCard: {
-        backgroundColor: "#120707",
-        borderColor: "#EF4444",
-        shadowColor: "#EF4444",
-        shadowOpacity: 0.25,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
         elevation: 8,
-    },
-    countdownEventCard: {
-        backgroundColor: "#071326",
-        borderColor: "#2EE7FF",
-        shadowColor: "#2EE7FF",
-        shadowOpacity: 0.2,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 8,
-    },
-    completedEventCard: {
-        opacity: 0.78,
-        backgroundColor: "#090909",
-        borderColor: "#2A2A2A",
     },
     eventImage: {
         width: 94,
@@ -625,7 +771,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingVertical: 2,
     },
-
     liveBadge: {
         alignSelf: "flex-start",
         flexDirection: "row",
@@ -655,14 +800,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 5,
-        backgroundColor: "#2EE7FF",
         paddingHorizontal: 9,
         paddingVertical: 4,
         borderRadius: 999,
         marginBottom: 8,
     },
     nextBadgeText: {
-        color: "#000000",
+        color: "#07111F",
         fontSize: 12,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
@@ -670,22 +814,18 @@ const styles = StyleSheet.create({
     },
     completedBadge: {
         alignSelf: "flex-start",
-        backgroundColor: "#2A2A2A",
         paddingHorizontal: 9,
         paddingVertical: 4,
         borderRadius: 999,
         marginBottom: 8,
     },
     completedBadgeText: {
-        color: "#CFCFCF",
         fontSize: 12,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
         textTransform: "uppercase",
     },
-
     eventTitle: {
-        color: "#FFFFFF",
         fontSize: 18,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.25,
@@ -693,18 +833,15 @@ const styles = StyleSheet.create({
         marginBottom: 6,
     },
     eventDate: {
-        color: "#F4D03F",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.25,
         marginBottom: 6,
     },
     eventLocation: {
-        color: "#CFCFCF",
         fontSize: 13,
         lineHeight: 17,
     },
-
     countdownRow: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -713,27 +850,22 @@ const styles = StyleSheet.create({
     },
     countdownBox: {
         flex: 1,
-        backgroundColor: "#04152D",
         borderRadius: 12,
         paddingVertical: 8,
         alignItems: "center",
         borderWidth: 1,
-        borderColor: "#0E2A52",
     },
     countdownNumber: {
-        color: "#2EE7FF",
         fontSize: 20,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
         marginBottom: 2,
     },
     countdownLabel: {
-        color: "#CAD4E3",
         fontSize: 11,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.3,
     },
-
     completedSection: {
         marginTop: 4,
         marginBottom: 24,
@@ -742,28 +874,23 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: "#090D14",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
         borderRadius: 20,
         paddingHorizontal: 16,
         paddingVertical: 14,
         marginBottom: 14,
     },
     completedToggleTitle: {
-        color: "#FFFFFF",
         fontSize: 20,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
     },
     completedToggleSubtitle: {
-        color: "#AFAFAF",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.25,
         marginTop: 3,
     },
-
     fixedHomeButtonWrap: {
         position: "absolute",
         left: 0,
@@ -778,10 +905,7 @@ const styles = StyleSheet.create({
         borderRadius: 30,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1A4A",
         borderWidth: 1.5,
-        borderColor: "#2EE7FF",
-        shadowColor: "#2EE7FF",
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.32,
         shadowRadius: 12,

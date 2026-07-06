@@ -27,7 +27,6 @@ import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
-import AlertSportsTicker from "../components/AlertSportsTicker";
 import { finishTransaction } from "react-native-iap";
 
 import { s, vs, ms } from "react-native-size-matters";
@@ -45,6 +44,8 @@ import {
     cleanupIAP,
 } from "../services/iap";
 
+type TimeTheme = "day" | "night";
+
 const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
@@ -52,12 +53,70 @@ const API_BASE_URL =
 
 const SUPPORTER_MILESTONES = [100, 1000, 10000, 50000];
 
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getHomeTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            mode,
+            bg: "#F8FAFC",
+            card: "#FFFFFF",
+            cardAlt: "#ECFEFF",
+            cardDeep: "#F1F5F9",
+            text: "#07111F",
+            textSoft: "#475569",
+            muted: "#64748B",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            cyan: "#06B6D4",
+            cyanSoft: "rgba(6,182,212,0.12)",
+            yellow: "#FACC15",
+            purple: "#8B5CF6",
+            green: "#22C55E",
+            red: "#EF4444",
+            shadow: "#06B6D4",
+            modalBackdrop: "rgba(2,6,23,0.58)",
+            refreshBg: "#FFFFFF",
+            darkText: "#050816",
+        };
+    }
+
+    return {
+        mode,
+        bg: "#020617",
+        card: "#090D14",
+        cardAlt: "#07111F",
+        cardDeep: "#101827",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        cyan: "#22D3EE",
+        cyanSoft: "rgba(34,211,238,0.12)",
+        yellow: "#FACC15",
+        purple: "#C084FC",
+        green: "#35D07F",
+        red: "#FF7A7A",
+        shadow: "#22D3EE",
+        modalBackdrop: "rgba(0,0,0,0.82)",
+        refreshBg: "#111827",
+        darkText: "#050816",
+    };
+};
+
 export default function HomeScreen() {
     const navigation = useNavigation<any>();
 
     const [fontsLoaded] = useFonts({
         Rajdhani_700Bold,
     });
+
+    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const theme = getHomeTheme(themeMode);
 
     const [featuredPosts, setFeaturedPosts] = useState<any[]>([]);
     const [featuredStories, setFeaturedStories] = useState<any[]>([]);
@@ -74,6 +133,14 @@ export default function HomeScreen() {
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const getToken = async () => {
         return await AsyncStorage.getItem("token");
@@ -235,7 +302,7 @@ export default function HomeScreen() {
             await fetchEntitlements();
             await fetchSupporterProgress();
 
-            Alert.alert("Subscribed 🎉", "Welcome to Just Move Supporters ♟️🔥");
+            Alert.alert("Subscribed 🎉");
         } catch (error) {
             console.log("Verify home blog subscription error:", error);
 
@@ -292,7 +359,7 @@ export default function HomeScreen() {
         try {
             await Share.share({
                 message:
-                    "Follow chess like a sport on Just Move ♟️🔥 https://linktr.ee/justmovechess",
+                    "Dump It Out on the #1 Place Where Students' Voices Are Heard.🎓 https://linktr.ee/scoolfools",
             });
         } catch (error) {
             console.log("Share error:", error);
@@ -369,11 +436,14 @@ export default function HomeScreen() {
 
     if (!fontsLoaded) {
         return (
-            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-                <View style={styles.container}>
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={[styles.safeArea, { backgroundColor: theme.bg }]}
+            >
+                <View style={[styles.container, { backgroundColor: theme.bg }]}>
                     <AppHeader />
                     <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color="#2EE7FF" />
+                        <ActivityIndicator size="small" color={theme.cyan} />
                     </View>
                 </View>
             </SafeAreaView>
@@ -381,8 +451,11 @@ export default function HomeScreen() {
     }
 
     return (
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-            <View style={styles.container}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+        >
+            <View style={[styles.container, { backgroundColor: theme.bg }]}>
                 <AppHeader />
 
                 <ScrollView
@@ -392,15 +465,22 @@ export default function HomeScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            tintColor="#2EE7FF"
-                            colors={["#2EE7FF"]}
-                            progressBackgroundColor="#0B1224"
+                            tintColor={theme.cyan}
+                            colors={[theme.cyan]}
+                            progressBackgroundColor={theme.refreshBg}
                         />
                     }
                 >
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle}>Featured Stories</Text>
-                        <View style={styles.sectionAccentLine} />
+                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                            Featured Stories
+                        </Text>
+                        <View
+                            style={[
+                                styles.sectionAccentLine,
+                                { backgroundColor: theme.cyan },
+                            ]}
+                        />
                     </View>
 
                     <FeaturedCarousel
@@ -413,8 +493,6 @@ export default function HomeScreen() {
                         }}
                     />
 
-                    {/* <AlertSportsTicker refreshKey={alertsRefreshKey} /> */}
-
                     <SupportGrowthBanner
                         supporterCount={supporterCount}
                         isSubscribed={isSubscribed}
@@ -422,13 +500,21 @@ export default function HomeScreen() {
                             setPaywallVisible(true);
                             await loadBlogSubscription();
                         }}
+                        theme={theme}
                     />
 
                     <EventCountdownCard event={countdownEvent} loading={loadingHome} />
 
                     <View style={styles.sectionHeaderWrap}>
-                        <Text style={styles.sectionTitle2}>More Featured Stories...</Text>
-                        <View style={styles.sectionAccentLine} />
+                        <Text style={[styles.sectionTitle2, { color: theme.text }]}>
+                            More Featured Stories...
+                        </Text>
+                        <View
+                            style={[
+                                styles.sectionAccentLine,
+                                { backgroundColor: theme.cyan },
+                            ]}
+                        />
                     </View>
 
                     <HorizontalPostsRow
@@ -444,12 +530,14 @@ export default function HomeScreen() {
                     <PartyGamesPromo
                         navigation={navigation}
                         gamesPackagePurchased={gamesPackagePurchased}
+                        theme={theme}
                     />
 
                     {isSubscribed && (
                         <SupporterBottomActions
                             onSharePress={handleSharePress}
                             onRatePress={handleRatePress}
+                            theme={theme}
                         />
                     )}
                 </ScrollView>
@@ -463,48 +551,85 @@ export default function HomeScreen() {
             >
                 <View style={styles.paywallOverlay}>
                     <Pressable
-                        style={styles.paywallBackdrop}
+                        style={[
+                            styles.paywallBackdrop,
+                            { backgroundColor: theme.modalBackdrop },
+                        ]}
                         onPress={() => setPaywallVisible(false)}
                     />
 
-                    <View style={styles.paywallCard}>
+                    <View
+                        style={[
+                            styles.paywallCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.cyan,
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             style={styles.closeButton}
                             onPress={() => setPaywallVisible(false)}
                         >
-                            <Text style={styles.closeButtonText}>×</Text>
+                            <Text style={[styles.closeButtonText, { color: theme.text }]}>
+                                ×
+                            </Text>
                         </TouchableOpacity>
 
                         <Text style={styles.paywallEmoji}>♟️</Text>
 
-                        <Text style={styles.paywallTitle}>Support Just Move</Text>
+                        <Text style={[styles.paywallTitle, { color: theme.text }]}>
+                            Support ScoolFools
+                        </Text>
 
-                        <Text style={styles.paywallSubtitle}>
+                        <Text style={[styles.paywallSubtitle, { color: theme.textSoft }]}>
                             Help support independent chess journalism and modern chess media.
                         </Text>
 
-                        <View style={styles.priceBox}>
-                            <Text style={styles.freeTrialText}>1 Month Free</Text>
+                        <View
+                            style={[
+                                styles.priceBox,
+                                {
+                                    backgroundColor: theme.cardDeep,
+                                    borderColor: theme.border,
+                                },
+                            ]}
+                        >
+                            <Text style={[styles.freeTrialText, { color: theme.cyan }]}>
+                                1 Month Free
+                            </Text>
 
-                            <Text style={styles.priceText}>
+                            <Text style={[styles.priceText, { color: theme.text }]}>
                                 Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
                             </Text>
                         </View>
 
                         <TouchableOpacity
-                            style={styles.subscribeButton}
+                            style={[
+                                styles.subscribeButton,
+                                { backgroundColor: theme.cyan },
+                            ]}
                             activeOpacity={0.9}
                             onPress={handleSubscribePress}
                             disabled={loadingSubscription}
                         >
                             {loadingSubscription ? (
-                                <ActivityIndicator color="#050816" />
+                                <ActivityIndicator color={theme.darkText} />
                             ) : (
-                                <Text style={styles.subscribeButtonText}>Start Free Month</Text>
+                                <Text
+                                    style={[
+                                        styles.subscribeButtonText,
+                                        { color: theme.darkText },
+                                    ]}
+                                >
+                                    Start Free Month
+                                </Text>
                             )}
                         </TouchableOpacity>
 
-                        <Text style={styles.paywallFinePrint}>Cancel anytime.</Text>
+                        <Text style={[styles.paywallFinePrint, { color: theme.muted }]}>
+                            Cancel anytime.
+                        </Text>
                     </View>
                 </View>
             </Modal>
@@ -527,6 +652,7 @@ function SupportGrowthBanner({
     supporterCount,
     isSubscribed,
     onOpenBlogPaywall,
+    theme,
 }: any) {
     const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -550,102 +676,165 @@ function SupportGrowthBanner({
     });
 
     return (
-        <View style={styles.supportMissionCard}>
+        <View
+            style={[
+                styles.supportMissionCard,
+                {
+                    backgroundColor: theme.cardAlt,
+                    borderColor: theme.borderStrong,
+                },
+            ]}
+        >
             <View style={styles.supportTopRow}>
-                <Ionicons name="rocket" size={17} color="#39C0ED" />
+                <Ionicons name="rocket" size={17} color={theme.cyan} />
 
-                <Text style={styles.supportMissionTitle}>
-                    Just Move Supporters ♟️
+                <Text style={[styles.supportMissionTitle, { color: theme.text }]}>
+                    ScoolFools Subscribers 🤪🎓
                 </Text>
             </View>
 
-            <Text style={styles.supportMissionSubtitle}>
+            <Text style={[styles.supportMissionSubtitle, { color: theme.textSoft }]}>
                 {isSubscribed
                     ? "Thank you for helping us push chess forward."
                     : "Help us build the future of chess media."}
             </Text>
 
-            <View style={styles.progressBarWrap}>
-                <Animated.View style={[styles.progressFill, { width }]} />
+            <View
+                style={[
+                    styles.progressBarWrap,
+                    {
+                        backgroundColor:
+                            theme.mode === "day" ? "#E2E8F0" : "#0E1625",
+                    },
+                ]}
+            >
+                <Animated.View
+                    style={[
+                        styles.progressFill,
+                        {
+                            width,
+                            backgroundColor: theme.cyan,
+                            shadowColor: theme.cyan,
+                        },
+                    ]}
+                />
             </View>
 
             <View style={styles.progressMetaRow}>
-                <Text style={styles.progressCount}>
+                <Text style={[styles.progressCount, { color: theme.text }]}>
                     {supporterCount.toLocaleString()} Supporters
                 </Text>
 
-                <Text style={styles.progressGoal}>
+                <Text style={[styles.progressGoal, { color: theme.muted }]}>
                     Goal: {currentGoal.toLocaleString()}
                 </Text>
             </View>
 
             {!isSubscribed && (
                 <TouchableOpacity
-                    style={styles.supportSubscribeButton}
+                    style={[
+                        styles.supportSubscribeButton,
+                        { backgroundColor: theme.cyan },
+                    ]}
                     onPress={onOpenBlogPaywall}
                     activeOpacity={0.9}
                 >
-                    <Ionicons name="flash" size={16} color="#050816" />
-                    <Text style={styles.supportSubscribeText}>Start Free Month</Text>
+                    <Ionicons name="flash" size={16} color={theme.darkText} />
+                    <Text
+                        style={[
+                            styles.supportSubscribeText,
+                            { color: theme.darkText },
+                        ]}
+                    >
+                        Start Free Month
+                    </Text>
                 </TouchableOpacity>
             )}
         </View>
     );
 }
 
-function PartyGamesPromo({ navigation, gamesPackagePurchased }: any) {
+function PartyGamesPromo({ navigation, gamesPackagePurchased, theme }: any) {
     return (
         <TouchableOpacity
             activeOpacity={0.92}
-            style={styles.partyGamesCard}
+            style={[
+                styles.partyGamesCard,
+                {
+                    backgroundColor: theme.card,
+                    borderColor: theme.purple,
+                },
+            ]}
             onPress={() => navigation.navigate("GameHome")}
         >
             <View style={styles.partyGamesTopRow}>
                 <View style={styles.partyGamesLeft}>
-                    <Ionicons name="game-controller" size={20} color="#C084FF" />
+                    <Ionicons name="game-controller" size={20} color={theme.purple} />
 
-                    <Text style={styles.partyGamesTitle}>Party Games 🎉</Text>
+                    <Text style={[styles.partyGamesTitle, { color: theme.text }]}>
+                        Party Games 🎉
+                    </Text>
                 </View>
 
                 <View style={styles.inlineGamesRow}>
-                    <Ionicons name="happy-outline" size={16} color="#39C0ED" />
-                    <Ionicons name="people-outline" size={16} color="#35D07F" />
-                    <Ionicons name="help-outline" size={16} color="#FFD166" />
-                    <Ionicons name="timer-outline" size={16} color="#FF7A7A" />
+                    <Ionicons name="happy-outline" size={16} color={theme.cyan} />
+                    <Ionicons name="people-outline" size={16} color={theme.green} />
+                    <Ionicons name="help-outline" size={16} color={theme.yellow} />
+                    <Ionicons name="timer-outline" size={16} color={theme.red} />
                 </View>
             </View>
 
-            <Text style={styles.partyGamesSubtitle}>
+            <Text style={[styles.partyGamesSubtitle, { color: theme.textSoft }]}>
                 {gamesPackagePurchased
-                    ? "Share videos of your group playing Just Move Party Games ♟️🔥"
+                    ? "Share videos of your group playing ScoolFools Party Games ♟️🔥"
                     : "Fun social games for chess friends, clubs, and tournaments."}
             </Text>
         </TouchableOpacity>
     );
 }
 
-function SupporterBottomActions({ onSharePress, onRatePress }: any) {
+function SupporterBottomActions({ onSharePress, onRatePress, theme }: any) {
     return (
-        <View style={styles.bottomActionsCard}>
-            <Text style={styles.bottomActionsTitle}>Support Just Move</Text>
+        <View
+            style={[
+                styles.bottomActionsCard,
+                {
+                    backgroundColor: theme.cardAlt,
+                    borderColor: theme.border,
+                },
+            ]}
+        >
+            <Text style={[styles.bottomActionsTitle, { color: theme.text }]}>
+                Support ScoolFools
+            </Text>
 
             <View style={styles.bottomActionsRow}>
                 <TouchableOpacity
                     activeOpacity={0.85}
-                    style={styles.bottomShareButton}
+                    style={[
+                        styles.bottomShareButton,
+                        { backgroundColor: theme.green },
+                    ]}
                     onPress={onSharePress}
                 >
-                    <Ionicons name="share-social" size={17} color="#050816" />
-                    <Text style={styles.bottomShareText}>Share App</Text>
+                    <Ionicons name="share-social" size={17} color={theme.darkText} />
+                    <Text style={[styles.bottomShareText, { color: theme.darkText }]}>
+                        Share App
+                    </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     activeOpacity={0.85}
-                    style={styles.bottomRateButton}
+                    style={[
+                        styles.bottomRateButton,
+                        { backgroundColor: theme.purple },
+                    ]}
                     onPress={onRatePress}
                 >
-                    <Ionicons name="star" size={17} color="#050816" />
-                    <Text style={styles.bottomRateText}>Rate & Review</Text>
+                    <Ionicons name="star" size={17} color={theme.darkText} />
+                    <Text style={[styles.bottomRateText, { color: theme.darkText }]}>
+                        Rate & Review
+                    </Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -655,12 +844,10 @@ function SupporterBottomActions({ onSharePress, onRatePress }: any) {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000",
     },
 
     container: {
         flex: 1,
-        backgroundColor: "#000",
     },
 
     loadingContainer: {
@@ -680,7 +867,6 @@ const styles = StyleSheet.create({
     },
 
     sectionTitle: {
-        color: "#FFF",
         fontSize: ms(23),
         fontFamily: "Rajdhani_700Bold",
         marginBottom: vs(8),
@@ -688,7 +874,6 @@ const styles = StyleSheet.create({
     },
 
     sectionTitle2: {
-        color: "#FFF",
         fontSize: ms(18),
         fontFamily: "Rajdhani_700Bold",
         marginBottom: vs(8),
@@ -699,15 +884,14 @@ const styles = StyleSheet.create({
         width: s(58),
         height: vs(3),
         borderRadius: 999,
-        backgroundColor: "#1FD8FF",
     },
 
     supportMissionCard: {
-        backgroundColor: "#07111F",
         borderRadius: 20,
         paddingVertical: 10,
         paddingHorizontal: 13,
         marginBottom: 16,
+        borderWidth: 1,
     },
 
     supportTopRow: {
@@ -718,7 +902,6 @@ const styles = StyleSheet.create({
     },
 
     supportMissionTitle: {
-        color: "#FFF",
         fontSize: 15,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
@@ -726,7 +909,6 @@ const styles = StyleSheet.create({
     },
 
     supportMissionSubtitle: {
-        color: "#BFD8E8",
         fontSize: 11.5,
         marginBottom: 9,
         fontWeight: "700",
@@ -735,16 +917,13 @@ const styles = StyleSheet.create({
     progressBarWrap: {
         width: "100%",
         height: 7,
-        backgroundColor: "#0E1625",
         borderRadius: 999,
         overflow: "hidden",
     },
 
     progressFill: {
         height: "100%",
-        backgroundColor: "#39C0ED",
         borderRadius: 999,
-        shadowColor: "#39C0ED",
         shadowOpacity: 0.9,
         shadowRadius: 10,
         shadowOffset: {
@@ -761,19 +940,16 @@ const styles = StyleSheet.create({
     },
 
     progressCount: {
-        color: "#FFF",
         fontWeight: "800",
         fontSize: 11.5,
     },
 
     progressGoal: {
-        color: "#9FB7C7",
         fontWeight: "700",
         fontSize: 11.5,
     },
 
     supportSubscribeButton: {
-        backgroundColor: "#39C0ED",
         height: 36,
         borderRadius: 13,
         alignItems: "center",
@@ -784,16 +960,13 @@ const styles = StyleSheet.create({
     },
 
     supportSubscribeText: {
-        color: "#050816",
         fontWeight: "900",
         fontSize: 13,
     },
 
     partyGamesCard: {
-        backgroundColor: "#101320",
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: "#7746FF",
         paddingVertical: 12,
         paddingHorizontal: 14,
         marginTop: 28,
@@ -817,14 +990,12 @@ const styles = StyleSheet.create({
     },
 
     partyGamesTitle: {
-        color: "#FFF",
         fontSize: 17,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
     },
 
     partyGamesSubtitle: {
-        color: "#B8BED0",
         fontSize: 12,
         marginTop: 8,
         lineHeight: 16,
@@ -832,14 +1003,13 @@ const styles = StyleSheet.create({
 
     bottomActionsCard: {
         marginTop: 18,
-        backgroundColor: "#07111F",
         borderRadius: 18,
         paddingVertical: 13,
         paddingHorizontal: 13,
+        borderWidth: 1,
     },
 
     bottomActionsTitle: {
-        color: "#FFFFFF",
         fontSize: 15,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
@@ -855,7 +1025,6 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 42,
         borderRadius: 14,
-        backgroundColor: "#35D07F",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
@@ -866,7 +1035,6 @@ const styles = StyleSheet.create({
         flex: 1,
         height: 42,
         borderRadius: 14,
-        backgroundColor: "#C084FF",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
@@ -874,13 +1042,11 @@ const styles = StyleSheet.create({
     },
 
     bottomShareText: {
-        color: "#050816",
         fontSize: 12.5,
         fontWeight: "900",
     },
 
     bottomRateText: {
-        color: "#050816",
         fontSize: 12.5,
         fontWeight: "900",
     },
@@ -894,15 +1060,12 @@ const styles = StyleSheet.create({
 
     paywallBackdrop: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.82)",
     },
 
     paywallCard: {
         width: "100%",
-        backgroundColor: "#070A16",
         borderRadius: 28,
         borderWidth: 1.5,
-        borderColor: "#39C0ED",
         paddingHorizontal: 22,
         paddingTop: 26,
         paddingBottom: 22,
@@ -917,7 +1080,6 @@ const styles = StyleSheet.create({
     },
 
     closeButtonText: {
-        color: "#FFFFFF",
         fontSize: 28,
     },
 
@@ -927,7 +1089,6 @@ const styles = StyleSheet.create({
     },
 
     paywallTitle: {
-        color: "#FFFFFF",
         fontSize: 24,
         fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
@@ -936,7 +1097,6 @@ const styles = StyleSheet.create({
     },
 
     paywallSubtitle: {
-        color: "#C9D4E5",
         fontSize: 14,
         textAlign: "center",
         marginBottom: 16,
@@ -944,22 +1104,20 @@ const styles = StyleSheet.create({
 
     priceBox: {
         width: "100%",
-        backgroundColor: "#101827",
         borderRadius: 18,
         paddingVertical: 14,
         alignItems: "center",
         marginBottom: 18,
+        borderWidth: 1,
     },
 
     freeTrialText: {
-        color: "#39C0ED",
         fontSize: 28,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
     },
 
     priceText: {
-        color: "#FFFFFF",
         fontSize: 13,
         fontWeight: "800",
         marginTop: 4,
@@ -969,19 +1127,16 @@ const styles = StyleSheet.create({
         width: "100%",
         height: 50,
         borderRadius: 16,
-        backgroundColor: "#39C0ED",
         alignItems: "center",
         justifyContent: "center",
     },
 
     subscribeButtonText: {
-        color: "#050816",
         fontSize: 15,
         fontWeight: "900",
     },
 
     paywallFinePrint: {
-        color: "#7F8CA3",
         fontSize: 11,
         marginTop: 12,
     },

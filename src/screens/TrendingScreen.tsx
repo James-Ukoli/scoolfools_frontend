@@ -29,12 +29,10 @@ import {
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
-import {
-    useFonts,
-    Rajdhani_700Bold,
-} from "@expo-google-fonts/rajdhani";
+import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
 type ContentTab = "trending" | "blog";
+type TimeTheme = "day" | "night";
 
 type Post = {
     _id: string;
@@ -84,6 +82,61 @@ const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
+
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getScreenTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            mode,
+            bg: "#F8FAFC",
+            card: "#FFFFFF",
+            cardSoft: "#ECFEFF",
+            elevated: "#FFFFFF",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            text: "#07111F",
+            textSoft: "#334155",
+            muted: "#64748B",
+            cyan: "#06B6D4",
+            cyanSoft: "rgba(6,182,212,0.12)",
+            yellow: "#FACC15",
+            yellowSoft: "rgba(250,204,21,0.16)",
+            tabTrack: "#E2E8F0",
+            pill: "#FFFFFF",
+            pillBorder: "rgba(7,17,31,0.12)",
+            shadow: "#06B6D4",
+            modalBackdrop: "rgba(2,6,23,0.58)",
+            refreshBg: "#FFFFFF",
+        };
+    }
+
+    return {
+        mode,
+        bg: "#020617",
+        card: "#090D14",
+        cardSoft: "#07111F",
+        elevated: "#0F172A",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        cyan: "#22D3EE",
+        cyanSoft: "rgba(34,211,238,0.13)",
+        yellow: "#FACC15",
+        yellowSoft: "rgba(250,204,21,0.12)",
+        tabTrack: "#101417",
+        pill: "#111827",
+        pillBorder: "rgba(255,255,255,0.10)",
+        shadow: "#22D3EE",
+        modalBackdrop: "rgba(0,0,0,0.82)",
+        refreshBg: "#111827",
+    };
+};
 
 function formatTimeAgo(dateString: string) {
     const now = new Date();
@@ -140,6 +193,9 @@ export default function TrendingScreen({ navigation }: any) {
         Rajdhani_700Bold,
     });
 
+    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const theme = getScreenTheme(themeMode);
+
     const [activeTab, setActiveTab] = useState<ContentTab>("trending");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [posts, setPosts] = useState<Post[]>([]);
@@ -157,8 +213,16 @@ export default function TrendingScreen({ navigation }: any) {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const feedFadeAnim = useRef(new Animated.Value(1)).current;
 
-    const activeColor = activeTab === "trending" ? "#A3E635" : "#39C0ED";
+    const activeColor = activeTab === "trending" ? theme.yellow : theme.cyan;
     const categories = activeTab === "trending" ? TRENDING_CATEGORIES : BLOG_CATEGORIES;
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const getToken = async () => {
         return await AsyncStorage.getItem("token");
@@ -223,7 +287,6 @@ export default function TrendingScreen({ navigation }: any) {
     const loadBlogSubscription = async () => {
         try {
             await initializeIAP();
-
             const product = await getBlogsSubscriptionProduct();
             setSubscriptionProduct(product);
         } catch (error) {
@@ -280,7 +343,7 @@ export default function TrendingScreen({ navigation }: any) {
 
             await fetchEntitlements();
 
-            Alert.alert("Subscribed 🎉", "You now have access to Just Move blogs.");
+            Alert.alert("Subscribed 🎉", "You now have access to ScoolFools Blogs.");
         } catch (error) {
             console.log("Verify blog subscription error:", error);
 
@@ -426,7 +489,10 @@ export default function TrendingScreen({ navigation }: any) {
 
     if (loading || !fontsLoaded) {
         return (
-            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={[styles.safeArea, { backgroundColor: theme.bg }]}
+            >
                 <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={activeColor} />
@@ -436,7 +502,10 @@ export default function TrendingScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+        >
             <AppHeader />
 
             {refreshing && (
@@ -446,7 +515,7 @@ export default function TrendingScreen({ navigation }: any) {
             )}
 
             <ScrollView
-                style={styles.container}
+                style={[styles.container, { backgroundColor: theme.bg }]}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
                 onScroll={handleScroll}
@@ -457,20 +526,33 @@ export default function TrendingScreen({ navigation }: any) {
                         onRefresh={onRefresh}
                         tintColor={activeColor}
                         colors={[activeColor]}
-                        progressBackgroundColor="#111111"
+                        progressBackgroundColor={theme.refreshBg}
                     />
                 }
             >
-                <View style={styles.mainTabsOuter}>
+                <View
+                    style={[
+                        styles.mainTabsOuter,
+                        {
+                            backgroundColor: theme.tabTrack,
+                            borderColor: theme.border,
+                        },
+                    ]}
+                >
                     <Animated.View
                         style={[
                             styles.mainTabSlider,
                             {
-                                transform: [{ translateX: sliderTranslate }],
+                                backgroundColor:
+                                    activeTab === "trending"
+                                        ? theme.yellow
+                                        : theme.cyan,
                                 borderColor:
                                     activeTab === "trending"
-                                        ? "rgba(163,230,53,0.45)"
-                                        : "rgba(57,192,237,0.48)",
+                                        ? "rgba(250,204,21,0.60)"
+                                        : theme.borderStrong,
+                                shadowColor: activeColor,
+                                transform: [{ translateX: sliderTranslate }],
                             },
                         ]}
                     />
@@ -483,7 +565,11 @@ export default function TrendingScreen({ navigation }: any) {
                         <Text
                             style={[
                                 styles.mainTabText,
-                                activeTab === "trending" && styles.mainTabTextTrendingActive,
+                                { color: theme.textSoft },
+                                activeTab === "trending" && {
+                                    color: "#07111F",
+                                    textShadowColor: "transparent",
+                                },
                             ]}
                         >
                             Trending
@@ -498,7 +584,11 @@ export default function TrendingScreen({ navigation }: any) {
                         <Text
                             style={[
                                 styles.mainTabText,
-                                activeTab === "blog" && styles.mainTabTextBlogsActive,
+                                { color: theme.textSoft },
+                                activeTab === "blog" && {
+                                    color: "white",
+                                    textShadowColor: theme.cyan,
+                                },
                             ]}
                         >
                             Blogs
@@ -509,16 +599,23 @@ export default function TrendingScreen({ navigation }: any) {
                 {activeTab === "blog" && !isSubscribed && (
                     <TouchableOpacity
                         activeOpacity={0.9}
-                        style={styles.supportBanner}
+                        style={[
+                            styles.supportBanner,
+                            {
+                                backgroundColor: theme.cardSoft,
+                                borderColor: theme.cyan,
+                                shadowColor: theme.cyan,
+                            },
+                        ]}
                         onPress={() => {
                             setPaywallVisible(true);
                             loadBlogSubscription();
                         }}
                     >
-                        <Text style={styles.supportBannerTitle}>
-                            Support Just Move Blogs ♟️
+                        <Text style={[styles.supportBannerTitle, { color: theme.cyan }]}>
+                            Support Scool Fools Blogs ♟️
                         </Text>
-                        <Text style={styles.supportBannerText}>
+                        <Text style={[styles.supportBannerText, { color: theme.textSoft }]}>
                             Start with 1 month free and help shape the future of chess media for only $5.99/year ♟️
                         </Text>
                     </TouchableOpacity>
@@ -538,6 +635,10 @@ export default function TrendingScreen({ navigation }: any) {
                                 onPress={() => setSelectedCategory(category)}
                                 style={[
                                     styles.tabPill,
+                                    {
+                                        backgroundColor: theme.pill,
+                                        borderColor: theme.pillBorder,
+                                    },
                                     active && {
                                         backgroundColor: activeColor,
                                         borderColor: activeColor,
@@ -545,7 +646,13 @@ export default function TrendingScreen({ navigation }: any) {
                                 ]}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.tabText, active && styles.activeTabText]}>
+                                <Text
+                                    style={[
+                                        styles.tabText,
+                                        { color: theme.textSoft },
+                                        active && { color: "#07111F" },
+                                    ]}
+                                >
                                     {category}
                                 </Text>
                             </TouchableOpacity>
@@ -570,10 +677,11 @@ export default function TrendingScreen({ navigation }: any) {
                                     style={[
                                         styles.featuredCard,
                                         {
+                                            backgroundColor: theme.card,
                                             borderColor:
                                                 activeTab === "trending"
-                                                    ? "rgba(163,230,53,0.25)"
-                                                    : "rgba(57,192,237,0.28)",
+                                                    ? "rgba(250,204,21,0.34)"
+                                                    : theme.borderStrong,
                                             shadowColor: activeColor,
                                         },
                                     ]}
@@ -585,7 +693,14 @@ export default function TrendingScreen({ navigation }: any) {
                                         resizeMode="cover"
                                     >
                                         {activeTab === "blog" && !isSubscribed && (
-                                            <View style={styles.lockOverlay}>
+                                            <View
+                                                style={[
+                                                    styles.lockOverlay,
+                                                    {
+                                                        borderColor: theme.cyan,
+                                                    },
+                                                ]}
+                                            >
                                                 <Text style={styles.lockText}>🔒 Supporter Blog</Text>
                                             </View>
                                         )}
@@ -604,16 +719,27 @@ export default function TrendingScreen({ navigation }: any) {
                                         </View>
                                     </ImageBackground>
 
-                                    <View style={styles.featuredInfoBox}>
-                                        <Text style={styles.featuredTitle} numberOfLines={2}>
+                                    <View
+                                        style={[
+                                            styles.featuredInfoBox,
+                                            { backgroundColor: theme.card },
+                                        ]}
+                                    >
+                                        <Text
+                                            style={[styles.featuredTitle, { color: theme.text }]}
+                                            numberOfLines={2}
+                                        >
                                             {featuredPost.title}
                                         </Text>
 
-                                        <Text style={styles.featuredSummary} numberOfLines={1}>
+                                        <Text
+                                            style={[styles.featuredSummary, { color: theme.textSoft }]}
+                                            numberOfLines={1}
+                                        >
                                             {featuredPost.summary}
                                         </Text>
 
-                                        <Text style={styles.featuredMeta}>
+                                        <Text style={[styles.featuredMeta, { color: theme.muted }]}>
                                             {formatTimeAgo(featuredPost.created_at)}
                                         </Text>
                                     </View>
@@ -621,12 +747,7 @@ export default function TrendingScreen({ navigation }: any) {
                             </TouchableOpacity>
 
                             {topStories.length > 0 && (
-                                <Text
-                                    style={[
-                                        styles.sectionTitle,
-                                        { color: activeTab === "trending" ? "#F4D03F" : "#39C0ED" },
-                                    ]}
-                                >
+                                <Text style={[styles.sectionTitle, { color: activeColor }]}>
                                     {activeTab === "trending" ? "Recent Stories" : "Latest Blogs"}
                                 </Text>
                             )}
@@ -634,7 +755,13 @@ export default function TrendingScreen({ navigation }: any) {
                             {visibleTopStories.map((post) => (
                                 <TouchableOpacity
                                     key={post._id}
-                                    style={styles.storyRow}
+                                    style={[
+                                        styles.storyRow,
+                                        {
+                                            backgroundColor: theme.card,
+                                            borderColor: theme.border,
+                                        },
+                                    ]}
                                     activeOpacity={0.85}
                                     onPress={() => handleOpenPost(post)}
                                 >
@@ -645,18 +772,31 @@ export default function TrendingScreen({ navigation }: any) {
                                         />
 
                                         {activeTab === "blog" && !isSubscribed && (
-                                            <View style={styles.storyLockBadge}>
+                                            <View
+                                                style={[
+                                                    styles.storyLockBadge,
+                                                    {
+                                                        borderColor: theme.cyan,
+                                                    },
+                                                ]}
+                                            >
                                                 <Text style={styles.storyLockBadgeText}>🔒</Text>
                                             </View>
                                         )}
                                     </View>
 
                                     <View style={styles.storyContent}>
-                                        <Text style={styles.storyTitle} numberOfLines={2}>
+                                        <Text
+                                            style={[styles.storyTitle, { color: theme.text }]}
+                                            numberOfLines={2}
+                                        >
                                             {post.title}
                                         </Text>
 
-                                        <Text style={styles.storySummary} numberOfLines={2}>
+                                        <Text
+                                            style={[styles.storySummary, { color: theme.textSoft }]}
+                                            numberOfLines={2}
+                                        >
                                             {post.summary}
                                         </Text>
 
@@ -672,7 +812,7 @@ export default function TrendingScreen({ navigation }: any) {
                                                 </Text>
                                             </View>
 
-                                            <Text style={styles.storyMetaText}>
+                                            <Text style={[styles.storyMetaText, { color: theme.muted }]}>
                                                 {formatTimeAgo(post.created_at)}
                                             </Text>
                                         </View>
@@ -683,7 +823,7 @@ export default function TrendingScreen({ navigation }: any) {
                             {loadingMore && (
                                 <View style={styles.loadMoreWrap}>
                                     <ActivityIndicator size="small" color={activeColor} />
-                                    <Text style={styles.loadMoreText}>
+                                    <Text style={[styles.loadMoreText, { color: activeColor }]}>
                                         Loading more {activeTab === "trending" ? "stories" : "blogs"}...
                                     </Text>
                                 </View>
@@ -691,7 +831,7 @@ export default function TrendingScreen({ navigation }: any) {
 
                             {!loadingMore && hasMoreStories && (
                                 <View style={styles.loadMoreHintWrap}>
-                                    <Text style={styles.loadMoreHintText}>
+                                    <Text style={[styles.loadMoreHintText, { color: theme.muted }]}>
                                         Scroll for more {activeTab === "trending" ? "stories" : "blogs"}
                                     </Text>
                                 </View>
@@ -699,7 +839,7 @@ export default function TrendingScreen({ navigation }: any) {
                         </>
                     ) : (
                         <View style={styles.emptyState}>
-                            <Text style={styles.emptyStateText}>
+                            <Text style={[styles.emptyStateText, { color: theme.muted }]}>
                                 No {activeTab === "trending" ? "trending posts" : "blog posts"} in this category yet.
                             </Text>
                         </View>
@@ -715,49 +855,83 @@ export default function TrendingScreen({ navigation }: any) {
             >
                 <View style={styles.paywallOverlay}>
                     <Pressable
-                        style={styles.paywallBackdrop}
+                        style={[
+                            styles.paywallBackdrop,
+                            { backgroundColor: theme.modalBackdrop },
+                        ]}
                         onPress={() => setPaywallVisible(false)}
                     />
 
-                    <View style={styles.paywallCard}>
+                    <View
+                        style={[
+                            styles.paywallCard,
+                            {
+                                backgroundColor: theme.elevated,
+                                borderColor: theme.cyan,
+                                shadowColor: theme.cyan,
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
-                            style={styles.closeButton}
+                            style={[
+                                styles.closeButton,
+                                {
+                                    backgroundColor:
+                                        theme.mode === "day" ? "#E2E8F0" : "#111827",
+                                },
+                            ]}
                             onPress={() => setPaywallVisible(false)}
                         >
-                            <Text style={styles.closeButtonText}>×</Text>
+                            <Text style={[styles.closeButtonText, { color: theme.text }]}>×</Text>
                         </TouchableOpacity>
 
                         <Text style={styles.paywallEmoji}>♟️</Text>
 
-                        <Text style={styles.paywallTitle}>
-                            Support Just Move Blogs
+                        <Text style={[styles.paywallTitle, { color: theme.text }]}>
+                            Support ScoolFools Blogs
                         </Text>
 
-                        <Text style={styles.paywallSubtitle}>
+                        <Text style={[styles.paywallSubtitle, { color: theme.textSoft }]}>
                             Help support independent chess journalism and the future of modern chess media.
                         </Text>
 
-                        <View style={styles.priceBox}>
-                            <Text style={styles.freeTrialText}>1 Month Free</Text>
-                            <Text style={styles.priceText}>
+                        <View
+                            style={[
+                                styles.priceBox,
+                                {
+                                    backgroundColor: theme.cardSoft,
+                                    borderColor: theme.borderStrong,
+                                },
+                            ]}
+                        >
+                            <Text style={[styles.freeTrialText, { color: theme.cyan }]}>
+                                1 Month Free
+                            </Text>
+                            <Text style={[styles.priceText, { color: theme.text }]}>
                                 Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
                             </Text>
                         </View>
 
                         <View style={styles.benefitsBox}>
-                            <Text style={styles.benefitText}>✓ Exclusive blogs and stories</Text>
-                            <Text style={styles.benefitText}>✓ Support independent chess coverage</Text>
-                            <Text style={styles.benefitText}>✓ Help grow modern chess media</Text>
+                            <Text style={[styles.benefitText, { color: theme.text }]}>
+                                ✓ Exclusive blogs and stories
+                            </Text>
+                            <Text style={[styles.benefitText, { color: theme.text }]}>
+                                ✓ Support independent chess coverage
+                            </Text>
+                            <Text style={[styles.benefitText, { color: theme.text }]}>
+                                ✓ Help grow modern chess media
+                            </Text>
                         </View>
 
                         <TouchableOpacity
-                            style={styles.subscribeButton}
+                            style={[styles.subscribeButton, { backgroundColor: theme.cyan }]}
                             activeOpacity={0.9}
                             onPress={handleSubscribePress}
                             disabled={loadingSubscription}
                         >
                             {loadingSubscription ? (
-                                <ActivityIndicator color="#050816" />
+                                <ActivityIndicator color="#07111F" />
                             ) : (
                                 <Text style={styles.subscribeButtonText}>
                                     Start Free Month
@@ -765,7 +939,7 @@ export default function TrendingScreen({ navigation }: any) {
                             )}
                         </TouchableOpacity>
 
-                        <Text style={styles.paywallFinePrint}>
+                        <Text style={[styles.paywallFinePrint, { color: theme.muted }]}>
                             Cancel anytime. Subscription renews yearly after the free trial.
                         </Text>
                     </View>
@@ -789,11 +963,9 @@ export default function TrendingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     container: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     contentContainer: {
         paddingHorizontal: 16,
@@ -812,9 +984,7 @@ const styles = StyleSheet.create({
     mainTabsOuter: {
         height: 50,
         borderRadius: 999,
-        backgroundColor: "#101417",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.08)",
         padding: 4,
         marginTop: 14,
         marginBottom: 14,
@@ -829,8 +999,11 @@ const styles = StyleSheet.create({
         width: "50%",
         height: 42,
         borderRadius: 999,
-        backgroundColor: "#1B2226",
         borderWidth: 1,
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6,
     },
     mainTabButton: {
         flex: 1,
@@ -841,46 +1014,30 @@ const styles = StyleSheet.create({
         zIndex: 2,
     },
     mainTabText: {
-        color: "#FFFFFF",
         fontSize: 17,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.55,
-    },
-    mainTabTextTrendingActive: {
-        color: "#A3E635",
-        textShadowColor: "#A3E635",
         textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 14,
-    },
-    mainTabTextBlogsActive: {
-        color: "#39C0ED",
-        textShadowColor: "#39C0ED",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 14,
+        textShadowRadius: 12,
     },
 
     supportBanner: {
-        backgroundColor: "#07111F",
-        borderColor: "#39C0ED",
         borderWidth: 1,
         borderRadius: 20,
         paddingVertical: 13,
         paddingHorizontal: 14,
         marginBottom: 14,
-        shadowColor: "#39C0ED",
         shadowOpacity: 0.18,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
     },
     supportBannerTitle: {
-        color: "#39C0ED",
         fontSize: 19,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.45,
         marginBottom: 4,
     },
     supportBannerText: {
-        color: "#D6D6D6",
         fontSize: 13,
         lineHeight: 18,
         fontWeight: "700",
@@ -894,19 +1051,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 7,
         borderRadius: 999,
-        backgroundColor: "#171717",
         borderWidth: 1.2,
-        borderColor: "#2B2B2B",
         marginRight: 8,
     },
     tabText: {
-        color: "#EAEAEA",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
-    },
-    activeTabText: {
-        color: "#111111",
     },
 
     featuredWrapper: {
@@ -915,7 +1066,6 @@ const styles = StyleSheet.create({
     featuredCard: {
         borderRadius: 24,
         overflow: "hidden",
-        backgroundColor: "#090D14",
         borderWidth: 1,
         shadowOpacity: 0.2,
         shadowRadius: 16,
@@ -939,10 +1089,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 14,
         paddingTop: 11,
         paddingBottom: 12,
-        backgroundColor: "#090D14",
     },
     featuredTitle: {
-        color: "#FFFFFF",
         fontSize: 22,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
@@ -950,13 +1098,11 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     featuredSummary: {
-        color: "#D6D6D6",
         fontSize: 13,
         lineHeight: 17,
         marginTop: 6,
     },
     featuredMeta: {
-        color: "#BFC7D4",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.3,
@@ -988,11 +1134,9 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "flex-start",
         marginBottom: 14,
-        backgroundColor: "#090D14",
         borderRadius: 18,
         padding: 10,
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.06)",
     },
     storyImage: {
         width: 96,
@@ -1008,7 +1152,6 @@ const styles = StyleSheet.create({
         paddingVertical: 1,
     },
     storyTitle: {
-        color: "#FFFFFF",
         fontSize: 18,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.25,
@@ -1016,7 +1159,6 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     storySummary: {
-        color: "#C8C8C8",
         fontSize: 13,
         lineHeight: 17,
         marginBottom: 8,
@@ -1028,7 +1170,6 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     storyMetaText: {
-        color: "#CFCFCF",
         fontSize: 12,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.25,
@@ -1055,7 +1196,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 6,
         borderWidth: 1,
-        borderColor: "#39C0ED",
     },
     lockText: {
         color: "#FFFFFF",
@@ -1074,7 +1214,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         borderWidth: 1,
-        borderColor: "#39C0ED",
     },
     storyLockBadgeText: {
         fontSize: 12,
@@ -1086,7 +1225,6 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
     loadMoreText: {
-        color: "#D7E8B5",
         fontSize: 14,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.3,
@@ -1098,7 +1236,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     loadMoreHintText: {
-        color: "#9AAC76",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.3,
@@ -1108,7 +1245,6 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     emptyStateText: {
-        color: "#BDBDBD",
         fontSize: 17,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
@@ -1122,19 +1258,15 @@ const styles = StyleSheet.create({
     },
     paywallBackdrop: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.82)",
     },
     paywallCard: {
         width: "100%",
-        backgroundColor: "#070A16",
         borderRadius: 28,
         borderWidth: 1.5,
-        borderColor: "#39C0ED",
         paddingHorizontal: 22,
         paddingTop: 26,
         paddingBottom: 20,
         alignItems: "center",
-        shadowColor: "#39C0ED",
         shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.45,
         shadowRadius: 24,
@@ -1147,12 +1279,10 @@ const styles = StyleSheet.create({
         width: 34,
         height: 34,
         borderRadius: 17,
-        backgroundColor: "#111827",
         alignItems: "center",
         justifyContent: "center",
     },
     closeButtonText: {
-        color: "#FFFFFF",
         fontSize: 26,
         lineHeight: 28,
         fontWeight: "700",
@@ -1162,7 +1292,6 @@ const styles = StyleSheet.create({
         marginBottom: 10,
     },
     paywallTitle: {
-        color: "#FFFFFF",
         fontSize: 25,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
@@ -1170,7 +1299,6 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     paywallSubtitle: {
-        color: "#C9D4E5",
         fontSize: 14,
         lineHeight: 21,
         fontWeight: "700",
@@ -1179,22 +1307,18 @@ const styles = StyleSheet.create({
     },
     priceBox: {
         width: "100%",
-        backgroundColor: "#101827",
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: "#1E4660",
         paddingVertical: 14,
         alignItems: "center",
         marginBottom: 16,
     },
     freeTrialText: {
-        color: "#39C0ED",
         fontSize: 30,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.4,
     },
     priceText: {
-        color: "#FFFFFF",
         fontSize: 13,
         fontWeight: "800",
         marginTop: 4,
@@ -1205,7 +1329,6 @@ const styles = StyleSheet.create({
         marginBottom: 18,
     },
     benefitText: {
-        color: "#FFFFFF",
         fontSize: 13.5,
         fontWeight: "800",
         marginBottom: 8,
@@ -1214,19 +1337,17 @@ const styles = StyleSheet.create({
         width: "100%",
         height: 50,
         borderRadius: 16,
-        backgroundColor: "#39C0ED",
         alignItems: "center",
         justifyContent: "center",
         marginBottom: 12,
     },
     subscribeButtonText: {
-        color: "#050816",
+        color: "#07111F",
         fontSize: 16,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
     },
     paywallFinePrint: {
-        color: "#7E96A5",
         fontSize: 11,
         lineHeight: 16,
         textAlign: "center",

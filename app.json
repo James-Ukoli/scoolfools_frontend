@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Just Move",
-    "slug": "frontend",
-    "version": "1.2.5",
+    "name": "ScoolFools",
+    "slug": "scoolfools",
+    "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "scoolfools",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {

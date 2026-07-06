@@ -1,20 +1,20 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { jwtDecode } from "jwt-decode";
 
 import BottomTabs from "./src/navigation/BottomTabs";
 import ArticleScreen from "./src/screens/ArticleScreen";
-import { StatusBar } from "expo-status-bar";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import MenuScreen from "./src/screens/MenuScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
-import { useEffect, useState } from "react";
-import { NotificationsProvider } from "./src/context/NotificationsContext";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { View, ActivityIndicator } from "react-native";
 import ContactUsScreen from "./src/screens/ContactUsScreen";
 import EventsScreen from "./src/screens/EventsScreen";
 import ReviewerLoginScreen from "./src/screens/ReviewerLoginScreen";
@@ -27,7 +27,7 @@ import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScr
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
 import TVScreen from "./src/screens/TVScreen";
-import { jwtDecode } from "jwt-decode";
+import { NotificationsProvider } from "./src/context/NotificationsContext";
 
 const Stack = createNativeStackNavigator();
 
@@ -86,11 +86,11 @@ export default function App() {
                         flex: 1,
                         justifyContent: "center",
                         alignItems: "center",
-                        backgroundColor: "#000",
+                        backgroundColor: "#06B6D4",
                     }}
                 >
-                    <StatusBar style="light" />
-                    <ActivityIndicator size="large" color="#fff" />
+                    <StatusBar style="dark" backgroundColor="#06B6D4" />
+                    <ActivityIndicator size="large" color="#07111F" />
                 </View>
             </SafeAreaProvider>
         );
@@ -100,10 +100,17 @@ export default function App() {
         <SafeAreaProvider>
             <NotificationsProvider>
                 <NavigationContainer>
-                    <StatusBar style="light" />
+                    <StatusBar style="dark" backgroundColor="#06B6D4" />
+
                     <Stack.Navigator
                         initialRouteName={initialRoute}
-                        screenOptions={{ headerShown: false }}
+                        screenOptions={{
+                            headerShown: false,
+                            animation: "none",
+                            contentStyle: {
+                                backgroundColor: "#FFFFFF",
+                            },
+                        }}
                     >
                         <Stack.Screen name="GoogleSignIn" component={GoogleSignInScreen} />
                         <Stack.Screen name="MainTabs" component={BottomTabs} />

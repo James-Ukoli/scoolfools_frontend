@@ -25,6 +25,8 @@ import * as WebBrowser from "expo-web-browser";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import YoutubePlayer from "react-native-youtube-iframe";
 
+type TimeTheme = "day" | "night";
+
 type PostBlock = {
     _id: string;
     post_id: string;
@@ -68,6 +70,49 @@ const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
+
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getArticleTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            bg: "#F8FAFC",
+            card: "#FFFFFF",
+            cardAlt: "#F1F5F9",
+            text: "#07111F",
+            textSoft: "#475569",
+            muted: "#64748B",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            cyan: "#06B6D4",
+            cyanSoft: "rgba(6,182,212,0.10)",
+            yellow: "#FACC15",
+            shadow: "#06B6D4",
+            icon: "#07111F",
+            previewBg: "#000000",
+        };
+    }
+
+    return {
+        bg: "#020617",
+        card: "#090D14",
+        cardAlt: "#050A10",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        cyan: "#22D3EE",
+        cyanSoft: "rgba(34,211,238,0.10)",
+        yellow: "#FACC15",
+        shadow: "#22D3EE",
+        icon: "#FFFFFF",
+        previewBg: "#000000",
+    };
+};
 
 function FadeInBlock({
     index,
@@ -123,6 +168,9 @@ export default function ArticleScreen() {
     const navigation = useNavigation<any>();
     const { slug } = route.params;
 
+    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const theme = getArticleTheme(themeMode);
+
     const [post, setPost] = useState<Post | null>(null);
     const [blocks, setBlocks] = useState<PostBlock[]>([]);
     const [loading, setLoading] = useState(true);
@@ -147,6 +195,14 @@ export default function ArticleScreen() {
     const heroTranslate = useRef(new Animated.Value(18)).current;
     const headerFade = useRef(new Animated.Value(0)).current;
     const headerTranslate = useRef(new Animated.Value(18)).current;
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         Animated.sequence([
@@ -246,7 +302,7 @@ export default function ArticleScreen() {
         try {
             await Share.share({
                 title: post.title,
-                message: `${post.title}\n\n${post.summary}\n\nRead on Just Move`,
+                message: `${post.title}\n\n${post.summary}\n\nRead on ScoolFools`,
             });
         } catch (error) {
             console.log("Share error:", error);
@@ -476,21 +532,32 @@ export default function ArticleScreen() {
         switch (block.block_type) {
             case "header":
                 return (
-                    <Text style={styles.blockHeader}>
+                    <Text
+                        style={[
+                            styles.blockHeader,
+                            {
+                                color: theme.text,
+                                textShadowColor:
+                                    themeMode === "night"
+                                        ? "rgba(34,211,238,0.25)"
+                                        : "transparent",
+                            },
+                        ]}
+                    >
                         {block.input}
                     </Text>
                 );
 
             case "subheader":
                 return (
-                    <Text style={styles.subheader}>
+                    <Text style={[styles.subheader, { color: theme.text }]}>
                         {block.input}
                     </Text>
                 );
 
             case "paragraph":
                 return (
-                    <Text style={styles.paragraph}>
+                    <Text style={[styles.paragraph, { color: theme.textSoft }]}>
                         {block.input}
                     </Text>
                 );
@@ -498,12 +565,21 @@ export default function ArticleScreen() {
             case "image":
                 return (
                     <Pressable
-                        style={styles.mediaBlock}
+                        style={[
+                            styles.mediaBlock,
+                            {
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.borderStrong,
+                            },
+                        ]}
                         onPress={() => setPreviewImage(block.input)}
                     >
                         <Image
                             source={{ uri: block.input }}
-                            style={styles.blockImage}
+                            style={[
+                                styles.blockImage,
+                                { backgroundColor: theme.cardAlt },
+                            ]}
                             resizeMode="contain"
                             onError={() => console.log("Block image failed:", block.input)}
                         />
@@ -512,27 +588,55 @@ export default function ArticleScreen() {
 
             case "caption":
                 return (
-                    <Text style={styles.caption}>
+                    <Text style={[styles.caption, { color: theme.muted }]}>
                         {block.input}
                     </Text>
                 );
 
             case "quote":
                 return (
-                    <View style={styles.quoteContainer}>
-                        <View style={styles.quoteAccent} />
-                        <Text style={styles.quoteText}>{block.input}</Text>
+                    <View
+                        style={[
+                            styles.quoteContainer,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.borderStrong,
+                                shadowColor: theme.shadow,
+                            },
+                        ]}
+                    >
+                        <View
+                            style={[
+                                styles.quoteAccent,
+                                {
+                                    backgroundColor: theme.cyan,
+                                    shadowColor: theme.cyan,
+                                },
+                            ]}
+                        />
+                        <Text style={[styles.quoteText, { color: theme.text }]}>
+                            {block.input}
+                        </Text>
                     </View>
                 );
 
             case "link":
                 return (
                     <Pressable
-                        style={styles.linkCard}
+                        style={[
+                            styles.linkCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.borderStrong,
+                            },
+                        ]}
                         onPress={() => openExternalLink(block.input)}
                     >
-                        <Ionicons name="link-outline" size={18} color="#3CF2FF" />
-                        <Text style={styles.linkText} numberOfLines={1}>
+                        <Ionicons name="link-outline" size={18} color={theme.cyan} />
+                        <Text
+                            style={[styles.linkText, { color: theme.text }]}
+                            numberOfLines={1}
+                        >
                             {block.input}
                         </Text>
                     </Pressable>
@@ -540,10 +644,20 @@ export default function ArticleScreen() {
 
             case "pgn":
                 return (
-                    <View style={styles.pgnContainer}>
-                        <Text style={styles.pgnLabel}>PGN</Text>
+                    <View
+                        style={[
+                            styles.pgnContainer,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.borderStrong,
+                            },
+                        ]}
+                    >
+                        <Text style={[styles.pgnLabel, { color: theme.cyan }]}>PGN</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            <Text style={styles.pgnText}>{block.input}</Text>
+                            <Text style={[styles.pgnText, { color: theme.textSoft }]}>
+                                {block.input}
+                            </Text>
                         </ScrollView>
                     </View>
                 );
@@ -554,19 +668,44 @@ export default function ArticleScreen() {
                 if (!youtubeId) {
                     return (
                         <Pressable
-                            style={styles.videoPreviewCard}
+                            style={[
+                                styles.videoPreviewCard,
+                                {
+                                    backgroundColor: theme.cardAlt,
+                                    borderColor: theme.borderStrong,
+                                },
+                            ]}
                             onPress={() => openExternalLink(block.input)}
                         >
-                            <View style={styles.videoFallback}>
-                                <Ionicons name="play-circle-outline" size={42} color="#FFFFFF" />
-                                <Text style={styles.videoOverlayText}>OPEN VIDEO</Text>
+                            <View
+                                style={[
+                                    styles.videoFallback,
+                                    { backgroundColor: theme.cardAlt },
+                                ]}
+                            >
+                                <Ionicons
+                                    name="play-circle-outline"
+                                    size={42}
+                                    color={theme.icon}
+                                />
+                                <Text style={[styles.videoOverlayText, { color: theme.text }]}>
+                                    OPEN VIDEO
+                                </Text>
                             </View>
                         </Pressable>
                     );
                 }
 
                 return (
-                    <View style={styles.articleVideoCard}>
+                    <View
+                        style={[
+                            styles.articleVideoCard,
+                            {
+                                backgroundColor: "#000000",
+                                borderColor: theme.borderStrong,
+                            },
+                        ]}
+                    >
                         <YoutubePlayer
                             height={vs(210)}
                             width={s(340)}
@@ -591,12 +730,28 @@ export default function ArticleScreen() {
 
     if (loading) {
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.loadingContainer}>
-                    <View style={styles.loadingOrb}>
-                        <ActivityIndicator size="small" color="#3CF2FF" />
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
+                <View
+                    style={[
+                        styles.loadingContainer,
+                        { backgroundColor: theme.bg },
+                    ]}
+                >
+                    <View
+                        style={[
+                            styles.loadingOrb,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.borderStrong,
+                                shadowColor: theme.shadow,
+                            },
+                        ]}
+                    >
+                        <ActivityIndicator size="small" color={theme.cyan} />
                     </View>
-                    <Text style={styles.loadingText}>Loading article feed...</Text>
+                    <Text style={[styles.loadingText, { color: theme.cyan }]}>
+                        Loading article feed...
+                    </Text>
                 </View>
             </SafeAreaView>
         );
@@ -604,47 +759,115 @@ export default function ArticleScreen() {
 
     if (!post) {
         return (
-            <SafeAreaView style={styles.safeArea}>
-                <View style={styles.loadingContainer}>
-                    <Text style={styles.errorText}>Article not found.</Text>
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
+                <View
+                    style={[
+                        styles.loadingContainer,
+                        { backgroundColor: theme.bg },
+                    ]}
+                >
+                    <Text style={[styles.errorText, { color: theme.text }]}>
+                        Article not found.
+                    </Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView edges={["top"]} style={styles.safeArea}>
-            <Animated.View style={[styles.screen, { opacity: screenFade }]}>
+        <SafeAreaView
+            edges={["top"]}
+            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+        >
+            <Animated.View
+                style={[
+                    styles.screen,
+                    {
+                        opacity: screenFade,
+                        backgroundColor: theme.bg,
+                    },
+                ]}
+            >
                 <ScrollView
                     ref={scrollRef}
-                    style={styles.container}
+                    style={[styles.container, { backgroundColor: theme.bg }]}
                     contentContainerStyle={styles.contentContainer}
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.topRow}>
                         <View style={styles.leftActions}>
                             <Pressable
-                                style={styles.backButton}
+                                style={[
+                                    styles.backButton,
+                                    {
+                                        backgroundColor: theme.card,
+                                        borderColor: theme.borderStrong,
+                                        shadowColor: theme.shadow,
+                                    },
+                                ]}
                                 onPress={() => navigation.goBack()}
                             >
-                                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                                <Ionicons name="arrow-back" size={20} color={theme.icon} />
                             </Pressable>
 
                             {!!post.category && (
-                                <View style={styles.categoryChip}>
-                                    <Text style={styles.categoryChipText}>{post.category}</Text>
+                                <View
+                                    style={[
+                                        styles.categoryChip,
+                                        {
+                                            backgroundColor: theme.card,
+                                            borderColor: theme.borderStrong,
+                                        },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.categoryChipText,
+                                            { color: theme.cyan },
+                                        ]}
+                                    >
+                                        {post.category}
+                                    </Text>
                                 </View>
                             )}
 
                             {!!post.content_type && (
-                                <View style={styles.typeChip}>
-                                    <Text style={styles.typeChipText}>{post.content_type}</Text>
+                                <View
+                                    style={[
+                                        styles.typeChip,
+                                        {
+                                            backgroundColor: theme.card,
+                                            borderColor: theme.border,
+                                        },
+                                    ]}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.typeChipText,
+                                            { color: theme.text },
+                                        ]}
+                                    >
+                                        {post.content_type}
+                                    </Text>
                                 </View>
                             )}
                         </View>
 
-                        <Pressable style={styles.shareButton} onPress={handleShare}>
-                            <Ionicons name="share-social-outline" size={18} color="#FFFFFF" />
+                        <Pressable
+                            style={[
+                                styles.shareButton,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.border,
+                                },
+                            ]}
+                            onPress={handleShare}
+                        >
+                            <Ionicons
+                                name="share-social-outline"
+                                size={18}
+                                color={theme.icon}
+                            />
                         </Pressable>
                     </View>
 
@@ -660,10 +883,27 @@ export default function ArticleScreen() {
                         >
                             <Image
                                 source={{ uri: post.cover_image_url }}
-                                style={styles.heroImage}
+                                style={[
+                                    styles.heroImage,
+                                    {
+                                        backgroundColor: theme.cardAlt,
+                                        borderColor: theme.borderStrong,
+                                    },
+                                ]}
                                 resizeMode="contain"
                             />
-                            <View pointerEvents="none" style={styles.heroGlow} />
+                            <View
+                                pointerEvents="none"
+                                style={[
+                                    styles.heroGlow,
+                                    {
+                                        backgroundColor:
+                                            themeMode === "day"
+                                                ? "rgba(6,182,212,0.10)"
+                                                : "rgba(34,211,238,0.11)",
+                                    },
+                                ]}
+                            />
                         </Animated.View>
                     )}
 
@@ -676,16 +916,43 @@ export default function ArticleScreen() {
                             },
                         ]}
                     >
+                        <Text
+                            style={[
+                                styles.title,
+                                {
+                                    color: theme.text,
+                                    textShadowColor:
+                                        themeMode === "night"
+                                            ? "rgba(34,211,238,0.35)"
+                                            : "transparent",
+                                },
+                            ]}
+                        >
+                            {post.title}
+                        </Text>
 
+                        {!!post.summary && (
+                            <Text style={[styles.summary, { color: theme.textSoft }]}>
+                                {post.summary}
+                            </Text>
+                        )}
 
-                        <Text style={styles.title}>{post.title}</Text>
-
-                        {!!post.summary && <Text style={styles.summary}>{post.summary}</Text>}
-
-                        <View style={styles.metaCard}>
-                            <Ionicons name="person-circle-outline" size={17} color="#3CF2FF" />
-                            <Text style={styles.metaText}>
-                                {post.author || "Just Move"} · {displayDate}
+                        <View
+                            style={[
+                                styles.metaCard,
+                                {
+                                    backgroundColor: theme.card,
+                                    borderColor: theme.border,
+                                },
+                            ]}
+                        >
+                            <Ionicons
+                                name="person-circle-outline"
+                                size={17}
+                                color={theme.cyan}
+                            />
+                            <Text style={[styles.metaText, { color: theme.muted }]}>
+                                {post.author || "ScoolFools"} · {displayDate}
                             </Text>
                         </View>
 
@@ -693,21 +960,29 @@ export default function ArticleScreen() {
                             onPress={handleToggleNarration}
                             style={({ pressed }) => [
                                 styles.aiChip,
-                                isPlaying && styles.aiChipActive,
+                                {
+                                    backgroundColor: theme.cyanSoft,
+                                    borderColor: theme.borderStrong,
+                                },
+                                isPlaying && {
+                                    backgroundColor: theme.cyanSoft,
+                                    borderColor: theme.cyan,
+                                    shadowColor: theme.shadow,
+                                },
                                 pressed && styles.aiChipPressed,
                             ]}
                         >
                             {isGeneratingNarration ? (
-                                <ActivityIndicator color="#3CF2FF" size="small" />
+                                <ActivityIndicator color={theme.cyan} size="small" />
                             ) : (
                                 <Ionicons
                                     name={isPlaying ? "volume-high" : "sparkles-outline"}
                                     size={14}
-                                    color="#3CF2FF"
+                                    color={theme.cyan}
                                 />
                             )}
 
-                            <Text style={styles.aiDisclosure}>
+                            <Text style={[styles.aiDisclosure, { color: theme.cyan }]}>
                                 {isGeneratingNarration
                                     ? "Preparing narration..."
                                     : isPlaying
@@ -732,7 +1007,7 @@ export default function ArticleScreen() {
                             style={styles.closePreview}
                             onPress={() => setPreviewImage(null)}
                         >
-                            <Ionicons name="close" size={30} color="#fff" />
+                            <Ionicons name="close" size={30} color="#FFFFFF" />
                         </Pressable>
 
                         <ScrollView
@@ -753,9 +1028,18 @@ export default function ArticleScreen() {
 
                 <Pressable
                     onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-                    style={styles.scrollTopArrow}
+                    style={[
+                        styles.scrollTopArrow,
+                        {
+                            backgroundColor:
+                                themeMode === "day"
+                                    ? "rgba(255,255,255,0.92)"
+                                    : "rgba(5,10,16,0.82)",
+                            borderColor: theme.border,
+                        },
+                    ]}
                 >
-                    <Ionicons name="arrow-up" size={24} color="#FFFFFF" />
+                    <Ionicons name="arrow-up" size={24} color={theme.icon} />
                 </Pressable>
 
                 <Animated.View
@@ -773,6 +1057,7 @@ export default function ArticleScreen() {
                                 style={[
                                     styles.ttsRipple,
                                     {
+                                        backgroundColor: theme.cyan,
                                         opacity: rippleAnim1.interpolate({
                                             inputRange: [0, 1],
                                             outputRange: [0.35, 0],
@@ -793,6 +1078,7 @@ export default function ArticleScreen() {
                                 style={[
                                     styles.ttsRipple,
                                     {
+                                        backgroundColor: theme.cyan,
                                         opacity: rippleAnim2.interpolate({
                                             inputRange: [0, 1],
                                             outputRange: [0.24, 0],
@@ -815,7 +1101,16 @@ export default function ArticleScreen() {
                         onPress={handleToggleNarration}
                         style={({ pressed }) => [
                             styles.ttsButton,
-                            (isPlaying || isGeneratingNarration) && styles.ttsButtonActive,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.borderStrong,
+                                shadowColor: theme.shadow,
+                            },
+                            (isPlaying || isGeneratingNarration) && {
+                                backgroundColor:
+                                    themeMode === "day" ? theme.cyan : "#06202B",
+                                borderColor: theme.cyan,
+                            },
                             pressed && styles.ttsButtonPressed,
                         ]}
                     >
@@ -825,7 +1120,7 @@ export default function ArticleScreen() {
                             <Ionicons
                                 name={isPlaying ? "volume-high" : "volume-medium"}
                                 size={24}
-                                color="#FFFFFF"
+                                color={isPlaying || themeMode === "night" ? "#FFFFFF" : theme.icon}
                             />
                         )}
                     </Pressable>
@@ -838,15 +1133,12 @@ export default function ArticleScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     screen: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     container: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     contentContainer: {
         paddingBottom: Platform.OS === "android" ? vs(190) : vs(120),
@@ -855,7 +1147,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#000000",
     },
     loadingOrb: {
         width: s(54),
@@ -863,17 +1154,13 @@ const styles = StyleSheet.create({
         borderRadius: s(27),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#06131D",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.45)",
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.35,
         shadowRadius: 18,
         shadowOffset: { width: 0, height: 0 },
         elevation: 8,
     },
     loadingText: {
-        color: "#A7F7FF",
         fontSize: ms(12),
         fontWeight: "800",
         marginTop: vs(12),
@@ -881,7 +1168,6 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
     },
     errorText: {
-        color: "#FFFFFF",
         fontSize: ms(16),
         fontWeight: "700",
     },
@@ -905,40 +1191,31 @@ const styles = StyleSheet.create({
         borderRadius: s(19.5),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#070B12",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.32)",
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.18,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 0 },
         elevation: 5,
     },
     categoryChip: {
-        backgroundColor: "#050D15",
-        borderColor: "rgba(60,242,255,0.35)",
         borderWidth: 1,
         paddingHorizontal: s(12),
         paddingVertical: vs(6),
         borderRadius: s(999),
     },
     categoryChipText: {
-        color: "#3CF2FF",
         fontSize: ms(11.5),
         fontWeight: "900",
         letterSpacing: 0.6,
         textTransform: "uppercase",
     },
     typeChip: {
-        backgroundColor: "#070B12",
-        borderColor: "rgba(255,255,255,0.18)",
         borderWidth: 1,
         paddingHorizontal: s(12),
         paddingVertical: vs(6),
         borderRadius: s(999),
     },
     typeChipText: {
-        color: "#FFFFFF",
         fontSize: ms(11.5),
         fontWeight: "800",
         textTransform: "capitalize",
@@ -950,9 +1227,7 @@ const styles = StyleSheet.create({
         borderRadius: s(19.5),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#070B12",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.18)",
     },
     heroShell: {
         width: "100%",
@@ -964,9 +1239,7 @@ const styles = StyleSheet.create({
         width: "100%",
         height: vs(255),
         borderRadius: s(22),
-        backgroundColor: "#020304",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.22)",
     },
     heroGlow: {
         position: "absolute",
@@ -974,48 +1247,22 @@ const styles = StyleSheet.create({
         right: s(26),
         bottom: -vs(8),
         height: vs(20),
-        backgroundColor: "rgba(60,242,255,0.11)",
         borderRadius: s(999),
     },
     headerSection: {
         paddingHorizontal: s(17),
         paddingTop: vs(18),
     },
-    liveSignalRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: vs(10),
-    },
-    signalDot: {
-        width: s(8),
-        height: s(8),
-        borderRadius: s(4),
-        backgroundColor: "#3CF2FF",
-        marginRight: s(8),
-        shadowColor: "#3CF2FF",
-        shadowOpacity: 0.8,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 0 },
-    },
-    signalText: {
-        color: "#7DF7FF",
-        fontSize: ms(10.5),
-        fontWeight: "900",
-        letterSpacing: 1.2,
-    },
     title: {
-        color: "#FFFFFF",
         fontSize: ms(30),
         lineHeight: ms(37),
         fontWeight: "900",
         marginBottom: vs(11),
         letterSpacing: 0.35,
-        textShadowColor: "rgba(60,242,255,0.36)",
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 14,
     },
     summary: {
-        color: "#D7E3F5",
         fontSize: ms(15.5),
         lineHeight: ms(24),
         marginBottom: vs(14),
@@ -1025,9 +1272,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         alignSelf: "flex-start",
-        backgroundColor: "#050A10",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.12)",
         borderRadius: s(999),
         paddingHorizontal: s(11),
         paddingVertical: vs(7),
@@ -1035,7 +1280,6 @@ const styles = StyleSheet.create({
         gap: s(6),
     },
     metaText: {
-        color: "#B7C7D9",
         fontSize: ms(12),
         fontWeight: "700",
     },
@@ -1043,16 +1287,13 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         alignSelf: "flex-start",
-        backgroundColor: "rgba(60,242,255,0.08)",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.25)",
         borderRadius: s(999),
         paddingHorizontal: s(10),
         paddingVertical: vs(6),
         gap: s(6),
     },
     aiDisclosure: {
-        color: "#9AFBFF",
         fontSize: ms(10.5),
         fontWeight: "900",
         textTransform: "uppercase",
@@ -1063,19 +1304,16 @@ const styles = StyleSheet.create({
         paddingTop: vs(18),
     },
     blockHeader: {
-        color: "#FFFFFF",
         fontSize: ms(24),
         lineHeight: ms(31),
         fontWeight: "900",
         marginTop: vs(22),
         marginBottom: vs(11),
         letterSpacing: 0.35,
-        textShadowColor: "rgba(60,242,255,0.25)",
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },
     subheader: {
-        color: "#EAFDFF",
         fontSize: ms(20),
         lineHeight: ms(27),
         fontWeight: "900",
@@ -1084,7 +1322,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.25,
     },
     paragraph: {
-        color: "#F2F6FF",
         fontSize: ms(16.2),
         lineHeight: ms(28),
         marginBottom: vs(16),
@@ -1096,18 +1333,14 @@ const styles = StyleSheet.create({
         marginBottom: vs(10),
         borderRadius: s(20),
         overflow: "hidden",
-        backgroundColor: "#03070D",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.18)",
     },
     blockImage: {
         width: "100%",
         height: vs(250),
         borderRadius: s(20),
-        backgroundColor: "#03070D",
     },
     caption: {
-        color: "#96A6BA",
         fontSize: ms(12.5),
         lineHeight: ms(18),
         marginBottom: vs(15),
@@ -1116,14 +1349,11 @@ const styles = StyleSheet.create({
     },
     quoteContainer: {
         flexDirection: "row",
-        backgroundColor: "#050A10",
         borderRadius: s(20),
         paddingVertical: vs(15),
         paddingHorizontal: s(15),
         marginVertical: vs(13),
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.22)",
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.12,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
@@ -1132,38 +1362,31 @@ const styles = StyleSheet.create({
     quoteAccent: {
         width: s(4),
         borderRadius: s(999),
-        backgroundColor: "#3CF2FF",
         marginRight: s(12),
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.7,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 0 },
     },
     quoteText: {
         flex: 1,
-        color: "#F8FCFF",
         fontSize: ms(16),
         lineHeight: ms(25),
         fontStyle: "italic",
         fontWeight: "700",
     },
     pgnContainer: {
-        backgroundColor: "#04080E",
         borderRadius: s(20),
         padding: s(14),
         marginVertical: vs(13),
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.2)",
     },
     pgnLabel: {
-        color: "#3CF2FF",
         fontSize: ms(12),
         fontWeight: "900",
         marginBottom: vs(8),
         letterSpacing: 1,
     },
     pgnText: {
-        color: "#E6ECF8",
         fontSize: ms(13),
         lineHeight: ms(20),
         fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
@@ -1172,9 +1395,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: s(8),
-        backgroundColor: "#050A10",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.24)",
         borderRadius: s(18),
         paddingHorizontal: s(14),
         paddingVertical: vs(13),
@@ -1182,7 +1403,6 @@ const styles = StyleSheet.create({
     },
     linkText: {
         flex: 1,
-        color: "#DDFBFF",
         fontSize: ms(14),
         fontWeight: "800",
     },
@@ -1192,7 +1412,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: "#000",
+        backgroundColor: "#000000",
         justifyContent: "center",
         alignItems: "center",
         zIndex: 1000,
@@ -1217,23 +1437,10 @@ const styles = StyleSheet.create({
         borderRadius: s(20),
         overflow: "hidden",
         marginVertical: vs(13),
-        backgroundColor: "#04080E",
         position: "relative",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.2)",
-    },
-    videoPreviewImage: {
-        width: "100%",
-        height: "100%",
-    },
-    videoOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "rgba(0,0,0,0.28)",
     },
     videoOverlayText: {
-        color: "#FFFFFF",
         fontSize: ms(11),
         fontWeight: "900",
         letterSpacing: 1.5,
@@ -1243,7 +1450,6 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
-        backgroundColor: "#04080E",
     },
     ttsButtonWrapper: {
         position: "absolute",
@@ -1259,20 +1465,13 @@ const styles = StyleSheet.create({
         width: s(60),
         height: s(60),
         borderRadius: s(30),
-        backgroundColor: "#050B12",
         borderWidth: 1.5,
-        borderColor: "rgba(60,242,255,0.45)",
         justifyContent: "center",
         alignItems: "center",
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.32,
         shadowRadius: 16,
         shadowOffset: { width: 0, height: 0 },
         elevation: 8,
-    },
-    ttsButtonActive: {
-        backgroundColor: "#06202B",
-        borderColor: "#3CF2FF",
     },
     ttsButtonPressed: {
         opacity: 0.88,
@@ -1283,7 +1482,6 @@ const styles = StyleSheet.create({
         width: s(60),
         height: s(60),
         borderRadius: s(30),
-        backgroundColor: "#3CF2FF",
     },
     scrollTopArrow: {
         position: "absolute",
@@ -1295,22 +1493,11 @@ const styles = StyleSheet.create({
         borderRadius: s(22),
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "rgba(5,10,16,0.82)",
         borderWidth: 1,
-        borderColor: "rgba(255,255,255,0.14)",
     },
     aiChipPressed: {
         opacity: 0.75,
         transform: [{ scale: 0.98 }],
-    },
-    aiChipActive: {
-        backgroundColor: "rgba(60,242,255,0.15)",
-        borderColor: "rgba(60,242,255,0.65)",
-        shadowColor: "#3CF2FF",
-        shadowOpacity: 0.35,
-        shadowRadius: 14,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 7,
     },
     articleVideoCard: {
         width: "100%",
@@ -1318,11 +1505,8 @@ const styles = StyleSheet.create({
         borderRadius: s(18),
         overflow: "hidden",
         marginVertical: vs(13),
-        backgroundColor: "#000000",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.2)",
     },
-
     youtubeWebView: {
         backgroundColor: "#000000",
     },

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     StyleSheet,
@@ -13,73 +13,152 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { useNotifications } from "../context/NotificationsContext";
-import {
-    useFonts,
-    Rajdhani_700Bold,
-} from "@expo-google-fonts/rajdhani";
+import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
+
+type TimeTheme = "day" | "night";
+
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getNotificationTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            bg: "#F8FAFC",
+            card: "#FFFFFF",
+            cardAlt: "#ECFEFF",
+            text: "#07111F",
+            textSoft: "#475569",
+            muted: "#64748B",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            cyan: "#06B6D4",
+            yellow: "#FACC15",
+            switchTrackOff: "#CBD5E1",
+            iconBg: "#F1F5F9",
+            shadow: "#06B6D4",
+        };
+    }
+
+    return {
+        bg: "#020617",
+        card: "#090D14",
+        cardAlt: "#07111F",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        cyan: "#22D3EE",
+        yellow: "#FACC15",
+        switchTrackOff: "#1B2A4A",
+        iconBg: "#0B1220",
+        shadow: "#22D3EE",
+    };
+};
 
 export default function NotificationsScreen() {
     const navigation = useNavigation<any>();
     const { featuredEnabled, alertsEnabled, loading, toggleFeatured, toggleAlerts } =
         useNotifications();
 
+    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const theme = getNotificationTheme(themeMode);
+
     const [fontsLoaded] = useFonts({
         Rajdhani_700Bold,
     });
 
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
     if (!fontsLoaded) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={[styles.safeArea, { backgroundColor: theme.bg }]}
+            >
                 <AppHeader />
+
                 <View style={styles.loadingScreen}>
-                    <ActivityIndicator size="small" color="#3CF2FF" />
+                    <ActivityIndicator size="small" color={theme.cyan} />
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+        >
             <AppHeader />
 
             <View style={styles.container}>
-                <View style={styles.hero}>
+                <View
+                    style={[
+                        styles.hero,
+                        {
+                            backgroundColor: theme.card,
+                            borderColor: theme.borderStrong,
+                            shadowColor: theme.shadow,
+                        },
+                    ]}
+                >
                     <TouchableOpacity
                         onPress={() => navigation.goBack()}
-                        style={styles.backButton}
+                        style={[
+                            styles.backButton,
+                            {
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
                         activeOpacity={0.8}
                     >
-                        <Feather name="arrow-left" size={22} color="#FFFFFF" />
+                        <Feather name="arrow-left" size={22} color={theme.text} />
                     </TouchableOpacity>
 
                     <View style={styles.heroTextWrap}>
-                        <Text style={styles.heroEyebrow}>JUST MOVE</Text>
-                        <Text style={styles.title}>Notifications</Text>
+                        <Text style={[styles.heroEyebrow, { color: theme.cyan }]}>
+                            SCOOLFOOLS
+                        </Text>
+                        <Text style={[styles.title, { color: theme.text }]}>
+                            Notifications
+                        </Text>
                     </View>
                 </View>
 
-                <Text style={styles.subtitle}>
-                    Choose which chess updates you want pushed to your phone.
+                <Text style={[styles.subtitle, { color: theme.textSoft }]}>
+                    Choose which updates you want pushed to your phone.
                 </Text>
 
                 <NotificationCard
                     icon="star-outline"
-                    iconColor="#F4D03F"
+                    iconColor={theme.yellow}
                     title="Featured Posts"
                     description="Get notified when a featured article or major story goes live."
                     enabled={featuredEnabled}
                     loading={loading}
                     onToggle={toggleFeatured}
+                    theme={theme}
                 />
 
                 <NotificationCard
                     icon="flash-outline"
-                    iconColor="#3CF2FF"
+                    iconColor={theme.cyan}
                     title="Breaking Alerts"
-                    description="Breaking news, live games, results, announcements, and urgent chess updates."
+                    description="Breaking news, live games, results, announcements, and urgent updates."
                     enabled={alertsEnabled}
                     loading={loading}
                     onToggle={toggleAlerts}
+                    theme={theme}
                 />
             </View>
         </SafeAreaView>
@@ -94,6 +173,7 @@ function NotificationCard({
     enabled,
     loading,
     onToggle,
+    theme,
 }: {
     icon: keyof typeof Ionicons.glyphMap;
     iconColor: string;
@@ -102,44 +182,66 @@ function NotificationCard({
     enabled: boolean;
     loading: boolean;
     onToggle: () => void;
+    theme: ReturnType<typeof getNotificationTheme>;
 }) {
     return (
-        <View style={[styles.card, enabled && styles.cardEnabled]}>
+        <View
+            style={[
+                styles.card,
+                {
+                    backgroundColor: theme.card,
+                    borderColor: enabled ? theme.borderStrong : theme.border,
+                    shadowColor: enabled ? theme.shadow : "transparent",
+                    shadowOpacity: enabled ? 0.12 : 0,
+                },
+            ]}
+        >
             <View style={styles.cardTopRow}>
-                <View style={[styles.iconBubble, { borderColor: `${iconColor}55` }]}>
+                <View
+                    style={[
+                        styles.iconBubble,
+                        {
+                            backgroundColor: theme.iconBg,
+                            borderColor: `${iconColor}55`,
+                        },
+                    ]}
+                >
                     <Ionicons name={icon} size={22} color={iconColor} />
                 </View>
 
                 <View style={styles.cardTextWrap}>
-                    <Text style={styles.label}>{title}</Text>
-                    <Text style={styles.helper}>{description}</Text>
+                    <Text style={[styles.label, { color: theme.text }]}>{title}</Text>
+
+                    <Text style={[styles.helper, { color: theme.textSoft }]}>
+                        {description}
+                    </Text>
                 </View>
 
                 {loading ? (
-                    <ActivityIndicator size="small" color="#3CF2FF" />
+                    <ActivityIndicator size="small" color={theme.cyan} />
                 ) : (
                     <Switch
                         value={enabled}
                         onValueChange={onToggle}
                         trackColor={{
-                            false: "#1B2A4A",
-                            true: "#164E63",
+                            false: theme.switchTrackOff,
+                            true: theme.cyan,
                         }}
-                        thumbColor={enabled ? "#3CF2FF" : "#8A8F98"}
-                        ios_backgroundColor="#1B2A4A"
+                        thumbColor={enabled ? "#FFFFFF" : theme.muted}
+                        ios_backgroundColor={theme.switchTrackOff}
                     />
                 )}
             </View>
 
-            <View style={styles.statusRow}>
+            <View style={[styles.statusRow, { borderTopColor: theme.border }]}>
                 <View
                     style={[
                         styles.statusDot,
-                        { backgroundColor: enabled ? "#3CF2FF" : "#4B5563" },
+                        { backgroundColor: enabled ? theme.cyan : theme.muted },
                     ]}
                 />
 
-                <Text style={styles.statusText}>
+                <Text style={[styles.statusText, { color: theme.muted }]}>
                     {enabled ? "Enabled" : "Disabled"}
                 </Text>
             </View>
@@ -150,7 +252,6 @@ function NotificationCard({
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     loadingScreen: {
         flex: 1,
@@ -161,18 +262,14 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 16,
     },
-
     hero: {
         minHeight: 78,
         borderRadius: 24,
-        backgroundColor: "#070A10",
         borderWidth: 1,
-        borderColor: "rgba(60,242,255,0.22)",
         flexDirection: "row",
         alignItems: "center",
         paddingHorizontal: 14,
         marginBottom: 14,
-        shadowColor: "#3CF2FF",
         shadowOpacity: 0.16,
         shadowRadius: 14,
         shadowOffset: { width: 0, height: 0 },
@@ -183,46 +280,33 @@ const styles = StyleSheet.create({
         borderRadius: 21,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1220",
         borderWidth: 1,
-        borderColor: "#16233B",
         marginRight: 13,
     },
     heroTextWrap: {
         flex: 1,
     },
     heroEyebrow: {
-        color: "#3CF2FF",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 1.8,
     },
     title: {
-        color: "#FFFFFF",
         fontSize: 31,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.45,
         marginTop: -2,
     },
     subtitle: {
-        color: "#9AA8C3",
         fontSize: 14,
         lineHeight: 20,
         marginBottom: 18,
     },
-
     card: {
-        backgroundColor: "#050816",
         borderRadius: 22,
         padding: 16,
         borderWidth: 1,
-        borderColor: "#12203A",
         marginBottom: 16,
-    },
-    cardEnabled: {
-        borderColor: "rgba(60,242,255,0.32)",
-        shadowColor: "#3CF2FF",
-        shadowOpacity: 0.12,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
     },
@@ -234,7 +318,6 @@ const styles = StyleSheet.create({
         width: 42,
         height: 42,
         borderRadius: 21,
-        backgroundColor: "#0B1220",
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
@@ -245,14 +328,12 @@ const styles = StyleSheet.create({
         paddingRight: 10,
     },
     label: {
-        color: "#FFFFFF",
         fontSize: 19,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
         marginBottom: 3,
     },
     helper: {
-        color: "#8EA0BF",
         fontSize: 13,
         lineHeight: 18,
     },
@@ -262,7 +343,6 @@ const styles = StyleSheet.create({
         marginTop: 13,
         paddingTop: 12,
         borderTopWidth: 1,
-        borderTopColor: "#101A2E",
     },
     statusDot: {
         width: 7,
@@ -271,7 +351,6 @@ const styles = StyleSheet.create({
         marginRight: 7,
     },
     statusText: {
-        color: "#AAB4C3",
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,

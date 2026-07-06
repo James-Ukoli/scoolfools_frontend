@@ -895,7 +895,7 @@ export default function PowerRankingsScreen() {
                         {
                             bottom:
                                 Platform.OS === "android"
-                                    ? 10 + insets.bottom
+                                    ? -25 + insets.bottom
                                     : 5 + insets.bottom,
                             opacity: toastAnim,
                             transform: [

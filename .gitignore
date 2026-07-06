@@ -12,6 +12,9 @@ expo-env.d.ts
 ios/
 android/
 
+# Firebase
+google-services.json
+
 # Environment variables
 .env
 .env.*
