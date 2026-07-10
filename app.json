@@ -12,7 +12,7 @@
       "buildNumber": "1",
       "usesAppleSignIn": true,
       "supportsTablet": false,
-      "bundleIdentifier": "com.justmovechess.app",
+      "bundleIdentifier": "com.scoolfools.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -23,10 +23,14 @@
         "foregroundImage": "./assets/images/iconandroid.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.justmove.app",
+      "package": "com.scoolfools.app",
       "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "single",
@@ -38,15 +42,15 @@
       "react-native-iap",
       [
         "expo-build-properties",
-      {
-    "ios": {
-      "useFrameworks": "static",
-      "useModularHeaders": true
-    },
-    "android": {
-      "kotlinVersion": "2.2.0"
-    }
-  }
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "useModularHeaders": true
+          },
+          "android": {
+            "kotlinVersion": "2.2.0"
+          }
+        }
       ],
       [
         "expo-splash-screen",
@@ -62,7 +66,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.226445408215-38u7tbvl7dgtc9k01rp7f6bp6pqkcfb9"
+          "iosUrlScheme": "com.googleusercontent.apps.1073878118462-t008oddqc45l10galk2gsrmp0en5qdiq"
         }
       ],
       "expo-web-browser",
@@ -70,11 +74,11 @@
       "expo-font",
       "expo-asset"
     ],
+    "owner": "cyberglobers",
     "extra": {
       "eas": {
-        "projectId": "55003675-01c3-44ff-a9ad-b129c3df579f"
+        "projectId": "1d821fa3-2440-46e1-8067-1f77d8691fb4"
       }
-    },
-    "owner": "cyberglobers"
+    }
   }
 }
