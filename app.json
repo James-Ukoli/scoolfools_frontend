@@ -72,7 +72,8 @@
       "expo-web-browser",
       "expo-audio",
       "expo-font",
-      "expo-asset"
+      "expo-asset",
+      "expo-video"
     ],
     "owner": "cyberglobers",
     "extra": {
