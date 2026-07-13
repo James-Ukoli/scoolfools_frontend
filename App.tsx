@@ -12,6 +12,8 @@ import BottomTabs from "./src/navigation/BottomTabs";
 import ArticleScreen from "./src/screens/ArticleScreen";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
+import SetupProfileScreen from "./src/screens/SetupProfileScreen";
+import IntroVideoScreen from "./src/screens/IntroVideoScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import MenuScreen from "./src/screens/MenuScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
@@ -31,10 +33,21 @@ import { NotificationsProvider } from "./src/context/NotificationsContext";
 
 const Stack = createNativeStackNavigator();
 
+type InitialRoute =
+    | "GoogleSignIn"
+    | "SetupProfile"
+    | "IntroVideo"
+    | "MainTabs";
+
+type OnboardingStage = "profile" | "introVideo" | "complete";
+
 const isTokenExpired = (token: string) => {
     try {
         const decoded: any = jwtDecode(token);
-        if (!decoded?.exp) return true;
+
+        if (!decoded?.exp) {
+            return true;
+        }
 
         return decoded.exp < Date.now() / 1000;
     } catch {
@@ -42,14 +55,34 @@ const isTokenExpired = (token: string) => {
     }
 };
 
+const getRouteFromOnboardingStage = (
+    onboardingStage?: OnboardingStage
+): InitialRoute => {
+    switch (onboardingStage) {
+        case "introVideo":
+            return "IntroVideo";
+
+        case "complete":
+            return "MainTabs";
+
+        case "profile":
+        default:
+            return "SetupProfile";
+    }
+};
+
 export default function App() {
-    const [initialRoute, setInitialRoute] = useState<"GoogleSignIn" | "MainTabs" | null>(null);
+    const [initialRoute, setInitialRoute] =
+        useState<InitialRoute | null>(null);
 
     useEffect(() => {
         const setupApp = async () => {
             try {
-                const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
-                const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+                const iosClientId =
+                    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
+                const webClientId =
+                    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
                 if (iosClientId) {
                     GoogleSignin.configure({
@@ -58,14 +91,43 @@ export default function App() {
                         profileImageSize: 150,
                     });
                 } else {
-                    console.log("Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID");
+                    console.log(
+                        "Missing EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID"
+                    );
                 }
 
-                const token = await AsyncStorage.getItem("token");
+                const [token, storedUser] =
+                    await AsyncStorage.multiGet(["token", "user"]);
 
-                if (token && !isTokenExpired(token)) {
-                    setInitialRoute("MainTabs");
-                } else {
+                const tokenValue = token[1];
+                const storedUserValue = storedUser[1];
+
+                if (!tokenValue || isTokenExpired(tokenValue)) {
+                    await AsyncStorage.multiRemove(["token", "user"]);
+                    setInitialRoute("GoogleSignIn");
+                    return;
+                }
+
+                if (!storedUserValue) {
+                    await AsyncStorage.multiRemove(["token", "user"]);
+                    setInitialRoute("GoogleSignIn");
+                    return;
+                }
+
+                try {
+                    const user = JSON.parse(storedUserValue);
+
+                    const route = getRouteFromOnboardingStage(
+                        user?.onboardingStage
+                    );
+
+                    setInitialRoute(route);
+                } catch (parseError) {
+                    console.log(
+                        "Stored user could not be parsed:",
+                        parseError
+                    );
+
                     await AsyncStorage.multiRemove(["token", "user"]);
                     setInitialRoute("GoogleSignIn");
                 }
@@ -89,8 +151,15 @@ export default function App() {
                         backgroundColor: "#06B6D4",
                     }}
                 >
-                    <StatusBar style="dark" backgroundColor="#06B6D4" />
-                    <ActivityIndicator size="large" color="#07111F" />
+                    <StatusBar
+                        style="dark"
+                        backgroundColor="#06B6D4"
+                    />
+
+                    <ActivityIndicator
+                        size="large"
+                        color="#07111F"
+                    />
                 </View>
             </SafeAreaProvider>
         );
@@ -100,7 +169,10 @@ export default function App() {
         <SafeAreaProvider>
             <NotificationsProvider>
                 <NavigationContainer>
-                    <StatusBar style="dark" backgroundColor="#06B6D4" />
+                    <StatusBar
+                        style="dark"
+                        backgroundColor="#06B6D4"
+                    />
 
                     <Stack.Navigator
                         initialRouteName={initialRoute}
@@ -112,25 +184,110 @@ export default function App() {
                             },
                         }}
                     >
-                        <Stack.Screen name="GoogleSignIn" component={GoogleSignInScreen} />
-                        <Stack.Screen name="MainTabs" component={BottomTabs} />
-                        <Stack.Screen name="ArticleScreen" component={ArticleScreen} />
-                        <Stack.Screen name="EventDetailScreen" component={EventDetailScreen} />
-                        <Stack.Screen name="Search" component={SearchScreen} />
-                        <Stack.Screen name="Menu" component={MenuScreen} />
-                        <Stack.Screen name="ReviewerLogin" component={ReviewerLoginScreen} />
-                        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                        <Stack.Screen name="ContactUs" component={ContactUsScreen} />
-                        <Stack.Screen name="EventsScreen" component={EventsScreen} />
-                        <Stack.Screen name="GameHome" component={GameHomeScreen} />
-                        <Stack.Screen name="CharadesSetup" component={CharadesSetupScreen} />
-                        <Stack.Screen name="CharadesPlay" component={CharadesPlayScreen} />
-                        <Stack.Screen name="MostLikely" component={MostLikelyScreen} />
-                        <Stack.Screen name="ImpostorSetup" component={ImpostorSetupScreen} />
-                        <Stack.Screen name="ImpostorReveal" component={ImpostorRevealScreen} />
-                        <Stack.Screen name="JustMoveClock" component={JustMoveClockScreen} />
-                        <Stack.Screen name="GamesPaywall" component={GamesPaywallScreen} />
-                        <Stack.Screen name="TVScreen" component={TVScreen} />
+                        <Stack.Screen
+                            name="GoogleSignIn"
+                            component={GoogleSignInScreen}
+                        />
+
+                        <Stack.Screen
+                            name="SetupProfile"
+                            component={SetupProfileScreen}
+                        />
+
+                        <Stack.Screen
+                            name="IntroVideo"
+                            component={IntroVideoScreen}
+                        />
+
+                        <Stack.Screen
+                            name="MainTabs"
+                            component={BottomTabs}
+                        />
+
+                        <Stack.Screen
+                            name="ArticleScreen"
+                            component={ArticleScreen}
+                        />
+
+                        <Stack.Screen
+                            name="EventDetailScreen"
+                            component={EventDetailScreen}
+                        />
+
+                        <Stack.Screen
+                            name="Search"
+                            component={SearchScreen}
+                        />
+
+                        <Stack.Screen
+                            name="Menu"
+                            component={MenuScreen}
+                        />
+
+                        <Stack.Screen
+                            name="ReviewerLogin"
+                            component={ReviewerLoginScreen}
+                        />
+
+                        <Stack.Screen
+                            name="Notifications"
+                            component={NotificationsScreen}
+                        />
+
+                        <Stack.Screen
+                            name="ContactUs"
+                            component={ContactUsScreen}
+                        />
+
+                        <Stack.Screen
+                            name="EventsScreen"
+                            component={EventsScreen}
+                        />
+
+                        <Stack.Screen
+                            name="GameHome"
+                            component={GameHomeScreen}
+                        />
+
+                        <Stack.Screen
+                            name="CharadesSetup"
+                            component={CharadesSetupScreen}
+                        />
+
+                        <Stack.Screen
+                            name="CharadesPlay"
+                            component={CharadesPlayScreen}
+                        />
+
+                        <Stack.Screen
+                            name="MostLikely"
+                            component={MostLikelyScreen}
+                        />
+
+                        <Stack.Screen
+                            name="ImpostorSetup"
+                            component={ImpostorSetupScreen}
+                        />
+
+                        <Stack.Screen
+                            name="ImpostorReveal"
+                            component={ImpostorRevealScreen}
+                        />
+
+                        <Stack.Screen
+                            name="JustMoveClock"
+                            component={JustMoveClockScreen}
+                        />
+
+                        <Stack.Screen
+                            name="GamesPaywall"
+                            component={GamesPaywallScreen}
+                        />
+
+                        <Stack.Screen
+                            name="TVScreen"
+                            component={TVScreen}
+                        />
                     </Stack.Navigator>
                 </NavigationContainer>
             </NotificationsProvider>

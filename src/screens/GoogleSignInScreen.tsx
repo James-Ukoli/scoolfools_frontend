@@ -24,6 +24,21 @@ const PRIVACY_POLICY_URL =
 const TERMS_URL =
     "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
 
+const getOnboardingRoute = (
+    onboardingStage?: "profile" | "introVideo" | "complete"
+) => {
+    switch (onboardingStage) {
+        case "introVideo":
+            return "IntroVideo";
+
+        case "complete":
+            return "MainTabs";
+
+        case "profile":
+        default:
+            return "SetupProfile";
+    }
+};
 export default function GoogleSignInScreen({ navigation }: any) {
     const [loadingProvider, setLoadingProvider] = useState<
         "google" | "apple" | null
@@ -98,7 +113,14 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 JSON.stringify(data.user)
             );
 
-            navigation.replace("MainTabs");
+            const nextRoute = getOnboardingRoute(
+                data.user?.onboardingStage
+            );
+
+            navigation.reset({
+                index: 0,
+                routes: [{ name: nextRoute }],
+            });
         } catch (error: any) {
             Alert.alert(
                 "Google Sign In Failed",
@@ -168,7 +190,14 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 JSON.stringify(data.user)
             );
 
-            navigation.replace("MainTabs");
+            const nextRoute = getOnboardingRoute(
+                data.user?.onboardingStage
+            );
+
+            navigation.reset({
+                index: 0,
+                routes: [{ name: nextRoute }],
+            });
         } catch (error: any) {
             if (error?.code === "ERR_REQUEST_CANCELED") {
                 return;
@@ -195,21 +224,19 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
                     <View style={styles.bottomSection}>
                         {Platform.OS === "ios" && (
-                            <AppleAuthentication.AppleAuthenticationButton
-                                buttonType={
-                                    AppleAuthentication
-                                        .AppleAuthenticationButtonType
-                                        .SIGN_IN
-                                }
-                                buttonStyle={
-                                    AppleAuthentication
-                                        .AppleAuthenticationButtonStyle
-                                        .BLACK
-                                }
-                                cornerRadius={16}
-                                style={styles.appleButton}
-                                onPress={handleAppleSignIn}
-                            />
+                            <View style={styles.appleButtonWrapper}>
+                                <AppleAuthentication.AppleAuthenticationButton
+                                    buttonType={
+                                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                                    }
+                                    buttonStyle={
+                                        AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                                    }
+                                    cornerRadius={16}
+                                    style={styles.appleButton}
+                                    onPress={handleAppleSignIn}
+                                />
+                            </View>
                         )}
 
                         <TouchableOpacity
@@ -284,13 +311,13 @@ const styles = StyleSheet.create({
     },
 
     bottomSection: {
-        paddingBottom: 22,
+        paddingBottom: 5,
     },
 
     appleButton: {
         width: "100%",
         height: 56,
-        marginBottom: 12,
+
     },
 
     googleButton: {
@@ -301,14 +328,15 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
         flexDirection: "row",
-        shadowColor: "#000000",
+
+        shadowColor: "#FFFFFF",
         shadowOffset: {
             width: 0,
-            height: 3,
+            height: 0,
         },
-        shadowOpacity: 0.18,
-        shadowRadius: 6,
-        elevation: 5,
+        shadowOpacity: 0.65,
+        shadowRadius: 12,
+        elevation: 8,
     },
 
     googleIcon: {
@@ -343,4 +371,20 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         textDecorationLine: "underline",
     },
+    appleButtonWrapper: {
+        borderRadius: 16,
+
+        shadowColor: "#FFFFFF",
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+        shadowOpacity: 0.65,
+        shadowRadius: 12,
+        elevation: 8,
+
+        marginBottom: 12,
+    },
+
+
 });
