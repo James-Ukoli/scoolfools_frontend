@@ -201,6 +201,14 @@ export default function MenuScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <View style={styles.card}>
+                        <MenuItem
+                            icon="person-circle-outline"
+                            color={theme.cyan}
+                            title="Account Settings"
+                            onPress={() => navigation.navigate("AccountSettings")}
+                            styles={styles}
+                            theme={theme}
+                        />
                         <MenuItem icon="information-circle-outline" color={theme.cyan} title="About ScoolFools" onPress={() => setAboutVisible(true)} styles={styles} theme={theme} />
                         <MenuItem icon="mail-outline" color={theme.cyan} title="Contact Us" onPress={() => navigation.navigate("ContactUs")} styles={styles} theme={theme} />
                         <MenuItem icon="notifications-outline" color={theme.cyan} title="Notifications" onPress={() => navigation.navigate("Notifications")} styles={styles} theme={theme} />

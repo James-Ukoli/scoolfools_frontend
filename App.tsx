@@ -13,6 +13,7 @@ import ArticleScreen from "./src/screens/ArticleScreen";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
 import SetupProfileScreen from "./src/screens/SetupProfileScreen";
+import AccountSettingsScreen from "./src/screens/AccountSettingsScreen";
 import IntroVideoScreen from "./src/screens/IntroVideoScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import MenuScreen from "./src/screens/MenuScreen";
@@ -223,7 +224,10 @@ export default function App() {
                             name="Menu"
                             component={MenuScreen}
                         />
-
+                        <Stack.Screen
+                            name="AccountSettings"
+                            component={AccountSettingsScreen}
+                        />
                         <Stack.Screen
                             name="ReviewerLogin"
                             component={ReviewerLoginScreen}

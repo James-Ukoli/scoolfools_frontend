@@ -12,23 +12,10 @@ import {
     Platform,
     NativeSyntheticEvent,
     NativeScrollEvent,
-    Modal,
-    Pressable,
-    Alert,
     Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppHeader from "../components/AppHeader";
-import {
-    initializeIAP,
-    getBlogsSubscriptionProduct,
-    buyBlogsSubscription,
-    setupPurchaseListeners,
-    cleanupIAP,
-} from "../services/iap";
-import { finishTransaction } from "react-native-iap";
-import ConfettiCannon from "react-native-confetti-cannon";
 import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
 type ContentTab = "trending" | "blog";
@@ -55,24 +42,25 @@ type PostsApiResponse = {
     };
 };
 
-const TRENDING_CATEGORIES = [
-    "All",
-    "Tournaments",
-    "Drama",
-    "Pros",
-    "Online",
-    "Rising Stars",
-    "Breaking News",
+type CategoryOption = {
+    value: string;
+    label: string;
+};
+
+const TRENDING_CATEGORIES: CategoryOption[] = [
+    { value: "All", label: "All" },
+    { value: "Campus News", label: "📰 Campus News" },
+    { value: "Sports", label: "🏆 Sports" },
+    { value: "Student Life", label: "🎓 Student Life" },
+    { value: "Trending", label: "🔥 Trending" },
 ];
 
-const BLOG_CATEGORIES = [
-    "All",
-    "Culture",
-    "Hot Takes",
-    "Future of Chess",
-    "Entertainment",
-    "Community",
-    "Education",
+const BLOG_CATEGORIES: CategoryOption[] = [
+    { value: "All", label: "All" },
+    { value: "Campus Stories", label: "📖 Campus Stories" },
+    { value: "Student Blogs", label: "✍️ Student Blogs" },
+    { value: "Cheat Codes", label: "🎮 Cheat Codes" },
+    { value: "Campus Culture", label: "🏫 Campus Culture" },
 ];
 
 const INITIAL_VISIBLE_STORIES = 6;
@@ -159,32 +147,24 @@ function formatTimeAgo(dateString: string) {
 
 function getCategoryBadgeStyle(category: string) {
     switch (category) {
-        case "Drama":
-            return { backgroundColor: "#6F102B", borderColor: "#A61B44" };
-        case "Tournaments":
-            return { backgroundColor: "#7A6500", borderColor: "#CFAF1A" };
-        case "Online":
-            return { backgroundColor: "#0F5B3A", borderColor: "#23C16B" };
-        case "Pros":
-            return { backgroundColor: "#183A63", borderColor: "#4D9BFF" };
-        case "Breaking News":
-            return { backgroundColor: "#450A0A", borderColor: "#DC2626" };
-        case "Rising Stars":
-            return { backgroundColor: "#5D2475", borderColor: "#B86EF2" };
-        case "Culture":
-            return { backgroundColor: "#4A1F5E", borderColor: "#9B5DE5" };
-        case "Entertainment":
-            return { backgroundColor: "#6A1B2E", borderColor: "#FF5C8A" };
-        case "Future of Chess":
-            return { backgroundColor: "#0E3C4D", borderColor: "#39C0ED" };
-        case "Community":
-            return { backgroundColor: "#165B36", borderColor: "#35D07F" };
-        case "Hot Takes":
-            return { backgroundColor: "#000000", borderColor: "#ff0000" };
-        case "Education":
-            return { backgroundColor: "#6A5200", borderColor: "#F4D03F" };
+        case "Campus News":
+            return { backgroundColor: "#174A72", borderColor: "#38BDF8" };
+        case "Sports":
+            return { backgroundColor: "#14532D", borderColor: "#4ADE80" };
+        case "Student Life":
+            return { backgroundColor: "#5B3A00", borderColor: "#FACC15" };
+        case "Trending":
+            return { backgroundColor: "#7F1D1D", borderColor: "#FB7185" };
+        case "Campus Stories":
+            return { backgroundColor: "#4C1D95", borderColor: "#A78BFA" };
+        case "Student Blogs":
+            return { backgroundColor: "#0F5B5D", borderColor: "#2DD4BF" };
+        case "Cheat Codes":
+            return { backgroundColor: "#312E81", borderColor: "#818CF8" };
+        case "Campus Culture":
+            return { backgroundColor: "#7C2D12", borderColor: "#FB923C" };
         default:
-            return { backgroundColor: "#2A2A2A", borderColor: "#555555" };
+            return { backgroundColor: "#2A2A2A", borderColor: "#64748B" };
     }
 }
 
@@ -204,12 +184,6 @@ export default function TrendingScreen({ navigation }: any) {
     const [visibleStoriesCount, setVisibleStoriesCount] = useState(INITIAL_VISIBLE_STORIES);
     const [loadingMore, setLoadingMore] = useState(false);
 
-    const [showConfetti, setShowConfetti] = useState(false);
-    const [isSubscribed, setIsSubscribed] = useState(false);
-    const [paywallVisible, setPaywallVisible] = useState(false);
-    const [loadingSubscription, setLoadingSubscription] = useState(false);
-    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
-
     const slideAnim = useRef(new Animated.Value(0)).current;
     const feedFadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -224,10 +198,6 @@ export default function TrendingScreen({ navigation }: any) {
         return () => clearInterval(interval);
     }, []);
 
-    const getToken = async () => {
-        return await AsyncStorage.getItem("token");
-    };
-
     const animateFeed = useCallback(() => {
         feedFadeAnim.setValue(0);
 
@@ -238,27 +208,6 @@ export default function TrendingScreen({ navigation }: any) {
         }).start();
     }, [feedFadeAnim]);
 
-    const fetchEntitlements = async () => {
-        try {
-            const token = await getToken();
-            if (!token || !API_BASE_URL) return;
-
-            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
-                method: "GET",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-            });
-
-            const data = await response.json();
-
-            if (data?.success) {
-                setIsSubscribed(!!data?.entitlements?.isSubscribed);
-            }
-        } catch (error) {
-            console.log("Blog entitlement fetch error:", error);
-        }
-    };
 
     const fetchPosts = useCallback(async () => {
         try {
@@ -284,114 +233,9 @@ export default function TrendingScreen({ navigation }: any) {
         }
     }, []);
 
-    const loadBlogSubscription = async () => {
-        try {
-            await initializeIAP();
-            const product = await getBlogsSubscriptionProduct();
-            setSubscriptionProduct(product);
-        } catch (error) {
-            console.log("Blog subscription load error:", error);
-        }
-    };
-
-    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
-        try {
-            const token = await getToken();
-
-            if (!token || !API_BASE_URL) {
-                throw new Error("Missing token or API base URL");
-            }
-
-            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    platform: Platform.OS === "ios" ? "ios" : "android",
-                    productId:
-                        purchase?.productId ||
-                        purchase?.productIdIOS ||
-                        "jms_599_1y",
-                    transactionId:
-                        purchase?.transactionId ||
-                        purchase?.transactionIdIOS ||
-                        purchase?.id ||
-                        null,
-                    purchaseToken:
-                        purchase?.purchaseToken ||
-                        purchase?.purchaseTokenAndroid ||
-                        null,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to verify subscription");
-            }
-
-            await finishTransaction({
-                purchase,
-                isConsumable: false,
-            });
-
-            setIsSubscribed(!!data.isSubscribed);
-            setPaywallVisible(false);
-            setShowConfetti(true);
-
-            await fetchEntitlements();
-
-            Alert.alert("Subscribed 🎉", "You now have access to ScoolFools Blogs.");
-        } catch (error) {
-            console.log("Verify blog subscription error:", error);
-
-            Alert.alert(
-                "Purchase Complete",
-                "Purchase worked, but verifying the subscription with your account failed."
-            );
-        } finally {
-            setLoadingSubscription(false);
-        }
-    };
-
-    const handleSubscribePress = async () => {
-        try {
-            setLoadingSubscription(true);
-
-            await initializeIAP();
-            await buyBlogsSubscription();
-        } catch (error) {
-            setLoadingSubscription(false);
-            console.log("Blog subscription request error:", error);
-
-            Alert.alert(
-                "Subscription Failed",
-                "Something went wrong while starting the subscription."
-            );
-        }
-    };
 
     useEffect(() => {
         fetchPosts();
-        fetchEntitlements();
-
-        setupPurchaseListeners({
-            onPurchaseSuccess: async () => { },
-            onGamesPackSuccess: async () => { },
-            onBlogsSubscriptionSuccess: async (purchase: any) => {
-                await verifyBlogSubscriptionOnBackend(purchase);
-            },
-            onPurchaseError: (error: any) => {
-                setLoadingSubscription(false);
-                console.log("Blog subscription listener error:", error);
-            },
-        });
-
-        return () => {
-            cleanupIAP();
-        };
     }, [fetchPosts]);
 
     useEffect(() => {
@@ -420,7 +264,6 @@ export default function TrendingScreen({ navigation }: any) {
 
         try {
             await fetchPosts();
-            await fetchEntitlements();
             setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
             await new Promise((resolve) => setTimeout(resolve, 700));
         } finally {
@@ -442,12 +285,6 @@ export default function TrendingScreen({ navigation }: any) {
     const hasMoreStories = visibleStoriesCount < topStories.length;
 
     const handleOpenPost = (post: Post) => {
-        if (post.content_type === "blog" && !isSubscribed) {
-            setPaywallVisible(true);
-            loadBlogSubscription();
-            return;
-        }
-
         navigation.navigate("ArticleScreen", { slug: post.slug });
     };
 
@@ -596,30 +433,6 @@ export default function TrendingScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
 
-                {activeTab === "blog" && !isSubscribed && (
-                    <TouchableOpacity
-                        activeOpacity={0.9}
-                        style={[
-                            styles.supportBanner,
-                            {
-                                backgroundColor: theme.cardSoft,
-                                borderColor: theme.cyan,
-                                shadowColor: theme.cyan,
-                            },
-                        ]}
-                        onPress={() => {
-                            setPaywallVisible(true);
-                            loadBlogSubscription();
-                        }}
-                    >
-                        <Text style={[styles.supportBannerTitle, { color: theme.cyan }]}>
-                            Support Scool Fools Blogs ♟️
-                        </Text>
-                        <Text style={[styles.supportBannerText, { color: theme.textSoft }]}>
-                            Start with 1 month free and help shape the future of chess media for only $5.99/year ♟️
-                        </Text>
-                    </TouchableOpacity>
-                )}
 
                 <ScrollView
                     horizontal
@@ -627,12 +440,12 @@ export default function TrendingScreen({ navigation }: any) {
                     contentContainerStyle={styles.tabsContainer}
                 >
                     {categories.map((category) => {
-                        const active = selectedCategory === category;
+                        const active = selectedCategory === category.value;
 
                         return (
                             <TouchableOpacity
-                                key={category}
-                                onPress={() => setSelectedCategory(category)}
+                                key={category.value}
+                                onPress={() => setSelectedCategory(category.value)}
                                 style={[
                                     styles.tabPill,
                                     {
@@ -653,7 +466,7 @@ export default function TrendingScreen({ navigation }: any) {
                                         active && { color: "#07111F" },
                                     ]}
                                 >
-                                    {category}
+                                    {category.label}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -692,18 +505,6 @@ export default function TrendingScreen({ navigation }: any) {
                                         imageStyle={styles.featuredImage}
                                         resizeMode="cover"
                                     >
-                                        {activeTab === "blog" && !isSubscribed && (
-                                            <View
-                                                style={[
-                                                    styles.lockOverlay,
-                                                    {
-                                                        borderColor: theme.cyan,
-                                                    },
-                                                ]}
-                                            >
-                                                <Text style={styles.lockText}>🔒 Supporter Blog</Text>
-                                            </View>
-                                        )}
 
                                         <View style={styles.featuredBadgeOverlay}>
                                             <View
@@ -771,18 +572,6 @@ export default function TrendingScreen({ navigation }: any) {
                                             style={styles.storyImage}
                                         />
 
-                                        {activeTab === "blog" && !isSubscribed && (
-                                            <View
-                                                style={[
-                                                    styles.storyLockBadge,
-                                                    {
-                                                        borderColor: theme.cyan,
-                                                    },
-                                                ]}
-                                            >
-                                                <Text style={styles.storyLockBadgeText}>🔒</Text>
-                                            </View>
-                                        )}
                                     </View>
 
                                     <View style={styles.storyContent}>
@@ -847,115 +636,7 @@ export default function TrendingScreen({ navigation }: any) {
                 </Animated.View>
             </ScrollView>
 
-            <Modal
-                visible={paywallVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setPaywallVisible(false)}
-            >
-                <View style={styles.paywallOverlay}>
-                    <Pressable
-                        style={[
-                            styles.paywallBackdrop,
-                            { backgroundColor: theme.modalBackdrop },
-                        ]}
-                        onPress={() => setPaywallVisible(false)}
-                    />
 
-                    <View
-                        style={[
-                            styles.paywallCard,
-                            {
-                                backgroundColor: theme.elevated,
-                                borderColor: theme.cyan,
-                                shadowColor: theme.cyan,
-                            },
-                        ]}
-                    >
-                        <TouchableOpacity
-                            style={[
-                                styles.closeButton,
-                                {
-                                    backgroundColor:
-                                        theme.mode === "day" ? "#E2E8F0" : "#111827",
-                                },
-                            ]}
-                            onPress={() => setPaywallVisible(false)}
-                        >
-                            <Text style={[styles.closeButtonText, { color: theme.text }]}>×</Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.paywallEmoji}>♟️</Text>
-
-                        <Text style={[styles.paywallTitle, { color: theme.text }]}>
-                            Support ScoolFools Blogs
-                        </Text>
-
-                        <Text style={[styles.paywallSubtitle, { color: theme.textSoft }]}>
-                            Help support independent chess journalism and the future of modern chess media.
-                        </Text>
-
-                        <View
-                            style={[
-                                styles.priceBox,
-                                {
-                                    backgroundColor: theme.cardSoft,
-                                    borderColor: theme.borderStrong,
-                                },
-                            ]}
-                        >
-                            <Text style={[styles.freeTrialText, { color: theme.cyan }]}>
-                                1 Month Free
-                            </Text>
-                            <Text style={[styles.priceText, { color: theme.text }]}>
-                                Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
-                            </Text>
-                        </View>
-
-                        <View style={styles.benefitsBox}>
-                            <Text style={[styles.benefitText, { color: theme.text }]}>
-                                ✓ Exclusive blogs and stories
-                            </Text>
-                            <Text style={[styles.benefitText, { color: theme.text }]}>
-                                ✓ Support independent chess coverage
-                            </Text>
-                            <Text style={[styles.benefitText, { color: theme.text }]}>
-                                ✓ Help grow modern chess media
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity
-                            style={[styles.subscribeButton, { backgroundColor: theme.cyan }]}
-                            activeOpacity={0.9}
-                            onPress={handleSubscribePress}
-                            disabled={loadingSubscription}
-                        >
-                            {loadingSubscription ? (
-                                <ActivityIndicator color="#07111F" />
-                            ) : (
-                                <Text style={styles.subscribeButtonText}>
-                                    Start Free Month
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        <Text style={[styles.paywallFinePrint, { color: theme.muted }]}>
-                            Cancel anytime. Subscription renews yearly after the free trial.
-                        </Text>
-                    </View>
-                </View>
-            </Modal>
-
-            {showConfetti && (
-                <ConfettiCannon
-                    count={140}
-                    origin={{ x: -10, y: 0 }}
-                    fadeOut
-                    explosionSpeed={350}
-                    fallSpeed={2600}
-                    onAnimationEnd={() => setShowConfetti(false)}
-                />
-            )}
         </SafeAreaView>
     );
 }
@@ -1019,28 +700,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.55,
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 12,
-    },
-
-    supportBanner: {
-        borderWidth: 1,
-        borderRadius: 20,
-        paddingVertical: 13,
-        paddingHorizontal: 14,
-        marginBottom: 14,
-        shadowOpacity: 0.18,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 0 },
-    },
-    supportBannerTitle: {
-        fontSize: 19,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.45,
-        marginBottom: 4,
-    },
-    supportBannerText: {
-        fontSize: 13,
-        lineHeight: 18,
-        fontWeight: "700",
     },
 
     tabsContainer: {
@@ -1187,38 +846,6 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
 
-    lockOverlay: {
-        position: "absolute",
-        top: 12,
-        right: 12,
-        backgroundColor: "rgba(0,0,0,0.72)",
-        borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderWidth: 1,
-    },
-    lockText: {
-        color: "#FFFFFF",
-        fontSize: 12,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.3,
-    },
-    storyLockBadge: {
-        position: "absolute",
-        top: 6,
-        right: 18,
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: "rgba(0,0,0,0.75)",
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-    },
-    storyLockBadgeText: {
-        fontSize: 12,
-    },
-
     loadMoreWrap: {
         paddingVertical: 18,
         alignItems: "center",
@@ -1250,107 +877,4 @@ const styles = StyleSheet.create({
         letterSpacing: 0.35,
     },
 
-    paywallOverlay: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 26,
-    },
-    paywallBackdrop: {
-        ...StyleSheet.absoluteFillObject,
-    },
-    paywallCard: {
-        width: "100%",
-        borderRadius: 28,
-        borderWidth: 1.5,
-        paddingHorizontal: 22,
-        paddingTop: 26,
-        paddingBottom: 20,
-        alignItems: "center",
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.45,
-        shadowRadius: 24,
-        elevation: 14,
-    },
-    closeButton: {
-        position: "absolute",
-        top: 12,
-        right: 14,
-        width: 34,
-        height: 34,
-        borderRadius: 17,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    closeButtonText: {
-        fontSize: 26,
-        lineHeight: 28,
-        fontWeight: "700",
-    },
-    paywallEmoji: {
-        fontSize: 42,
-        marginBottom: 10,
-    },
-    paywallTitle: {
-        fontSize: 25,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.4,
-        textAlign: "center",
-        marginBottom: 8,
-    },
-    paywallSubtitle: {
-        fontSize: 14,
-        lineHeight: 21,
-        fontWeight: "700",
-        textAlign: "center",
-        marginBottom: 16,
-    },
-    priceBox: {
-        width: "100%",
-        borderRadius: 18,
-        borderWidth: 1,
-        paddingVertical: 14,
-        alignItems: "center",
-        marginBottom: 16,
-    },
-    freeTrialText: {
-        fontSize: 30,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.4,
-    },
-    priceText: {
-        fontSize: 13,
-        fontWeight: "800",
-        marginTop: 4,
-        opacity: 0.9,
-    },
-    benefitsBox: {
-        width: "100%",
-        marginBottom: 18,
-    },
-    benefitText: {
-        fontSize: 13.5,
-        fontWeight: "800",
-        marginBottom: 8,
-    },
-    subscribeButton: {
-        width: "100%",
-        height: 50,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: 12,
-    },
-    subscribeButtonText: {
-        color: "#07111F",
-        fontSize: 16,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.35,
-    },
-    paywallFinePrint: {
-        fontSize: 11,
-        lineHeight: 16,
-        textAlign: "center",
-        fontWeight: "600",
-    },
 });
