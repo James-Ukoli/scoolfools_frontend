@@ -1,5 +1,6 @@
 import React, {
     useCallback,
+    useEffect,
     useMemo,
     useState,
 } from "react";
@@ -22,6 +23,8 @@ import { useNotifications } from "../context/NotificationsContext";
 
 const HEADER_CYAN = "#06B6D4";
 
+type TimeTheme = "day" | "night";
+
 const AVATAR_IMAGES: Record<
     string,
     ImageSourcePropType
@@ -42,15 +45,37 @@ type StoredUser = {
     avatar?: string | null;
 };
 
-const getHeaderTheme = () => ({
-    bg: HEADER_CYAN,
-    card: "#F8FAFC",
-    border: "rgba(7,17,31,0.10)",
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+
+    return hour >= 6 && hour < 19
+        ? "day"
+        : "night";
+};
+
+const getHeaderTheme = (
+    mode: TimeTheme
+) => ({
+    mode,
+
+    // Only the outside header area changes.
+    background:
+        mode === "day"
+            ? "#F8FAFC"
+            : "#020617",
+
+    // The floating card remains cyan.
+    card: HEADER_CYAN,
+
     icon: "#07111F",
     cyan: HEADER_CYAN,
     yellow: "#FACC15",
-    alertBlue: HEADER_CYAN,
-    alertGreenIcon: "#07111F",
+
+    border: "rgba(255,255,255,0.20)",
+    activeBackground:
+        "rgba(6,182,212,0.10)",
+    activeBorder:
+        "rgba(6,182,212,0.30)",
 });
 
 export default function AppHeader() {
@@ -64,15 +89,27 @@ export default function AppHeader() {
     const [user, setUser] =
         useState<StoredUser | null>(null);
 
+    const [themeMode, setThemeMode] =
+        useState<TimeTheme>(
+            getCurrentThemeMode()
+        );
+
     const theme = useMemo(
-        () => getHeaderTheme(),
-        []
+        () => getHeaderTheme(themeMode),
+        [themeMode]
     );
 
     const styles = useMemo(
         () => createStyles(theme),
         [theme]
     );
+
+    const updateThemeMode =
+        useCallback(() => {
+            setThemeMode(
+                getCurrentThemeMode()
+            );
+        }, []);
 
     const loadStoredUser = useCallback(
         async () => {
@@ -87,7 +124,7 @@ export default function AppHeader() {
                     return;
                 }
 
-                const parsedUser =
+                const parsedUser: StoredUser =
                     JSON.parse(storedUser);
 
                 setUser(parsedUser);
@@ -103,10 +140,24 @@ export default function AppHeader() {
         []
     );
 
+    useEffect(() => {
+        const interval = setInterval(
+            updateThemeMode,
+            60000
+        );
+
+        return () =>
+            clearInterval(interval);
+    }, [updateThemeMode]);
+
     useFocusEffect(
         useCallback(() => {
             loadStoredUser();
-        }, [loadStoredUser])
+            updateThemeMode();
+        }, [
+            loadStoredUser,
+            updateThemeMode,
+        ])
     );
 
     const selectedAvatarSource =
@@ -118,11 +169,9 @@ export default function AppHeader() {
 
     const remoteAvatarUrl =
         user?.providerAvatar ||
-        (
-            user?.avatar?.startsWith("http")
-                ? user.avatar
-                : null
-        );
+        (user?.avatar?.startsWith("http")
+            ? user.avatar
+            : null);
 
     const isOneEnabled =
         featuredEnabled || alertsEnabled;
@@ -131,118 +180,114 @@ export default function AppHeader() {
         featuredEnabled && alertsEnabled;
 
     const bellColor = isBothEnabled
-        ? theme.alertGreenIcon
-        : isOneEnabled
-            ? theme.alertBlue
-            : theme.icon;
+        ? theme.icon
+        : theme.cyan;
 
     return (
         <SafeAreaView
             edges={["top"]}
             style={styles.safeArea}
         >
-            <View style={styles.container}>
-                <View style={styles.sideLeft}>
-                    <TouchableOpacity
-                        style={styles.avatarButton}
-                        activeOpacity={0.8}
-                        onPress={() =>
-                            navigation.navigate(
-                                "Menu"
-                            )
-                        }
+            <View
+                style={
+                    styles.headerBackground
+                }
+            >
+                <View style={styles.card}>
+                    <View
+                        style={styles.sideLeft}
                     >
-                        {selectedAvatarSource ? (
-                            <Image
-                                source={
-                                    selectedAvatarSource
-                                }
-                                style={
-                                    styles.avatarImage
-                                }
-                                resizeMode="cover"
-                            />
-                        ) : remoteAvatarUrl ? (
-                            <Image
-                                source={{
-                                    uri: remoteAvatarUrl,
-                                }}
-                                style={
-                                    styles.avatarImage
-                                }
-                                resizeMode="cover"
-                            />
-                        ) : (
-                            <Feather
-                                name="user"
-                                size={18}
-                                color={theme.icon}
-                            />
-                        )}
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            style={
+                                styles.avatarButton
+                            }
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                navigation.navigate(
+                                    "Menu"
+                                )
+                            }
+                        >
+                            {selectedAvatarSource ? (
+                                <Image
+                                    source={
+                                        selectedAvatarSource
+                                    }
+                                    style={
+                                        styles.avatarImage
+                                    }
+                                    resizeMode="cover"
+                                />
+                            ) : remoteAvatarUrl ? (
+                                <Image
+                                    source={{
+                                        uri: remoteAvatarUrl,
+                                    }}
+                                    style={
+                                        styles.avatarImage
+                                    }
+                                    resizeMode="cover"
+                                />
+                            ) : (
+                                <Feather
+                                    name="user"
+                                    size={20}
+                                    color={
+                                        theme.cyan
+                                    }
+                                />
+                            )}
+                        </TouchableOpacity>
+                    </View>
 
-                <View
-                    pointerEvents="box-none"
-                    style={styles.logoWrapper}
-                >
-                    <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() =>
-                            navigation.navigate(
-                                "Home"
-                            )
-                        }
+                    <View
+                        pointerEvents="box-none"
                         style={
-                            styles.logoPressable
+                            styles.logoWrapper
                         }
                     >
-                        <Image
-                            source={require("../../assets/images/scoolfoolsheader.png")}
-                            style={styles.logo}
-                            resizeMode="contain"
-                        />
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                navigation.navigate(
+                                    "Home"
+                                )
+                            }
+                            style={
+                                styles.logoPressable
+                            }
+                        >
+                            <Image
+                                source={require("../../assets/images/scoolfoolsheader.png")}
+                                style={styles.logo}
+                                resizeMode="contain"
+                            />
+                        </TouchableOpacity>
+                    </View>
 
-                <View style={styles.sideRight}>
-                    <TouchableOpacity
-                        style={styles.iconButton}
-                        activeOpacity={0.8}
-                        onPress={() =>
-                            navigation.navigate(
-                                "Search"
-                            )
-                        }
-                    >
-                        <Feather
-                            name="search"
-                            size={20}
-                            color={theme.icon}
-                        />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.iconButton,
-                            isOneEnabled &&
-                            styles.iconButtonActive,
-                            isBothEnabled &&
-                            styles.iconButtonFullyActive,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() =>
-                            navigation.navigate(
-                                "Notifications"
-                            )
-                        }
-                    >
-                        <FontAwesome6
-                            name="bell"
-                            size={20}
-                            color={bellColor}
-                        />
-                    </TouchableOpacity>
+                    <View style={styles.sideRight}>
+                        <TouchableOpacity
+                            style={[
+                                styles.iconButton,
+                                isOneEnabled &&
+                                styles.iconButtonActive,
+                                isBothEnabled &&
+                                styles.iconButtonFullyActive,
+                            ]}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                                navigation.navigate(
+                                    "Notifications"
+                                )
+                            }
+                        >
+                            <FontAwesome6
+                                name="bell"
+                                size={20}
+                                color={bellColor}
+                            />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
         </SafeAreaView>
@@ -256,97 +301,173 @@ const createStyles = (
 ) =>
     StyleSheet.create({
         safeArea: {
-            backgroundColor: theme.bg,
+            backgroundColor:
+                theme.background,
         },
 
-        container: {
-            height: 76,
-            backgroundColor: theme.bg,
+        headerBackground: {
+            backgroundColor:
+                theme.background,
+            paddingHorizontal: 14,
+            paddingTop: 8,
+            paddingBottom: 14,
+        },
+
+        card: {
+            height: 82,
+            backgroundColor:
+                theme.card,
+            borderRadius: 26,
+
             flexDirection: "row",
             alignItems: "center",
+            justifyContent: "space-between",
+
             paddingHorizontal: 16,
+
+            position: "relative",
+
+            borderWidth: 1,
+            borderColor:
+                theme.border,
+
+            shadowColor: "#000",
+            shadowOffset: {
+                width: 0,
+                height: 8,
+            },
+            shadowOpacity:
+                theme.mode === "day"
+                    ? 0.14
+                    : 0.28,
+            shadowRadius: 18,
+
+            elevation: 9,
         },
 
         sideLeft: {
-            width: 92,
-            alignItems: "flex-start",
+            width: 72,
+            height: "100%",
+
             justifyContent: "center",
-            zIndex: 100,
-            elevation: 100,
+            alignItems: "flex-start",
+
+            zIndex: 5,
         },
 
         sideRight: {
-            width: 92,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "flex-end",
-            gap: 10,
-            zIndex: 100,
-            elevation: 100,
+            width: 72,
+            height: "100%",
+
+            justifyContent: "center",
+            alignItems: "flex-end",
+
+            zIndex: 5,
         },
 
         avatarButton: {
-            width: 42,
-            height: 42,
-            borderRadius: 21,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: theme.card,
+
+            backgroundColor: "#FFFFFF",
+
             borderWidth: 2,
-            borderColor: "#FFFFFF",
+            borderColor: "#E6F8FC",
+
             overflow: "hidden",
+
+            shadowColor: theme.cyan,
+            shadowOffset: {
+                width: 0,
+                height: 3,
+            },
+            shadowOpacity: 0.14,
+            shadowRadius: 7,
+
+            elevation: 4,
         },
 
         avatarImage: {
             width: "100%",
             height: "100%",
-            borderRadius: 21,
+            borderRadius: 22,
         },
 
         logoWrapper: {
-            flex: 1,
-            alignItems: "center",
+            position: "absolute",
+
+            left: 72,
+            right: 72,
+            top: 0,
+            bottom: 0,
+
             justifyContent: "center",
+            alignItems: "center",
+
             zIndex: 1,
-            elevation: 1,
         },
 
         logoPressable: {
-            alignItems: "center",
             justifyContent: "center",
+            alignItems: "center",
         },
 
         logo: {
-            width: 260,
-            height: 90,
+            width: 190,
+            height: 58,
+
             transform: [
-                { scale: 1.35 },
-                { rotate: "2deg" },
-                { translateX: -10 },
-                { translateY: 10 },
+                { scale: 2.10 },
+
+                // Left = negative
+                { translateX: -4 },
+
+                // Down = positive
+                { translateY: 2 },
+
+                { rotate: "1deg" },
             ],
         },
 
         iconButton: {
-            width: 36,
-            height: 36,
-            borderRadius: 18,
+            width: 44,
+            height: 44,
+            borderRadius: 14,
+
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: theme.card,
+
+            backgroundColor: "#FFFFFF",
+
             borderWidth: 1,
-            borderColor: theme.border,
+            borderColor: "#E6F8FC",
+
+            shadowColor: theme.cyan,
+            shadowOffset: {
+                width: 0,
+                height: 3,
+            },
+            shadowOpacity: 0.14,
+            shadowRadius: 7,
+
+            elevation: 4,
         },
 
         iconButtonActive: {
             backgroundColor:
-                "rgba(255,255,255,0.22)",
-            borderColor: "#FFFFFF",
+                theme.activeBackground,
+            borderColor:
+                theme.activeBorder,
         },
 
         iconButtonFullyActive: {
             backgroundColor:
                 theme.yellow,
-            borderColor: theme.yellow,
+            borderColor:
+                theme.yellow,
         },
     });

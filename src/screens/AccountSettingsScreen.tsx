@@ -647,7 +647,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const isUsernameValid = useMemo(() => {
         return (
-            username.length >= 3 &&
+            username.length >= 6 &&
             username.length <= 20 &&
             /^[a-z0-9._]+$/.test(username)
         );
@@ -745,7 +745,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
-        if (username.length < 3) {
+        if (username.length < 6) {
             setUsernameError(
                 "Your username must contain at least 3 characters."
             );
@@ -1143,7 +1143,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                         styles.helperText
                                     }
                                 >
-                                    3 to 20 characters. Letters,
+                                    6 to 20 characters. Letters,
                                     numbers, periods, and
                                     underscores only.
                                 </Text>

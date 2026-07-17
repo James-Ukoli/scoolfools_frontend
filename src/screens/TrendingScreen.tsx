@@ -18,7 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import AppHeader from "../components/AppHeader";
 import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
-type ContentTab = "trending" | "blog";
+type ContentTab = "news" | "blog";
 type TimeTheme = "day" | "night";
 
 type Post = {
@@ -47,7 +47,7 @@ type CategoryOption = {
     label: string;
 };
 
-const TRENDING_CATEGORIES: CategoryOption[] = [
+const NEWS_CATEGORIES: CategoryOption[] = [
     { value: "All", label: "All" },
     { value: "Campus News", label: "📰 Campus News" },
     { value: "Sports", label: "🏆 Sports" },
@@ -176,7 +176,7 @@ export default function TrendingScreen({ navigation }: any) {
     const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
     const theme = getScreenTheme(themeMode);
 
-    const [activeTab, setActiveTab] = useState<ContentTab>("trending");
+    const [activeTab, setActiveTab] = useState<ContentTab>("news");
     const [selectedCategory, setSelectedCategory] = useState("All");
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
@@ -187,8 +187,8 @@ export default function TrendingScreen({ navigation }: any) {
     const slideAnim = useRef(new Animated.Value(0)).current;
     const feedFadeAnim = useRef(new Animated.Value(1)).current;
 
-    const activeColor = activeTab === "trending" ? theme.yellow : theme.cyan;
-    const categories = activeTab === "trending" ? TRENDING_CATEGORIES : BLOG_CATEGORIES;
+    const activeColor = activeTab === "news" ? theme.yellow : theme.cyan;
+    const categories = activeTab === "news" ? NEWS_CATEGORIES : BLOG_CATEGORIES;
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -217,7 +217,7 @@ export default function TrendingScreen({ navigation }: any) {
             const allPosts = (json.data || [])
                 .filter(
                     (post) =>
-                        post.content_type === "trending" || post.content_type === "blog"
+                        post.content_type === "news" || post.content_type === "blog"
                 )
                 .sort((a, b) => {
                     const dateA = new Date(a.created_at).getTime();
@@ -252,7 +252,7 @@ export default function TrendingScreen({ navigation }: any) {
         setActiveTab(tab);
 
         Animated.spring(slideAnim, {
-            toValue: tab === "trending" ? 0 : 1,
+            toValue: tab === "news" ? 0 : 1,
             useNativeDriver: false,
             tension: 75,
             friction: 9,
@@ -381,11 +381,11 @@ export default function TrendingScreen({ navigation }: any) {
                             styles.mainTabSlider,
                             {
                                 backgroundColor:
-                                    activeTab === "trending"
+                                    activeTab === "news"
                                         ? theme.yellow
                                         : theme.cyan,
                                 borderColor:
-                                    activeTab === "trending"
+                                    activeTab === "news"
                                         ? "rgba(250,204,21,0.60)"
                                         : theme.borderStrong,
                                 shadowColor: activeColor,
@@ -397,19 +397,19 @@ export default function TrendingScreen({ navigation }: any) {
                     <TouchableOpacity
                         activeOpacity={0.9}
                         style={styles.mainTabButton}
-                        onPress={() => handleTabPress("trending")}
+                        onPress={() => handleTabPress("news")}
                     >
                         <Text
                             style={[
                                 styles.mainTabText,
                                 { color: theme.textSoft },
-                                activeTab === "trending" && {
+                                activeTab === "news" && {
                                     color: "#07111F",
                                     textShadowColor: "transparent",
                                 },
                             ]}
                         >
-                            Trending
+                            News
                         </Text>
                     </TouchableOpacity>
 
@@ -492,7 +492,7 @@ export default function TrendingScreen({ navigation }: any) {
                                         {
                                             backgroundColor: theme.card,
                                             borderColor:
-                                                activeTab === "trending"
+                                                activeTab === "news"
                                                     ? "rgba(250,204,21,0.34)"
                                                     : theme.borderStrong,
                                             shadowColor: activeColor,
@@ -549,7 +549,7 @@ export default function TrendingScreen({ navigation }: any) {
 
                             {topStories.length > 0 && (
                                 <Text style={[styles.sectionTitle, { color: activeColor }]}>
-                                    {activeTab === "trending" ? "Recent Stories" : "Latest Blogs"}
+                                    {activeTab === "news" ? "Recent News" : "Latest Blogs"}
                                 </Text>
                             )}
 
@@ -613,7 +613,7 @@ export default function TrendingScreen({ navigation }: any) {
                                 <View style={styles.loadMoreWrap}>
                                     <ActivityIndicator size="small" color={activeColor} />
                                     <Text style={[styles.loadMoreText, { color: activeColor }]}>
-                                        Loading more {activeTab === "trending" ? "stories" : "blogs"}...
+                                        Loading more {activeTab === "news" ? "news stories" : "blogs"}...
                                     </Text>
                                 </View>
                             )}
@@ -621,7 +621,7 @@ export default function TrendingScreen({ navigation }: any) {
                             {!loadingMore && hasMoreStories && (
                                 <View style={styles.loadMoreHintWrap}>
                                     <Text style={[styles.loadMoreHintText, { color: theme.muted }]}>
-                                        Scroll for more {activeTab === "trending" ? "stories" : "blogs"}
+                                        Scroll for more {activeTab === "news" ? "news stories" : "blogs"}
                                     </Text>
                                 </View>
                             )}
@@ -629,7 +629,7 @@ export default function TrendingScreen({ navigation }: any) {
                     ) : (
                         <View style={styles.emptyState}>
                             <Text style={[styles.emptyStateText, { color: theme.muted }]}>
-                                No {activeTab === "trending" ? "trending posts" : "blog posts"} in this category yet.
+                                No {activeTab === "news" ? "news posts" : "blog posts"} in this category yet.
                             </Text>
                         </View>
                     )}
