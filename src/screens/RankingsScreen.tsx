@@ -18,6 +18,7 @@ import {
 } from "@expo-google-fonts/rajdhani";
 
 import AppHeader from "../components/AppHeader";
+import RankingsLeaderCard from "../components/RankingsLeaderCard";
 import { getCollegeLogo } from "../../assets/data/collegeLogos";
 
 type Sport =
@@ -26,9 +27,14 @@ type Sport =
     | "football"
     | "volleyball";
 
+type ApiSport =
+    | "college-chess"
+    | "basketball"
+    | "football"
+    | "volleyball";
+
 type Cadence = "weekly" | "quarterly";
 type PeriodType = "week" | "quarter";
-type RankingStatus = "draft" | "published";
 
 type RankingEntry = {
     rank: number;
@@ -41,17 +47,17 @@ type RankingEntry = {
 
 type SportsRanking = {
     _id: string;
-    sport: Sport;
+    sport: string;
     division?: string | null;
     season: string;
     cadence: Cadence;
     period_type: PeriodType;
     period_number: number;
     period_label?: string | null;
-    title: string;
+    title?: string | null;
     description?: string | null;
     entries: RankingEntry[];
-    status: RankingStatus;
+    status?: "draft" | "published";
     is_season_final?: boolean;
     published_at?: string | null;
     createdAt?: string;
@@ -76,12 +82,50 @@ type Movement = {
     label: string;
 };
 
+type Theme = {
+    page: string;
+    card: string;
+    cardAlt: string;
+    border: string;
+    borderSoft: string;
+    text: string;
+    muted: string;
+    subtle: string;
+    tab: string;
+    tabBorder: string;
+    activeTab: string;
+    activeTabText: string;
+    toggle: string;
+    arrow: string;
+    arrowDisabled: string;
+    goldRow: string;
+    silverRow: string;
+    bronzeRow: string;
+    errorBackground: string;
+    errorBorder: string;
+    errorText: string;
+};
+
 const API_BASE =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
+const API_PATH = "/api/sports-power-rankings";
 const ACCENT = "#06B6D4";
+
+/**
+ * This lets the UI continue using the simple "football" value while the
+ * backend receives "college-football".
+ *
+ * If your backend enum uses a different exact value, change only this map.
+ */
+const API_SPORT_MAP: Record<Sport, ApiSport> = {
+    "college-chess": "college-chess",
+    basketball: "basketball",
+    football: "football",
+    volleyball: "volleyball",
+};
 
 const SPORT_OPTIONS: {
     label: string;
@@ -93,6 +137,78 @@ const SPORT_OPTIONS: {
         { label: "Football", value: "football", icon: "🏈" },
         { label: "Volleyball", value: "volleyball", icon: "🏐" },
     ];
+
+const LIGHT_THEME: Theme = {
+    page: "#F7F9FC",
+    card: "#FFFFFF",
+    cardAlt: "#F4F7FA",
+    border: "#DDE4EC",
+    borderSoft: "#E8EDF3",
+    text: "#101318",
+    muted: "#667085",
+    subtle: "#98A2B3",
+    tab: "#FFFFFF",
+    tabBorder: "#D5DEE8",
+    activeTab: ACCENT,
+    activeTabText: "#061014",
+    toggle: "#FFFFFF",
+    arrow: "#EAF7FA",
+    arrowDisabled: "#F1F4F7",
+    goldRow: "#FFFBEA",
+    silverRow: "#F8FAFC",
+    bronzeRow: "#FFF7F0",
+    errorBackground: "#FFF2F2",
+    errorBorder: "#FFC5C5",
+    errorText: "#D92D20",
+};
+
+const DARK_THEME: Theme = {
+    page: "#000000",
+    card: "#070B11",
+    cardAlt: "#0B1119",
+    border: "#1A2634",
+    borderSoft: "#172330",
+    text: "#FFFFFF",
+    muted: "#9AA6B6",
+    subtle: "#6F7B8A",
+    tab: "#080C13",
+    tabBorder: "#253041",
+    activeTab: ACCENT,
+    activeTabText: "#041014",
+    toggle: "#080D15",
+    arrow: "#101824",
+    arrowDisabled: "#0B1119",
+    goldRow: "rgba(250,204,21,0.055)",
+    silverRow: "rgba(203,213,225,0.045)",
+    bronzeRow: "rgba(249,115,22,0.05)",
+    errorBackground: "rgba(255,92,92,0.08)",
+    errorBorder: "rgba(255,92,92,0.45)",
+    errorText: "#FF8B8B",
+};
+
+function isNightTime(date = new Date()): boolean {
+    const hour = date.getHours();
+
+    // Light: 7:00 AM through 6:59 PM
+    // Dark: 7:00 PM through 6:59 AM
+    return hour < 7 || hour >= 19;
+}
+
+function millisecondsUntilNextThemeChange(date = new Date()): number {
+    const next = new Date(date);
+    const hour = date.getHours();
+
+    if (hour < 7) {
+        next.setHours(7, 0, 0, 0);
+    } else if (hour < 19) {
+        next.setHours(19, 0, 0, 0);
+    } else {
+        next.setDate(next.getDate() + 1);
+        next.setHours(7, 0, 0, 0);
+    }
+
+    return Math.max(next.getTime() - date.getTime(), 1000);
+}
 
 function extractRanking(payload: RankingApiResponse): SportsRanking | null {
     return payload?.ranking ?? payload?.item ?? payload?.data ?? null;
@@ -150,34 +266,80 @@ function getSportTitle(sport: Sport): string {
     return SPORT_OPTIONS.find((item) => item.value === sport)?.label ?? "Rankings";
 }
 
-function getTopRowStyle(rank: number) {
-    if (rank === 1) return styles.goldRow;
-    if (rank === 2) return styles.silverRow;
-    if (rank === 3) return styles.bronzeRow;
-    return null;
+function getRankColor(rank: number, isDark: boolean): string {
+    if (rank === 1) return "#F2C400";
+    if (rank === 2) return isDark ? "#E2E8F0" : "#667085";
+    if (rank === 3) return "#F0782A";
+    return isDark ? "#FFFFFF" : "#101318";
 }
 
-function getTopRankStyle(rank: number) {
-    if (rank === 1) return styles.goldRank;
-    if (rank === 2) return styles.silverRank;
-    if (rank === 3) return styles.bronzeRank;
-    return null;
-}
-
-function getTopNameStyle(rank: number) {
-    if (rank === 1) return styles.goldName;
-    if (rank === 2) return styles.silverName;
-    if (rank === 3) return styles.bronzeName;
-    return null;
-}
-
-function RankingRow({ entry }: { entry: RankingEntry }) {
+function RankingRow({
+    entry,
+    theme,
+    isDark,
+}: {
+    entry: RankingEntry;
+    theme: Theme;
+    isDark: boolean;
+}) {
     const logoSource = getCollegeLogo(entry.logo_key);
     const movement = getMovement(entry);
 
+    const rowBackground =
+        entry.rank === 1
+            ? theme.goldRow
+            : entry.rank === 2
+                ? theme.silverRow
+                : entry.rank === 3
+                    ? theme.bronzeRow
+                    : theme.card;
+
+    const rankColor = getRankColor(entry.rank, isDark);
+
+    const movementColors =
+        movement.type === "up"
+            ? {
+                text: "#20C900",
+                border: isDark
+                    ? "rgba(57,255,20,0.45)"
+                    : "rgba(32,201,0,0.38)",
+                background: isDark
+                    ? "rgba(57,255,20,0.08)"
+                    : "rgba(32,201,0,0.07)",
+            }
+            : movement.type === "down"
+                ? {
+                    text: "#F04438",
+                    border: isDark
+                        ? "rgba(255,76,76,0.45)"
+                        : "rgba(240,68,56,0.34)",
+                    background: isDark
+                        ? "rgba(255,76,76,0.08)"
+                        : "rgba(240,68,56,0.06)",
+                }
+                : movement.type === "new"
+                    ? {
+                        text: ACCENT,
+                        border: "rgba(6,182,212,0.45)",
+                        background: "rgba(6,182,212,0.08)",
+                    }
+                    : {
+                        text: theme.muted,
+                        border: theme.border,
+                        background: theme.cardAlt,
+                    };
+
     return (
-        <View style={[styles.rankRow, getTopRowStyle(entry.rank)]}>
-            <Text style={[styles.rankNumber, getTopRankStyle(entry.rank)]}>
+        <View
+            style={[
+                styles.rankRow,
+                {
+                    backgroundColor: rowBackground,
+                    borderBottomColor: theme.borderSoft,
+                },
+            ]}
+        >
+            <Text style={[styles.rankNumber, { color: rankColor }]}>
                 {entry.rank}
             </Text>
 
@@ -189,7 +351,15 @@ function RankingRow({ entry }: { entry: RankingEntry }) {
                         resizeMode="contain"
                     />
                 ) : (
-                    <View style={styles.logoFallback}>
+                    <View
+                        style={[
+                            styles.logoFallback,
+                            {
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                    >
                         <Text style={styles.logoFallbackText}>🎓</Text>
                     </View>
                 )}
@@ -197,19 +367,26 @@ function RankingRow({ entry }: { entry: RankingEntry }) {
 
             <View style={styles.teamInfo}>
                 <Text
-                    style={[styles.teamName, getTopNameStyle(entry.rank)]}
-                    numberOfLines={2}
+                    style={[
+                        styles.teamName,
+                        {
+                            color:
+                                entry.rank <= 3
+                                    ? rankColor
+                                    : theme.text,
+                        },
+                    ]}
+                    numberOfLines={1}
                 >
                     {entry.team_name}
                 </Text>
 
                 {!!entry.record && (
-                    <Text style={styles.recordText}>Record: {entry.record}</Text>
-                )}
-
-                {!!entry.note && (
-                    <Text style={styles.noteText} numberOfLines={1}>
-                        {entry.note}
+                    <Text
+                        style={[styles.recordText, { color: theme.muted }]}
+                        numberOfLines={1}
+                    >
+                        {entry.record}
                     </Text>
                 )}
             </View>
@@ -217,19 +394,19 @@ function RankingRow({ entry }: { entry: RankingEntry }) {
             <View
                 style={[
                     styles.movementBadge,
-                    movement.type === "up" && styles.movementUp,
-                    movement.type === "down" && styles.movementDown,
-                    movement.type === "same" && styles.movementSame,
-                    movement.type === "new" && styles.movementNew,
+                    {
+                        backgroundColor: movementColors.background,
+                        borderColor: movementColors.border,
+                    },
                 ]}
             >
                 <Text
                     style={[
                         styles.movementText,
-                        movement.type === "up" && styles.movementUpText,
-                        movement.type === "down" && styles.movementDownText,
-                        movement.type === "same" && styles.movementSameText,
-                        movement.type === "new" && styles.movementNewText,
+                        {
+                            color: movementColors.text,
+                            fontSize: movement.type === "new" ? 10.5 : 12.5,
+                        },
                     ]}
                 >
                     {movement.label}
@@ -241,6 +418,9 @@ function RankingRow({ entry }: { entry: RankingEntry }) {
 
 export default function RankingsScreen() {
     const scrollRef = useRef<ScrollView>(null);
+
+    const [isDark, setIsDark] = useState(() => isNightTime());
+    const theme = isDark ? DARK_THEME : LIGHT_THEME;
 
     const [fontsLoaded] = useFonts({
         Rajdhani_600SemiBold,
@@ -259,6 +439,35 @@ export default function RankingsScreen() {
     const [error, setError] = useState("");
 
     const periodLabel = useMemo(() => getPeriodLabel(ranking), [ranking]);
+
+    const sortedEntries = useMemo(() => {
+        return (ranking?.entries ?? [])
+            .slice()
+            .sort((a, b) => a.rank - b.rank);
+    }, [ranking]);
+
+    const leader = sortedEntries[0] ?? null;
+    const remainingEntries = sortedEntries.slice(1);
+
+    useEffect(() => {
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+
+        const scheduleThemeUpdate = () => {
+            setIsDark(isNightTime());
+
+            timeout = setTimeout(() => {
+                scheduleThemeUpdate();
+            }, millisecondsUntilNextThemeChange());
+        };
+
+        scheduleThemeUpdate();
+
+        return () => {
+            if (timeout) {
+                clearTimeout(timeout);
+            }
+        };
+    }, []);
 
     const fetchJson = useCallback(
         async (url: string): Promise<RankingApiResponse> => {
@@ -289,7 +498,7 @@ export default function RankingsScreen() {
     const fetchLatestRanking = useCallback(
         async (sport: Sport, showMainLoader = true) => {
             if (!API_BASE) {
-                setError("API URL is missing from the Expo environment variables.");
+                setError("API URL is missing.");
                 setRanking(null);
                 setLoading(false);
                 return;
@@ -302,8 +511,10 @@ export default function RankingsScreen() {
 
                 setError("");
 
+                const apiSport = API_SPORT_MAP[sport];
+
                 const payload = await fetchJson(
-                    `${API_BASE}/api/sports-power-rankings/${sport}/latest`
+                    `${API_BASE}${API_PATH}/${apiSport}/latest`
                 );
 
                 const nextRanking = extractRanking(payload);
@@ -340,8 +551,10 @@ export default function RankingsScreen() {
                 setChangingPeriod(true);
                 setError("");
 
+                const apiSport = API_SPORT_MAP[selectedSport];
+
                 const payload = await fetchJson(
-                    `${API_BASE}/sports-power-rankings/${selectedSport}/period/${periodNumber}`
+                    `${API_BASE}${API_PATH}/${apiSport}/period/${periodNumber}`
                 );
 
                 const nextRanking = extractRanking(payload);
@@ -414,18 +627,38 @@ export default function RankingsScreen() {
     const renderRankings = () => {
         if (loading) {
             return (
-                <View style={styles.stateCard}>
+                <View
+                    style={[
+                        styles.stateCard,
+                        {
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                        },
+                    ]}
+                >
                     <ActivityIndicator size="small" color={ACCENT} />
-                    <Text style={styles.stateText}>Loading rankings...</Text>
                 </View>
             );
         }
 
         if (error && !ranking) {
             return (
-                <View style={styles.stateCard}>
-                    <Text style={styles.errorTitle}>Rankings unavailable</Text>
-                    <Text style={styles.errorText}>{error}</Text>
+                <View
+                    style={[
+                        styles.stateCard,
+                        {
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                        },
+                    ]}
+                >
+                    <Text style={[styles.errorTitle, { color: theme.text }]}>
+                        Rankings unavailable
+                    </Text>
+
+                    <Text style={[styles.errorText, { color: theme.errorText }]}>
+                        {error}
+                    </Text>
 
                     <TouchableOpacity
                         activeOpacity={0.85}
@@ -438,15 +671,19 @@ export default function RankingsScreen() {
             );
         }
 
-        if (!ranking || !ranking.entries?.length) {
+        if (!ranking || !sortedEntries.length || !leader) {
             return (
-                <View style={styles.stateCard}>
-                    <Text style={styles.emptyTitle}>
+                <View
+                    style={[
+                        styles.stateCard,
+                        {
+                            backgroundColor: theme.card,
+                            borderColor: theme.border,
+                        },
+                    ]}
+                >
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>
                         No {getSportTitle(selectedSport)} rankings yet
-                    </Text>
-
-                    <Text style={styles.stateText}>
-                        The latest published ranking will appear here.
                     </Text>
                 </View>
             );
@@ -455,29 +692,64 @@ export default function RankingsScreen() {
         return (
             <>
                 {!!error && (
-                    <View style={styles.inlineError}>
-                        <Text style={styles.inlineErrorText}>{error}</Text>
+                    <View
+                        style={[
+                            styles.inlineError,
+                            {
+                                backgroundColor: theme.errorBackground,
+                                borderColor: theme.errorBorder,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.inlineErrorText,
+                                { color: theme.errorText },
+                            ]}
+                        >
+                            {error}
+                        </Text>
                     </View>
                 )}
 
-                <View style={styles.rankingsCard}>
-                    {ranking.entries
-                        .slice()
-                        .sort((a, b) => a.rank - b.rank)
-                        .map((entry) => (
+                <RankingsLeaderCard
+                    entry={leader}
+                    sport={selectedSport}
+                    theme={theme}
+                    isDark={isDark}
+                    logoSource={getCollegeLogo(leader.logo_key)}
+                />
+
+                {!!remainingEntries.length && (
+                    <View
+                        style={[
+                            styles.rankingsCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                    >
+                        {remainingEntries.map((entry) => (
                             <RankingRow
                                 key={`${ranking._id}-${entry.rank}-${entry.team_name}`}
                                 entry={entry}
+                                theme={theme}
+                                isDark={isDark}
                             />
                         ))}
-                </View>
+                    </View>
+                )}
             </>
         );
     };
 
     if (!fontsLoaded) {
         return (
-            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={[styles.safeArea, { backgroundColor: theme.page }]}
+            >
                 <AppHeader />
 
                 <View style={styles.fullPageLoader}>
@@ -488,12 +760,15 @@ export default function RankingsScreen() {
     }
 
     return (
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.page }]}
+        >
             <AppHeader />
 
             <ScrollView
                 ref={scrollRef}
-                style={styles.container}
+                style={[styles.container, { backgroundColor: theme.page }]}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
@@ -502,18 +777,10 @@ export default function RankingsScreen() {
                         onRefresh={onRefresh}
                         tintColor={ACCENT}
                         colors={[ACCENT]}
-                        progressBackgroundColor="#0B1018"
+                        progressBackgroundColor={theme.card}
                     />
                 }
             >
-                <View style={styles.titleBlock}>
-                    <Text style={styles.eyebrow}>SPORTSZONE</Text>
-                    <Text style={styles.pageTitle}>Power Rankings</Text>
-                    <Text style={styles.pageSubtitle}>
-                        College teams ranked by current performance.
-                    </Text>
-                </View>
-
                 <ScrollView
                     horizontal
                     nestedScrollEnabled
@@ -529,23 +796,29 @@ export default function RankingsScreen() {
                                 activeOpacity={0.85}
                                 style={[
                                     styles.sportTab,
-                                    active && styles.sportTabActive,
+                                    {
+                                        backgroundColor: active
+                                            ? theme.activeTab
+                                            : theme.tab,
+                                        borderColor: active
+                                            ? theme.activeTab
+                                            : theme.tabBorder,
+                                    },
                                 ]}
                                 onPress={() => handleSportChange(sport.value)}
                             >
-                                <Text
-                                    style={[
-                                        styles.sportTabIcon,
-                                        active && styles.sportTabIconActive,
-                                    ]}
-                                >
+                                <Text style={styles.sportTabIcon}>
                                     {sport.icon}
                                 </Text>
 
                                 <Text
                                     style={[
                                         styles.sportTabText,
-                                        active && styles.sportTabTextActive,
+                                        {
+                                            color: active
+                                                ? theme.activeTabText
+                                                : theme.text,
+                                        },
                                     ]}
                                 >
                                     {sport.label}
@@ -555,43 +828,60 @@ export default function RankingsScreen() {
                     })}
                 </ScrollView>
 
-                <View style={styles.periodCard}>
+                <View
+                    style={[
+                        styles.periodCard,
+                        {
+                            backgroundColor: theme.toggle,
+                            borderColor: theme.border,
+                        },
+                    ]}
+                >
                     <TouchableOpacity
                         activeOpacity={0.8}
                         disabled={previousDisabled}
                         style={[
                             styles.periodArrowButton,
-                            previousDisabled && styles.periodArrowDisabled,
+                            {
+                                backgroundColor: previousDisabled
+                                    ? theme.arrowDisabled
+                                    : theme.arrow,
+                                borderColor: theme.border,
+                            },
+                            previousDisabled && styles.disabledControl,
                         ]}
                         onPress={goToPreviousPeriod}
                     >
                         <Text
                             style={[
                                 styles.periodArrowText,
-                                previousDisabled && styles.periodArrowTextDisabled,
+                                {
+                                    color: previousDisabled
+                                        ? theme.subtle
+                                        : ACCENT,
+                                },
                             ]}
                         >
                             ‹
                         </Text>
                     </TouchableOpacity>
 
-                    <View style={styles.periodCenter}>
-                        <Text style={styles.periodTitle}>{periodLabel}</Text>
-
-                        {!!ranking?.season && (
-                            <Text style={styles.periodSeason}>
-                                Season {ranking.season}
-                                {ranking.is_season_final ? " • Final" : ""}
-                            </Text>
-                        )}
-                    </View>
+                    <Text style={[styles.periodTitle, { color: theme.text }]}>
+                        {periodLabel}
+                    </Text>
 
                     <TouchableOpacity
                         activeOpacity={0.8}
                         disabled={nextDisabled}
                         style={[
                             styles.periodArrowButton,
-                            nextDisabled && styles.periodArrowDisabled,
+                            {
+                                backgroundColor: nextDisabled
+                                    ? theme.arrowDisabled
+                                    : theme.arrow,
+                                borderColor: theme.border,
+                            },
+                            nextDisabled && styles.disabledControl,
                         ]}
                         onPress={goToNextPeriod}
                     >
@@ -601,7 +891,11 @@ export default function RankingsScreen() {
                             <Text
                                 style={[
                                     styles.periodArrowText,
-                                    nextDisabled && styles.periodArrowTextDisabled,
+                                    {
+                                        color: nextDisabled
+                                            ? theme.subtle
+                                            : ACCENT,
+                                    },
                                 ]}
                             >
                                 ›
@@ -609,28 +903,6 @@ export default function RankingsScreen() {
                         )}
                     </TouchableOpacity>
                 </View>
-
-                {!!ranking?.title && (
-                    <View style={styles.rankingHeader}>
-                        <View style={styles.rankingHeaderText}>
-                            <Text style={styles.rankingTitle}>{ranking.title}</Text>
-
-                            {!!ranking.description && (
-                                <Text
-                                    style={styles.rankingDescription}
-                                    numberOfLines={2}
-                                >
-                                    {ranking.description}
-                                </Text>
-                            )}
-                        </View>
-
-                        <View style={styles.publishedPill}>
-                            <View style={styles.publishedDot} />
-                            <Text style={styles.publishedText}>Published</Text>
-                        </View>
-                    </View>
-                )}
 
                 {renderRankings()}
             </ScrollView>
@@ -641,18 +913,16 @@ export default function RankingsScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
 
     container: {
         flex: 1,
-        backgroundColor: "#000000",
     },
 
     contentContainer: {
-        paddingHorizontal: 16,
-        paddingTop: 10,
-        paddingBottom: 120,
+        paddingHorizontal: 14,
+        paddingTop: 8,
+        paddingBottom: 105,
     },
 
     fullPageLoader: {
@@ -661,452 +931,210 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
-    titleBlock: {
-        marginBottom: 12,
-    },
-
-    eyebrow: {
-        color: ACCENT,
-        fontSize: 12,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 2.2,
-    },
-
-    pageTitle: {
-        color: "#FFFFFF",
-        fontSize: 30,
-        lineHeight: 34,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.4,
-    },
-
-    pageSubtitle: {
-        color: "#8F9AAA",
-        fontSize: 13.5,
-        lineHeight: 18,
-        fontFamily: "Rajdhani_600SemiBold",
-        marginTop: 2,
-    },
-
     sportTabs: {
-        paddingBottom: 12,
-        gap: 8,
+        gap: 7,
+        paddingBottom: 8,
     },
 
     sportTab: {
-        minHeight: 42,
-        paddingHorizontal: 15,
-        borderRadius: 22,
+        height: 38,
+        paddingHorizontal: 13,
+        borderRadius: 19,
         borderWidth: 1,
-        borderColor: "#253041",
-        backgroundColor: "#080C13",
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
-        gap: 7,
-    },
-
-    sportTabActive: {
-        backgroundColor: ACCENT,
-        borderColor: ACCENT,
-        shadowColor: ACCENT,
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 4,
+        gap: 6,
     },
 
     sportTabIcon: {
-        color: "#FFFFFF",
-        fontSize: 16,
-    },
-
-    sportTabIconActive: {
-        color: "#041014",
+        fontSize: 15,
     },
 
     sportTabText: {
-        color: "#FFFFFF",
-        fontSize: 15,
+        fontSize: 14.5,
         fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.2,
-    },
-
-    sportTabTextActive: {
-        color: "#041014",
+        letterSpacing: 0.1,
     },
 
     periodCard: {
-        minHeight: 60,
-        borderRadius: 18,
-        backgroundColor: "#080D15",
+        height: 48,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#1D2B3B",
-        paddingHorizontal: 10,
+        paddingHorizontal: 8,
         flexDirection: "row",
         alignItems: "center",
-        marginBottom: 12,
+        justifyContent: "space-between",
+        marginBottom: 9,
     },
 
     periodArrowButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: "#101824",
+        width: 34,
+        height: 34,
+        borderRadius: 17,
         borderWidth: 1,
-        borderColor: "#2A3A4B",
         alignItems: "center",
         justifyContent: "center",
     },
 
-    periodArrowDisabled: {
-        opacity: 0.35,
+    disabledControl: {
+        opacity: 0.55,
     },
 
     periodArrowText: {
-        color: ACCENT,
-        fontSize: 31,
-        lineHeight: 32,
+        fontSize: 27,
+        lineHeight: 28,
         fontFamily: "Rajdhani_700Bold",
         marginTop: -2,
     },
 
-    periodArrowTextDisabled: {
-        color: "#6B7280",
-    },
-
-    periodCenter: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 10,
-    },
-
     periodTitle: {
-        color: "#FFFFFF",
-        fontSize: 18,
+        fontSize: 17,
         fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.35,
-    },
-
-    periodSeason: {
-        color: "#8490A1",
-        fontSize: 11.5,
-        fontFamily: "Rajdhani_600SemiBold",
-        marginTop: 1,
-    },
-
-    rankingHeader: {
-        paddingHorizontal: 2,
-        marginBottom: 10,
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-    },
-
-    rankingHeaderText: {
-        flex: 1,
-    },
-
-    rankingTitle: {
-        color: "#FFFFFF",
-        fontSize: 21,
-        lineHeight: 24,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.2,
-    },
-
-    rankingDescription: {
-        color: "#8F9AAA",
-        fontSize: 12.5,
-        lineHeight: 17,
-        fontFamily: "Rajdhani_600SemiBold",
-        marginTop: 2,
-    },
-
-    publishedPill: {
-        minHeight: 26,
-        borderRadius: 13,
-        borderWidth: 1,
-        borderColor: "rgba(34,197,94,0.55)",
-        backgroundColor: "rgba(34,197,94,0.12)",
-        paddingHorizontal: 9,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 5,
-    },
-
-    publishedDot: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: "#22C55E",
-    },
-
-    publishedText: {
-        color: "#68E391",
-        fontSize: 11.5,
-        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
     },
 
     rankingsCard: {
         overflow: "hidden",
-        borderRadius: 20,
-        backgroundColor: "#070B11",
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#1A2634",
     },
 
     rankRow: {
-        minHeight: 70,
+        minHeight: 57,
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 10,
-        paddingVertical: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: "#203040",
-    },
-
-    goldRow: {
-        backgroundColor: "rgba(250,204,21,0.055)",
-    },
-
-    silverRow: {
-        backgroundColor: "rgba(203,213,225,0.045)",
-    },
-
-    bronzeRow: {
-        backgroundColor: "rgba(249,115,22,0.05)",
     },
 
     rankNumber: {
-        width: 34,
-        color: "#FFFFFF",
-        fontSize: 22,
+        width: 29,
+        fontSize: 20,
         textAlign: "center",
         fontFamily: "Rajdhani_700Bold",
     },
 
-    goldRank: {
-        color: "#FACC15",
-        textShadowColor: "rgba(250,204,21,0.7)",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 10,
-    },
-
-    silverRank: {
-        color: "#E2E8F0",
-        textShadowColor: "rgba(226,232,240,0.55)",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
-    },
-
-    bronzeRank: {
-        color: "#FB923C",
-        textShadowColor: "rgba(251,146,60,0.5)",
-        textShadowOffset: { width: 0, height: 0 },
-        textShadowRadius: 8,
-    },
-
     logoWrap: {
-        width: 52,
-        height: 52,
-        marginLeft: 6,
-        marginRight: 10,
+        width: 42,
+        height: 42,
+        marginLeft: 4,
+        marginRight: 8,
         alignItems: "center",
         justifyContent: "center",
     },
 
     collegeLogo: {
-        width: 48,
-        height: 48,
+        width: 40,
+        height: 40,
     },
 
     logoFallback: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: "#111A25",
+        width: 38,
+        height: 38,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: "#26384B",
         alignItems: "center",
         justifyContent: "center",
     },
 
     logoFallbackText: {
-        fontSize: 22,
+        fontSize: 19,
     },
 
     teamInfo: {
         flex: 1,
         minWidth: 0,
-        paddingRight: 8,
+        paddingRight: 6,
     },
 
     teamName: {
-        color: "#FFFFFF",
-        fontSize: 17.5,
-        lineHeight: 20,
+        fontSize: 16.5,
+        lineHeight: 18,
         fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.15,
-    },
-
-    goldName: {
-        color: "#FACC15",
-    },
-
-    silverName: {
-        color: "#E2E8F0",
-    },
-
-    bronzeName: {
-        color: "#FB923C",
+        letterSpacing: 0.1,
     },
 
     recordText: {
-        color: "#A7B1BF",
-        fontSize: 12.5,
-        lineHeight: 16,
-        fontFamily: "Rajdhani_600SemiBold",
-        marginTop: 2,
-    },
-
-    noteText: {
-        color: "#738095",
         fontSize: 11.5,
-        lineHeight: 15,
+        lineHeight: 14,
         fontFamily: "Rajdhani_600SemiBold",
         marginTop: 1,
     },
 
     movementBadge: {
-        minWidth: 48,
-        height: 30,
-        borderRadius: 15,
-        paddingHorizontal: 8,
+        minWidth: 44,
+        height: 27,
+        borderRadius: 14,
+        paddingHorizontal: 7,
+        borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
-        borderWidth: 1,
-    },
-
-    movementUp: {
-        backgroundColor: "rgba(57,255,20,0.09)",
-        borderColor: "rgba(57,255,20,0.5)",
-    },
-
-    movementDown: {
-        backgroundColor: "rgba(255,76,76,0.09)",
-        borderColor: "rgba(255,76,76,0.5)",
-    },
-
-    movementSame: {
-        backgroundColor: "rgba(148,163,184,0.08)",
-        borderColor: "rgba(148,163,184,0.34)",
-    },
-
-    movementNew: {
-        backgroundColor: "rgba(6,182,212,0.1)",
-        borderColor: "rgba(6,182,212,0.55)",
     },
 
     movementText: {
-        color: "#FFFFFF",
-        fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
     },
 
-    movementUpText: {
-        color: "#39FF14",
-    },
-
-    movementDownText: {
-        color: "#FF5C5C",
-    },
-
-    movementSameText: {
-        color: "#A7B1BF",
-    },
-
-    movementNewText: {
-        color: ACCENT,
-        fontSize: 11.5,
-    },
-
     stateCard: {
-        minHeight: 180,
-        borderRadius: 20,
-        backgroundColor: "#070B11",
+        minHeight: 145,
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: "#1A2634",
-        paddingHorizontal: 24,
-        paddingVertical: 28,
+        paddingHorizontal: 22,
+        paddingVertical: 24,
         alignItems: "center",
         justifyContent: "center",
     },
 
-    stateText: {
-        color: "#8F9AAA",
-        fontSize: 13.5,
-        lineHeight: 19,
-        fontFamily: "Rajdhani_600SemiBold",
-        textAlign: "center",
-        marginTop: 9,
-    },
-
     emptyTitle: {
-        color: "#FFFFFF",
-        fontSize: 19,
+        fontSize: 18,
         fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
     },
 
     errorTitle: {
-        color: "#FFFFFF",
-        fontSize: 19,
+        fontSize: 18,
         fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
-        marginBottom: 6,
+        marginBottom: 5,
     },
 
     errorText: {
-        color: "#FF7676",
-        fontSize: 13,
-        lineHeight: 18,
+        fontSize: 12.5,
+        lineHeight: 17,
         fontFamily: "Rajdhani_600SemiBold",
         textAlign: "center",
     },
 
     retryButton: {
-        minWidth: 110,
-        height: 40,
-        borderRadius: 20,
+        minWidth: 104,
+        height: 37,
+        borderRadius: 19,
         backgroundColor: ACCENT,
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 16,
-        paddingHorizontal: 18,
+        marginTop: 14,
+        paddingHorizontal: 16,
     },
 
     retryButtonText: {
         color: "#041014",
-        fontSize: 15,
+        fontSize: 14.5,
         fontFamily: "Rajdhani_700Bold",
     },
 
     inlineError: {
-        borderRadius: 12,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: "rgba(255,92,92,0.45)",
-        backgroundColor: "rgba(255,92,92,0.08)",
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        marginBottom: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 7,
+        marginBottom: 8,
     },
 
     inlineErrorText: {
-        color: "#FF8B8B",
-        fontSize: 12.5,
-        lineHeight: 17,
+        fontSize: 12,
+        lineHeight: 16,
         fontFamily: "Rajdhani_600SemiBold",
         textAlign: "center",
     },

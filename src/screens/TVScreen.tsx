@@ -16,7 +16,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
 import AppHeader from "../components/AppHeader";
 import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
@@ -70,7 +69,7 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const PLAYER_WIDTH = SCREEN_WIDTH - 60;
+const PLAYER_WIDTH = SCREEN_WIDTH - 10;
 const PLAYER_HEIGHT = PLAYER_WIDTH * 0.5625;
 
 const getCurrentThemeMode = (): TimeTheme => {
@@ -223,8 +222,6 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
 };
 
 export default function TVScreen() {
-    const navigation = useNavigation<any>();
-
     const [fontsLoaded] = useFonts({
         Rajdhani_700Bold,
     });
@@ -238,7 +235,7 @@ export default function TVScreen() {
     const [selectedStream, setSelectedStream] = useState<StreamItem | null>(null);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [showAll, setShowAll] = useState(false);
+    const [visibleCount, setVisibleCount] = useState(3);
 
     const sscAnim = useRef(new Animated.Value(0)).current;
     const glowAnim = useRef(new Animated.Value(0)).current;
@@ -341,7 +338,9 @@ export default function TVScreen() {
         return getGroupedLatestByTitle(filtered);
     }, [streams, selectedMode]);
 
-    const renderedStreams = showAll ? modeStreams : modeStreams.slice(0, 3);
+    const limitedModeStreams = modeStreams.slice(0, 10);
+    const renderedStreams = limitedModeStreams.slice(0, visibleCount);
+    const hasMoreStreams = visibleCount < limitedModeStreams.length;
 
     const broadcastOptions = useMemo(() => {
         if (!selectedStream) return [];
@@ -366,7 +365,7 @@ export default function TVScreen() {
         }).start();
 
         setSelectedMode(nextMode);
-        setShowAll(false);
+        setVisibleCount(3);
 
         const nextItems = streams.filter((item) =>
             nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
@@ -457,31 +456,6 @@ export default function TVScreen() {
                     </View>
                 ) : (
                     <>
-                        <View style={styles.headerRow}>
-                            <View style={styles.titleRow}>
-                                <Text style={styles.faceEmoji}>🤪</Text>
-                                <Text style={styles.screenTitle}>Scoolfools TV</Text>
-                            </View>
-
-                            <View style={styles.headerIcons}>
-                                <MaterialCommunityIcons
-                                    name="magnify"
-                                    size={26}
-                                    color={theme.text}
-                                />
-                                <View>
-                                    <MaterialCommunityIcons
-                                        name="bell-outline"
-                                        size={26}
-                                        color={theme.text}
-                                    />
-                                    <View style={styles.badgeBubble}>
-                                        <Text style={styles.badgeBubbleText}>3</Text>
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
-
                         <View style={styles.segmentWrap}>
                             <Animated.View
                                 style={[
@@ -500,7 +474,11 @@ export default function TVScreen() {
                                 <MaterialCommunityIcons
                                     name="play-circle"
                                     size={18}
-                                    color={selectedMode === "watch" ? "#FFFFFF" : theme.inactive}
+                                    color={
+                                        selectedMode === "watch"
+                                            ? "#FFFFFF"
+                                            : theme.inactive
+                                    }
                                 />
                                 <Text
                                     style={[
@@ -520,7 +498,13 @@ export default function TVScreen() {
                                 <MaterialCommunityIcons
                                     name="headphones"
                                     size={18}
-                                    color={selectedMode === "listen" ? "#07111F" : theme.inactive}
+                                    color={
+                                        selectedMode === "listen"
+                                            ? theme.mode === "night"
+                                                ? "#FFFFFF"
+                                                : "#07111F"
+                                            : theme.inactive
+                                    }
                                 />
                                 <Text
                                     style={[
@@ -614,13 +598,27 @@ export default function TVScreen() {
 
                             <View style={styles.heroInfo}>
                                 <View style={styles.liveRow}>
-                                    <View style={styles.liveDot} />
+                                    <View
+                                        style={[
+                                            styles.liveDot,
+                                            {
+                                                backgroundColor:
+                                                    selectedStream.type === "Live"
+                                                        ? theme.yellow
+                                                        : selectedStream.type === "Podcast"
+                                                            ? theme.cyan
+                                                            : "#60A5FA",
+                                            },
+                                        ]}
+                                    />
                                     <Text style={styles.liveText}>
-                                        {selectedStream.liveStatus === "live"
-                                            ? "LIVE NOW"
-                                            : selectedStream.liveStatus === "ended"
-                                                ? "ENDED"
-                                                : "UPCOMING"}
+                                        {selectedStream.type === "Live"
+                                            ? selectedStream.liveStatus === "live"
+                                                ? "LIVE NOW"
+                                                : selectedStream.liveStatus === "ended"
+                                                    ? "ENDED"
+                                                    : "UPCOMING"
+                                            : selectedStream.type.toUpperCase()}
                                     </Text>
                                 </View>
 
@@ -633,28 +631,25 @@ export default function TVScreen() {
                                 </Text>
 
                                 <View style={styles.heroBottomRow}>
-                                    <View style={styles.heroStatus}>
-                                        <MaterialCommunityIcons
-                                            name={
-                                                selectedStream.type === "Podcast"
+                                    <MaterialCommunityIcons
+                                        name={
+                                            selectedStream.type === "Live"
+                                                ? "access-point"
+                                                : selectedStream.type === "Podcast"
                                                     ? "headphones"
-                                                    : "access-point"
-                                            }
-                                            size={17}
-                                            color={theme.cyan}
-                                        />
-                                        <Text style={styles.heroStatusText}>
-                                            {getStatusLabel(selectedStream)}
-                                        </Text>
-                                    </View>
+                                                    : "clock-outline"
+                                        }
+                                        size={17}
+                                        color={theme.cyan}
+                                    />
 
-                                    <View style={styles.heroDivider} />
-
-                                    <Text style={styles.heroTimeText}>
-                                        {selectedStream.duration || "+ Multiple Broadcasts"}
+                                    <Text style={styles.heroStatusText}>
+                                        {getStatusLabel(selectedStream)}
                                     </Text>
 
-                                    <TouchableOpacity style={styles.expandButton} activeOpacity={0.8}>
+                                    <View style={{ flex: 1 }} />
+
+                                    <TouchableOpacity style={styles.expandButton}>
                                         <MaterialCommunityIcons
                                             name="arrow-expand"
                                             size={18}
@@ -675,14 +670,16 @@ export default function TVScreen() {
                                 {selectedMode === "watch" ? "LATEST WATCH" : "LATEST PODCASTS"}
                             </Text>
 
-                            {modeStreams.length > 3 && (
+                            {hasMoreStreams && (
                                 <TouchableOpacity
                                     activeOpacity={0.8}
-                                    onPress={() => setShowAll((prev) => !prev)}
+                                    onPress={() =>
+                                        setVisibleCount((current) =>
+                                            Math.min(current + 3, limitedModeStreams.length)
+                                        )
+                                    }
                                 >
-                                    <Text style={styles.viewAllText}>
-                                        {showAll ? "Show less" : "View all"}
-                                    </Text>
+                                    <Text style={styles.viewAllText}>See more</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
@@ -771,6 +768,25 @@ export default function TVScreen() {
                                 </TouchableOpacity>
                             );
                         })}
+
+                        {hasMoreStreams && (
+                            <TouchableOpacity
+                                activeOpacity={0.85}
+                                onPress={() =>
+                                    setVisibleCount((current) =>
+                                        Math.min(current + 3, limitedModeStreams.length)
+                                    )
+                                }
+                                style={styles.seeMoreButton}
+                            >
+                                <Text style={styles.seeMoreButtonText}>See more</Text>
+                                <MaterialCommunityIcons
+                                    name="chevron-down"
+                                    size={20}
+                                    color={theme.cyan}
+                                />
+                            </TouchableOpacity>
+                        )}
                     </>
                 )}
             </ScrollView>
@@ -800,48 +816,6 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             backgroundColor: theme.bg,
         },
 
-        headerRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 18,
-        },
-        titleRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-        },
-        faceEmoji: {
-            fontSize: 39,
-        },
-        screenTitle: {
-            color: theme.text,
-            fontSize: 27,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.2,
-        },
-        headerIcons: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 18,
-        },
-        badgeBubble: {
-            position: "absolute",
-            top: -10,
-            right: -10,
-            width: 22,
-            height: 22,
-            borderRadius: 11,
-            backgroundColor: theme.yellow,
-            alignItems: "center",
-            justifyContent: "center",
-        },
-        badgeBubbleText: {
-            color: "#07111F",
-            fontSize: 12,
-            fontWeight: "900",
-        },
-
         segmentWrap: {
             height: 56,
             borderRadius: 999,
@@ -866,7 +840,14 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             width: "50%",
             height: 48,
             borderRadius: 999,
-            backgroundColor: theme.cyan,
+            backgroundColor: theme.mode === "night" ? theme.card2 : theme.cyan,
+            borderWidth: theme.mode === "night" ? 1.2 : 0,
+            borderColor: theme.mode === "night" ? "rgba(255,255,255,0.78)" : "transparent",
+            shadowColor: "#FFFFFF",
+            shadowOpacity: theme.mode === "night" ? 0.42 : 0,
+            shadowRadius: theme.mode === "night" ? 11 : 0,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: theme.mode === "night" ? 5 : 0,
         },
         segmentButton: {
             flex: 1,
@@ -886,9 +867,19 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
         },
         segmentTextActive: {
             color: "#FFFFFF",
+            textShadowColor: theme.mode === "night"
+                ? "rgba(255,255,255,0.85)"
+                : "transparent",
+            textShadowRadius: theme.mode === "night" ? 8 : 0,
+            textShadowOffset: { width: 0, height: 0 },
         },
         segmentTextActiveListen: {
-            color: "#07111F",
+            color: theme.mode === "night" ? "#FFFFFF" : "#07111F",
+            textShadowColor: theme.mode === "night"
+                ? "rgba(255,255,255,0.85)"
+                : "transparent",
+            textShadowRadius: theme.mode === "night" ? 8 : 0,
+            textShadowOffset: { width: 0, height: 0 },
         },
 
         channelScroller: {
@@ -956,7 +947,6 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             width: 9,
             height: 9,
             borderRadius: 999,
-            backgroundColor: theme.yellow,
         },
         liveText: {
             color: theme.text,
@@ -994,17 +984,7 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             fontFamily: "Rajdhani_700Bold",
             letterSpacing: 0.2,
         },
-        heroDivider: {
-            width: 1,
-            height: 18,
-            backgroundColor: theme.border,
-        },
-        heroTimeText: {
-            flex: 1,
-            color: theme.cyan,
-            fontSize: 13,
-            fontWeight: "800",
-        },
+
         expandButton: {
             width: 32,
             height: 32,
@@ -1120,6 +1100,26 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             color: theme.muted,
             fontSize: 12,
             fontWeight: "700",
+        },
+
+        seeMoreButton: {
+            minHeight: 48,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: theme.cyan,
+            backgroundColor: theme.card,
+            marginTop: 2,
+            marginBottom: 12,
+            alignItems: "center",
+            justifyContent: "center",
+            flexDirection: "row",
+            gap: 6,
+        },
+        seeMoreButtonText: {
+            color: theme.cyan,
+            fontSize: 16,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.3,
         },
 
         emptyWrap: {

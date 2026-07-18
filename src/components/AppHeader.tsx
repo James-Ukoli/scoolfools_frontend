@@ -14,10 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
-import {
-    useFocusEffect,
-    useNavigation,
-} from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNotifications } from "../context/NotificationsContext";
 
@@ -58,11 +55,8 @@ const getHeaderTheme = (
 ) => ({
     mode,
 
-    // Only the outside header area changes.
-    background:
-        mode === "day"
-            ? "#F8FAFC"
-            : "#020617",
+    // The area outside the cyan card is fully transparent.
+    background: "transparent",
 
     // The floating card remains cyan.
     card: HEADER_CYAN,
@@ -88,6 +82,9 @@ export default function AppHeader() {
 
     const [user, setUser] =
         useState<StoredUser | null>(null);
+
+    const [userLoaded, setUserLoaded] =
+        useState(false);
 
     const [themeMode, setThemeMode] =
         useState<TimeTheme>(
@@ -135,6 +132,8 @@ export default function AppHeader() {
                 );
 
                 setUser(null);
+            } finally {
+                setUserLoaded(true);
             }
         },
         []
@@ -150,15 +149,13 @@ export default function AppHeader() {
             clearInterval(interval);
     }, [updateThemeMode]);
 
-    useFocusEffect(
-        useCallback(() => {
-            loadStoredUser();
-            updateThemeMode();
-        }, [
-            loadStoredUser,
-            updateThemeMode,
-        ])
-    );
+    useEffect(() => {
+        loadStoredUser();
+        updateThemeMode();
+    }, [
+        loadStoredUser,
+        updateThemeMode,
+    ]);
 
     const selectedAvatarSource =
         user?.selectedAvatar
@@ -208,7 +205,13 @@ export default function AppHeader() {
                                 )
                             }
                         >
-                            {selectedAvatarSource ? (
+                            {!userLoaded ? (
+                                <View
+                                    style={
+                                        styles.avatarPlaceholder
+                                    }
+                                />
+                            ) : selectedAvatarSource ? (
                                 <Image
                                     source={
                                         selectedAvatarSource
@@ -217,6 +220,7 @@ export default function AppHeader() {
                                         styles.avatarImage
                                     }
                                     resizeMode="cover"
+                                    fadeDuration={0}
                                 />
                             ) : remoteAvatarUrl ? (
                                 <Image
@@ -227,6 +231,7 @@ export default function AppHeader() {
                                         styles.avatarImage
                                     }
                                     resizeMode="cover"
+                                    fadeDuration={0}
                                 />
                             ) : (
                                 <Feather
@@ -261,6 +266,7 @@ export default function AppHeader() {
                                 source={require("../../assets/images/scoolfoolsheader.png")}
                                 style={styles.logo}
                                 resizeMode="contain"
+                                fadeDuration={0}
                             />
                         </TouchableOpacity>
                     </View>
@@ -301,16 +307,14 @@ const createStyles = (
 ) =>
     StyleSheet.create({
         safeArea: {
-            backgroundColor:
-                theme.background,
+            backgroundColor: "transparent",
         },
 
         headerBackground: {
-            backgroundColor:
-                theme.background,
+            backgroundColor: "transparent",
             paddingHorizontal: 14,
             paddingTop: 8,
-            paddingBottom: 14,
+            paddingBottom: 8,
         },
 
         card: {
@@ -338,11 +342,11 @@ const createStyles = (
             },
             shadowOpacity:
                 theme.mode === "day"
-                    ? 0.14
-                    : 0.28,
-            shadowRadius: 18,
+                    ? 0.08
+                    : 0.22,
+            shadowRadius: 12,
 
-            elevation: 9,
+            elevation: 6,
         },
 
         sideLeft: {
@@ -389,6 +393,11 @@ const createStyles = (
             shadowRadius: 7,
 
             elevation: 4,
+        },
+
+        avatarPlaceholder: {
+            width: "100%",
+            height: "100%",
         },
 
         avatarImage: {

@@ -174,15 +174,24 @@ export default function BottomTabs() {
     return (
         <Tab.Navigator
             initialRouteName="Home"
+            detachInactiveScreens={false}
             tabBar={(props) => <AnimatedTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
+                lazy: false,
+                animation: "none",
+                sceneStyle: {
+                    backgroundColor: "#FFFFFF",
+                },
             }}
         >
             <Tab.Screen name="Home" component={HomeScreen} />
             <Tab.Screen name="Buzz" component={TrendingScreen} />
             <Tab.Screen name="Dump" component={HomeScreen} />
-            <Tab.Screen name="SportsZone" component={RankingsScreen} />
+            <Tab.Screen
+                name="SportsZone"
+                component={RankingsScreen}
+            />
             <Tab.Screen name="TV" component={TVScreen} />
         </Tab.Navigator>
     );

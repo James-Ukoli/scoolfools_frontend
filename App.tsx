@@ -8,6 +8,11 @@ import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
 
+import {
+    useFonts,
+    Rajdhani_700Bold,
+} from "@expo-google-fonts/rajdhani";
+
 import BottomTabs from "./src/navigation/BottomTabs";
 import ArticleScreen from "./src/screens/ArticleScreen";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
@@ -40,7 +45,10 @@ type InitialRoute =
     | "IntroVideo"
     | "MainTabs";
 
-type OnboardingStage = "profile" | "introVideo" | "complete";
+type OnboardingStage =
+    | "profile"
+    | "introVideo"
+    | "complete";
 
 const isTokenExpired = (token: string) => {
     try {
@@ -76,14 +84,20 @@ export default function App() {
     const [initialRoute, setInitialRoute] =
         useState<InitialRoute | null>(null);
 
+    const [fontsLoaded, fontError] = useFonts({
+        Rajdhani_700Bold,
+    });
+
     useEffect(() => {
         const setupApp = async () => {
             try {
                 const iosClientId =
-                    process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+                    process.env
+                        .EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 
                 const webClientId =
-                    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+                    process.env
+                        .EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
 
                 if (iosClientId) {
                     GoogleSignin.configure({
@@ -98,29 +112,45 @@ export default function App() {
                 }
 
                 const [token, storedUser] =
-                    await AsyncStorage.multiGet(["token", "user"]);
+                    await AsyncStorage.multiGet([
+                        "token",
+                        "user",
+                    ]);
 
                 const tokenValue = token[1];
                 const storedUserValue = storedUser[1];
 
-                if (!tokenValue || isTokenExpired(tokenValue)) {
-                    await AsyncStorage.multiRemove(["token", "user"]);
+                if (
+                    !tokenValue ||
+                    isTokenExpired(tokenValue)
+                ) {
+                    await AsyncStorage.multiRemove([
+                        "token",
+                        "user",
+                    ]);
+
                     setInitialRoute("GoogleSignIn");
                     return;
                 }
 
                 if (!storedUserValue) {
-                    await AsyncStorage.multiRemove(["token", "user"]);
+                    await AsyncStorage.multiRemove([
+                        "token",
+                        "user",
+                    ]);
+
                     setInitialRoute("GoogleSignIn");
                     return;
                 }
 
                 try {
-                    const user = JSON.parse(storedUserValue);
+                    const user =
+                        JSON.parse(storedUserValue);
 
-                    const route = getRouteFromOnboardingStage(
-                        user?.onboardingStage
-                    );
+                    const route =
+                        getRouteFromOnboardingStage(
+                            user?.onboardingStage
+                        );
 
                     setInitialRoute(route);
                 } catch (parseError) {
@@ -129,11 +159,19 @@ export default function App() {
                         parseError
                     );
 
-                    await AsyncStorage.multiRemove(["token", "user"]);
+                    await AsyncStorage.multiRemove([
+                        "token",
+                        "user",
+                    ]);
+
                     setInitialRoute("GoogleSignIn");
                 }
             } catch (error) {
-                console.log("App bootstrap error:", error);
+                console.log(
+                    "App bootstrap error:",
+                    error
+                );
+
                 setInitialRoute("GoogleSignIn");
             }
         };
@@ -141,7 +179,20 @@ export default function App() {
         setupApp();
     }, []);
 
-    if (!initialRoute) {
+    useEffect(() => {
+        if (fontError) {
+            console.log(
+                "Rajdhani font loading error:",
+                fontError
+            );
+        }
+    }, [fontError]);
+
+    const appReady =
+        initialRoute !== null &&
+        (fontsLoaded || !!fontError);
+
+    if (!appReady) {
         return (
             <SafeAreaProvider>
                 <View
@@ -181,7 +232,7 @@ export default function App() {
                             headerShown: false,
                             animation: "none",
                             contentStyle: {
-                                backgroundColor: "#FFFFFF",
+                                backgroundColor: "#F8FAFC",
                             },
                         }}
                     >
@@ -224,10 +275,12 @@ export default function App() {
                             name="Menu"
                             component={MenuScreen}
                         />
+
                         <Stack.Screen
                             name="AccountSettings"
                             component={AccountSettingsScreen}
                         />
+
                         <Stack.Screen
                             name="ReviewerLogin"
                             component={ReviewerLoginScreen}
