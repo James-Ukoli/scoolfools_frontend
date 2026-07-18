@@ -50,27 +50,35 @@ const getCurrentThemeMode = (): TimeTheme => {
         : "night";
 };
 
-const getHeaderTheme = (
-    mode: TimeTheme
-) => ({
-    mode,
+const getHeaderTheme = (mode: TimeTheme) => {
+    const isDay = mode === "day";
 
-    // The area outside the cyan card is fully transparent.
-    background: "transparent",
+    return {
+        mode,
 
-    // The floating card remains cyan.
-    card: HEADER_CYAN,
+        // Match the rest of the app instead of using a cyan banner.
+        background: isDay ? "#FFFFFF" : "#020617",
+        card: isDay ? "#FFFFFF" : "#07111F",
+        surface: isDay ? "#F8FDFF" : "#0B1728",
 
-    icon: "#07111F",
-    cyan: HEADER_CYAN,
-    yellow: "#FACC15",
+        icon: isDay ? "#07111F" : "#FFFFFF",
+        cyan: HEADER_CYAN,
+        yellow: "#FACC15",
 
-    border: "rgba(255,255,255,0.20)",
-    activeBackground:
-        "rgba(6,182,212,0.10)",
-    activeBorder:
-        "rgba(6,182,212,0.30)",
-});
+        border: isDay
+            ? "rgba(7,17,31,0.10)"
+            : "rgba(255,255,255,0.09)",
+        buttonBorder: isDay
+            ? "rgba(7,17,31,0.10)"
+            : "rgba(255,255,255,0.12)",
+        activeBackground: isDay
+            ? "rgba(6,182,212,0.10)"
+            : "rgba(34,211,238,0.12)",
+        activeBorder: isDay
+            ? "rgba(6,182,212,0.30)"
+            : "rgba(34,211,238,0.35)",
+    };
+};
 
 export default function AppHeader() {
     const navigation = useNavigation<any>();
@@ -307,21 +315,21 @@ const createStyles = (
 ) =>
     StyleSheet.create({
         safeArea: {
-            backgroundColor: "transparent",
+            backgroundColor: theme.background,
         },
 
         headerBackground: {
-            backgroundColor: "transparent",
+            backgroundColor: theme.background,
             paddingHorizontal: 14,
-            paddingTop: 8,
-            paddingBottom: 8,
+            paddingTop: 5,
+            paddingBottom: 5,
         },
 
         card: {
-            height: 82,
+            height: 68,
             backgroundColor:
                 theme.card,
-            borderRadius: 26,
+            borderRadius: 20,
 
             flexDirection: "row",
             alignItems: "center",
@@ -342,9 +350,9 @@ const createStyles = (
             },
             shadowOpacity:
                 theme.mode === "day"
-                    ? 0.08
-                    : 0.22,
-            shadowRadius: 12,
+                    ? 0.05
+                    : 0.14,
+            shadowRadius: 9,
 
             elevation: 6,
         },
@@ -377,10 +385,10 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor: "#FFFFFF",
+            backgroundColor: theme.surface,
 
-            borderWidth: 2,
-            borderColor: "#E6F8FC",
+            borderWidth: 1.5,
+            borderColor: theme.buttonBorder,
 
             overflow: "hidden",
 
@@ -426,18 +434,13 @@ const createStyles = (
         },
 
         logo: {
-            width: 190,
-            height: 58,
+            width: 180,
+            height: 52,
 
             transform: [
-                { scale: 2.10 },
-
-                // Left = negative
-                { translateX: -4 },
-
-                // Down = positive
-                { translateY: 2 },
-
+                { scale: 1.98 },   // was 2.10
+                { translateX: -3 }, // was -4
+                { translateY: 3 },  // was 2
                 { rotate: "1deg" },
             ],
         },
@@ -450,10 +453,10 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor: "#FFFFFF",
+            backgroundColor: theme.surface,
 
             borderWidth: 1,
-            borderColor: "#E6F8FC",
+            borderColor: theme.buttonBorder,
 
             shadowColor: theme.cyan,
             shadowOffset: {

@@ -60,11 +60,23 @@ function getIcon(routeName: string, focused: boolean, color: string) {
     }
 
     if (routeName === "Dump") {
-        return <MaterialCommunityIcons name="trash-can-outline" size={24} color={color} />;
+        return (
+            <MaterialCommunityIcons
+                name={focused ? "trash-can" : "trash-can-outline"}
+                size={24}
+                color={color}
+            />
+        );
     }
 
     if (routeName === "SportsZone") {
-        return <Ionicons name="basketball-outline" size={24} />
+        return (
+            <Ionicons
+                name={focused ? "basketball" : "basketball-outline"}
+                size={24}
+                color={color}
+            />
+        );
     }
 
     if (routeName === "TV") {
@@ -75,7 +87,7 @@ function getIcon(routeName: string, focused: boolean, color: string) {
 }
 
 function getLabel(routeName: string) {
-    if (routeName === "SportsZone") return "SportsZone";
+    if (routeName === "SportsZone") return "Sports";
     return routeName;
 }
 

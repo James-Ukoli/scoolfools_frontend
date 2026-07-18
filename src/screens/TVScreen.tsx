@@ -597,31 +597,6 @@ export default function TVScreen() {
                             </View>
 
                             <View style={styles.heroInfo}>
-                                <View style={styles.liveRow}>
-                                    <View
-                                        style={[
-                                            styles.liveDot,
-                                            {
-                                                backgroundColor:
-                                                    selectedStream.type === "Live"
-                                                        ? theme.yellow
-                                                        : selectedStream.type === "Podcast"
-                                                            ? theme.cyan
-                                                            : "#60A5FA",
-                                            },
-                                        ]}
-                                    />
-                                    <Text style={styles.liveText}>
-                                        {selectedStream.type === "Live"
-                                            ? selectedStream.liveStatus === "live"
-                                                ? "LIVE NOW"
-                                                : selectedStream.liveStatus === "ended"
-                                                    ? "ENDED"
-                                                    : "UPCOMING"
-                                            : selectedStream.type.toUpperCase()}
-                                    </Text>
-                                </View>
-
                                 <Text style={styles.heroTitle} numberOfLines={2}>
                                     {selectedStream.title}
                                 </Text>
@@ -629,34 +604,6 @@ export default function TVScreen() {
                                 <Text style={styles.heroSubtitle} numberOfLines={1}>
                                     {selectedStream.subtitle}
                                 </Text>
-
-                                <View style={styles.heroBottomRow}>
-                                    <MaterialCommunityIcons
-                                        name={
-                                            selectedStream.type === "Live"
-                                                ? "access-point"
-                                                : selectedStream.type === "Podcast"
-                                                    ? "headphones"
-                                                    : "clock-outline"
-                                        }
-                                        size={17}
-                                        color={theme.cyan}
-                                    />
-
-                                    <Text style={styles.heroStatusText}>
-                                        {getStatusLabel(selectedStream)}
-                                    </Text>
-
-                                    <View style={{ flex: 1 }} />
-
-                                    <TouchableOpacity style={styles.expandButton}>
-                                        <MaterialCommunityIcons
-                                            name="arrow-expand"
-                                            size={18}
-                                            color={theme.text}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
 
                                 <View style={styles.heroAccentBar}>
                                     <View style={styles.heroAccentCyan} />
