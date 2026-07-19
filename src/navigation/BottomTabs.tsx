@@ -19,7 +19,7 @@ import TVScreen from "../screens/TVScreen";
 import RankingsScreen from "../screens/RankingsScreen";
 
 const Tab = createBottomTabNavigator();
-const SCREEN_WIDTH = Dimensions.get("window").width;
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 type TimeTheme = "day" | "night";
 
@@ -52,11 +52,23 @@ const getTabTheme = (mode: TimeTheme) => {
 
 function getIcon(routeName: string, focused: boolean, color: string) {
     if (routeName === "Home") {
-        return <Ionicons name={focused ? "home" : "home-outline"} size={23} color={color} />;
+        return (
+            <Ionicons
+                name={focused ? "home" : "home-outline"}
+                size={23}
+                color={color}
+            />
+        );
     }
 
     if (routeName === "Buzz") {
-        return <Ionicons name={focused ? "megaphone" : "megaphone-outline"} size={23} color={color} />;
+        return (
+            <Ionicons
+                name={focused ? "megaphone" : "megaphone-outline"}
+                size={23}
+                color={color}
+            />
+        );
     }
 
     if (routeName === "Dump") {
@@ -80,15 +92,20 @@ function getIcon(routeName: string, focused: boolean, color: string) {
     }
 
     if (routeName === "TV") {
-        return <MaterialCommunityIcons name="television-play" size={24} color={color} />;
+        return (
+            <MaterialCommunityIcons
+                name="television-play"
+                size={24}
+                color={color}
+            />
+        );
     }
 
     return null;
 }
 
 function getLabel(routeName: string) {
-    if (routeName === "SportsZone") return "Sports";
-    return routeName;
+    return routeName === "SportsZone" ? "Sports" : routeName;
 }
 
 function AnimatedTabBar({ state, navigation }: any) {
@@ -98,7 +115,9 @@ function AnimatedTabBar({ state, navigation }: any) {
     const tabWidth = SCREEN_WIDTH / state.routes.length;
     const bubbleWidth = tabWidth - 12;
 
-    const translateX = useRef(new Animated.Value(state.index * tabWidth + 6)).current;
+    const translateX = useRef(
+        new Animated.Value(state.index * tabWidth + 6)
+    ).current;
 
     useEffect(() => {
         Animated.spring(translateX, {
@@ -116,7 +135,10 @@ function AnimatedTabBar({ state, navigation }: any) {
                 {
                     backgroundColor: theme.bg,
                     borderTopColor: theme.border,
-                    height: Platform.OS === "android" ? 78 + insets.bottom : 72 + insets.bottom,
+                    height:
+                        Platform.OS === "android"
+                            ? 78 + insets.bottom
+                            : 72 + insets.bottom,
                     paddingBottom:
                         Platform.OS === "android"
                             ? Math.max(insets.bottom, 18)
@@ -136,9 +158,11 @@ function AnimatedTabBar({ state, navigation }: any) {
                 ]}
             />
 
-            {state.routes.map((route: any) => {
-                const focused = state.index === state.routes.indexOf(route);
-                const color = focused ? theme.bubbleText : theme.inactive;
+            {state.routes.map((route: any, index: number) => {
+                const focused = state.index === index;
+                const color = focused
+                    ? theme.bubbleText
+                    : theme.inactive;
 
                 const onPress = () => {
                     const event = navigation.emit({
@@ -187,7 +211,9 @@ export default function BottomTabs() {
         <Tab.Navigator
             initialRouteName="Home"
             detachInactiveScreens={false}
-            tabBar={(props) => <AnimatedTabBar {...props} />}
+            tabBar={(props) => (
+                <AnimatedTabBar {...props} />
+            )}
             screenOptions={{
                 headerShown: false,
                 lazy: false,
@@ -197,19 +223,36 @@ export default function BottomTabs() {
                 },
             }}
         >
-            <Tab.Screen name="Home" component={HomeScreen} />
-            <Tab.Screen name="Buzz" component={TrendingScreen} />
-            <Tab.Screen name="Dump" component={HomeScreen} />
+            <Tab.Screen
+                name="Home"
+                component={HomeScreen}
+            />
+
+            <Tab.Screen
+                name="Buzz"
+                component={TrendingScreen}
+            />
+
+            <Tab.Screen
+                name="Dump"
+                component={HomeScreen}
+            />
+
             <Tab.Screen
                 name="SportsZone"
                 component={RankingsScreen}
             />
-            <Tab.Screen name="TV" component={TVScreen} />
+
+            <Tab.Screen
+                name="TV"
+                component={TVScreen}
+            />
         </Tab.Navigator>
     );
 }
 
 const styles = StyleSheet.create({
+
     tabBar: {
         position: "absolute",
         left: 0,

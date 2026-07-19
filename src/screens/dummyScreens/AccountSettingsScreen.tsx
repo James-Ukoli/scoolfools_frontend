@@ -539,100 +539,63 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const [initialLoading, setInitialLoading] = useState(true);
 
     useEffect(() => {
+        let isMounted = true;
+
         const loadProfile = async () => {
             try {
                 setInitialLoading(true);
 
-                if (!API_BASE_URL) {
-                    throw new Error("API base URL is missing.");
-                }
+                const storedUserRaw = await AsyncStorage.getItem("user");
 
-                const token = await AsyncStorage.getItem("token");
-
-                if (!token) {
+                if (!storedUserRaw) {
                     throw new Error(
-                        "Your session has expired. Please sign in again."
+                        "Your saved profile could not be found. Please sign in again."
                     );
                 }
 
-                const response = await fetch(
-                    `${API_BASE_URL}/api/auth/me`,
-                    {
-                        method: "GET",
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    }
-                );
-
-                let data: any = {};
+                let profile: any = {};
 
                 try {
-                    data = await response.json();
+                    profile = JSON.parse(storedUserRaw);
                 } catch {
-                    data = {};
-                }
-
-                if (!response.ok) {
                     throw new Error(
-                        data?.message ||
-                        data?.error ||
-                        "Unable to load your profile."
+                        "Your saved profile information could not be read."
                     );
                 }
 
-                const user = data?.user || data;
-
-                const storedUserRaw =
-                    await AsyncStorage.getItem("user");
-
-                let storedUser: any = {};
-
-                if (storedUserRaw) {
-                    try {
-                        storedUser = JSON.parse(storedUserRaw);
-                    } catch {
-                        storedUser = {};
-                    }
+                if (!isMounted) {
+                    return;
                 }
-
-                const profile = {
-                    ...storedUser,
-                    ...user,
-                };
 
                 const avatarValue =
                     profile?.selectedAvatar ||
                     profile?.avatar ||
                     "";
 
-                setSelectedAvatar(avatarValue);
-                setUsername(profile?.username || "");
-
                 const level =
                     profile?.schoolLevel === "college" ||
-                    profile?.schoolLevel === "highSchool"
+                        profile?.schoolLevel === "highSchool"
                         ? profile.schoolLevel
                         : null;
-
-                setSchoolLevel(level);
 
                 const savedCollege =
                     level === "college"
                         ? profile?.collegeName || ""
                         : "";
 
-                setCollegeName(savedCollege);
-                setCollegeSearch(savedCollege);
-
-                setIsStudentAthlete(
+                const athleteValue =
                     typeof profile?.isStudentAthlete === "boolean"
                         ? profile.isStudentAthlete
-                        : false
-                );
+                        : false;
 
+                setSelectedAvatar(avatarValue);
+                setUsername(profile?.username || "");
+                setSchoolLevel(level);
+                setCollegeName(savedCollege);
+                setCollegeSearch(savedCollege);
+                setIsStudentAthlete(athleteValue);
                 setSelectedSport(
-                    profile?.isStudentAthlete
+                    athleteValue
                         ? profile?.sport || ""
                         : ""
                 );
@@ -654,13 +617,18 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     ]
                 );
             } finally {
-                setInitialLoading(false);
+                if (isMounted) {
+                    setInitialLoading(false);
+                }
             }
         };
 
         loadProfile();
-    }, [navigation]);
 
+        return () => {
+            isMounted = false;
+        };
+    }, []);
     const filteredColleges = useMemo(() => {
         const search = collegeSearch.trim().toLowerCase();
 
@@ -679,7 +647,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const isUsernameValid = useMemo(() => {
         return (
-            username.length >= 3 &&
+            username.length >= 6 &&
             username.length <= 20 &&
             /^[a-z0-9._]+$/.test(username)
         );
@@ -777,7 +745,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
-        if (username.length < 3) {
+        if (username.length < 6) {
             setUsernameError(
                 "Your username must contain at least 3 characters."
             );
@@ -876,7 +844,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             };
 
             const response = await fetch(
-                `${API_BASE_URL}/api/auth/me/setup-profile`,
+                `${API_BASE_URL}/api/auth/me/profile-settings`,
                 {
                     method: "PATCH",
                     headers: {
@@ -1009,7 +977,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         return (
             <SafeAreaView
                 style={styles.safeArea}
-                edges={["top", "left", "right"]}
+                edges={["left", "right"]}
             >
                 <View style={styles.initialLoadingContainer}>
                     <ActivityIndicator
@@ -1027,7 +995,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
     return (
         <SafeAreaView
             style={styles.safeArea}
-            edges={["top", "left", "right"]}
+            edges={["left", "right"]}
         >
             <KeyboardAvoidingView
                 style={styles.keyboardView}
@@ -1048,13 +1016,21 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         keyboardShouldPersistTaps="handled"
                     >
                         <View style={styles.header}>
+                            <TouchableOpacity
+                                style={styles.backButton}
+                                activeOpacity={0.8}
+                                onPress={() => navigation.goBack()}
+                            >
+                                <Text style={styles.backIcon}>‹</Text>
+                                <Text style={styles.backText}>Back</Text>
+                            </TouchableOpacity>
+
                             <Text style={styles.title}>
                                 Account Settings
                             </Text>
 
                             <Text style={styles.subtitle}>
-                                Choose how you will appear on
-                                ScoolFools.
+                                Update how you appear on ScoolFools.
                             </Text>
                         </View>
 
@@ -1167,7 +1143,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                         styles.helperText
                                     }
                                 >
-                                    3 to 20 characters. Letters,
+                                    6 to 20 characters. Letters,
                                     numbers, periods, and
                                     underscores only.
                                 </Text>
@@ -1737,7 +1713,7 @@ const styles = StyleSheet.create({
 
     scrollContent: {
         paddingHorizontal: 22,
-        paddingTop: 22,
+        paddingTop: 14,
         paddingBottom: 130,
     },
 
@@ -2094,5 +2070,25 @@ const styles = StyleSheet.create({
         fontWeight: "900",
         letterSpacing: 1.1,
         marginHorizontal: 12,
+    },
+    backButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        marginBottom: 18,
+    },
+
+    backIcon: {
+        color: "#06B6D4",
+        fontSize: 34,
+        lineHeight: 34,
+        fontWeight: "700",
+        marginRight: 2,
+    },
+
+    backText: {
+        color: "#06B6D4",
+        fontSize: 16,
+        fontWeight: "800",
     },
 });

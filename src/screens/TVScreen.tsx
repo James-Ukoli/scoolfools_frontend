@@ -16,8 +16,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import AppHeader from "../components/AppHeader";
-import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
 type StreamType = "Live" | "Podcast" | "Video" | "Highlight";
 type LiveStatus = "upcoming" | "live" | "ended";
@@ -222,10 +220,6 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
 };
 
 export default function TVScreen() {
-    const [fontsLoaded] = useFonts({
-        Rajdhani_700Bold,
-    });
-
     const [themeMode] = useState<TimeTheme>(getCurrentThemeMode());
     const theme = useMemo(() => getTheme(themeMode), [themeMode]);
     const styles = useMemo(() => createStyles(theme), [theme]);
@@ -413,10 +407,9 @@ export default function TVScreen() {
         return "clock-outline";
     };
 
-    if (loading || !fontsLoaded) {
+    if (loading) {
         return (
             <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-                <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={theme.cyan} />
                 </View>
@@ -426,7 +419,6 @@ export default function TVScreen() {
 
     return (
         <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-            <AppHeader />
 
             <ScrollView
                 style={styles.container}

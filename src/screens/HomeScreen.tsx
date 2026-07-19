@@ -23,18 +23,12 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as StoreReview from "expo-store-review";
 import ConfettiCannon from "react-native-confetti-cannon";
-import AppHeader from "../components/AppHeader";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
 import { finishTransaction } from "react-native-iap";
 
 import { s, vs, ms } from "react-native-size-matters";
-
-import {
-    useFonts,
-    Rajdhani_700Bold,
-} from "@expo-google-fonts/rajdhani";
 
 import {
     initializeIAP,
@@ -110,10 +104,6 @@ const getHomeTheme = (mode: TimeTheme) => {
 
 export default function HomeScreen() {
     const navigation = useNavigation<any>();
-
-    const [fontsLoaded] = useFonts({
-        Rajdhani_700Bold,
-    });
 
     const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
     const theme = getHomeTheme(themeMode);
@@ -434,30 +424,12 @@ export default function HomeScreen() {
         }
     }, [fetchHomeData]);
 
-    if (!fontsLoaded) {
-        return (
-            <SafeAreaView
-                edges={["left", "right"]}
-                style={[styles.safeArea, { backgroundColor: theme.bg }]}
-            >
-                <View style={[styles.container, { backgroundColor: theme.bg }]}>
-                    <AppHeader />
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={theme.cyan} />
-                    </View>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     return (
         <SafeAreaView
             edges={["left", "right"]}
             style={[styles.safeArea, { backgroundColor: theme.bg }]}
         >
             <View style={[styles.container, { backgroundColor: theme.bg }]}>
-                <AppHeader />
-
                 <ScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.scrollContent}

@@ -17,7 +17,6 @@ import {
     useFonts,
 } from "@expo-google-fonts/rajdhani";
 
-import AppHeader from "../components/AppHeader";
 import RankingsLeaderCard from "../components/RankingsLeaderCard";
 import { getCollegeLogo } from "../../assets/data/collegeLogos";
 
@@ -750,7 +749,6 @@ export default function RankingsScreen() {
                 edges={["left", "right"]}
                 style={[styles.safeArea, { backgroundColor: theme.page }]}
             >
-                <AppHeader />
 
                 <View style={styles.fullPageLoader}>
                     <ActivityIndicator size="small" color={ACCENT} />
@@ -764,7 +762,6 @@ export default function RankingsScreen() {
             edges={["left", "right"]}
             style={[styles.safeArea, { backgroundColor: theme.page }]}
         >
-            <AppHeader />
 
             <ScrollView
                 ref={scrollRef}

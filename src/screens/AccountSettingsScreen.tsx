@@ -977,7 +977,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         return (
             <SafeAreaView
                 style={styles.safeArea}
-                edges={["top", "left", "right"]}
+                edges={["left", "right"]}
             >
                 <View style={styles.initialLoadingContainer}>
                     <ActivityIndicator
@@ -995,7 +995,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
     return (
         <SafeAreaView
             style={styles.safeArea}
-            edges={["top", "left", "right"]}
+            edges={["left", "right"]}
         >
             <KeyboardAvoidingView
                 style={styles.keyboardView}
@@ -1713,7 +1713,7 @@ const styles = StyleSheet.create({
 
     scrollContent: {
         paddingHorizontal: 22,
-        paddingTop: 22,
+        paddingTop: 14,
         paddingBottom: 130,
     },
 

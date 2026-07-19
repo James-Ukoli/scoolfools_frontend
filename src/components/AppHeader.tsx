@@ -209,7 +209,10 @@ export default function AppHeader() {
                             activeOpacity={0.8}
                             onPress={() =>
                                 navigation.navigate(
-                                    "Menu"
+                                    "MainTabs",
+                                    {
+                                        screen: "Menu",
+                                    }
                                 )
                             }
                         >
@@ -263,7 +266,13 @@ export default function AppHeader() {
                             activeOpacity={0.8}
                             onPress={() =>
                                 navigation.navigate(
-                                    "Home"
+                                    "MainTabs",
+                                    {
+                                        screen: "MainTabs",
+                                        params: {
+                                            screen: "Home",
+                                        },
+                                    }
                                 )
                             }
                             style={
@@ -291,7 +300,10 @@ export default function AppHeader() {
                             activeOpacity={0.8}
                             onPress={() =>
                                 navigation.navigate(
-                                    "Notifications"
+                                    "MainTabs",
+                                    {
+                                        screen: "Notifications",
+                                    }
                                 )
                             }
                         >

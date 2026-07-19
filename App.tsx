@@ -13,7 +13,7 @@ import {
     Rajdhani_700Bold,
 } from "@expo-google-fonts/rajdhani";
 
-import BottomTabs from "./src/navigation/BottomTabs";
+import AppShell from "./src/navigation/AppShell";
 import ArticleScreen from "./src/screens/ArticleScreen";
 import EventDetailScreen from "./src/screens/EventDetail.Screen";
 import GoogleSignInScreen from "./src/screens/GoogleSignInScreen";
@@ -253,7 +253,7 @@ export default function App() {
 
                         <Stack.Screen
                             name="MainTabs"
-                            component={BottomTabs}
+                            component={AppShell}
                         />
 
                         <Stack.Screen

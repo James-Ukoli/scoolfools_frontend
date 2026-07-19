@@ -15,8 +15,6 @@ import {
     Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import AppHeader from "../components/AppHeader";
-import { useFonts, Rajdhani_700Bold } from "@expo-google-fonts/rajdhani";
 
 type ContentTab = "news" | "blog";
 type TimeTheme = "day" | "night";
@@ -169,10 +167,6 @@ function getCategoryBadgeStyle(category: string) {
 }
 
 export default function TrendingScreen({ navigation }: any) {
-    const [fontsLoaded] = useFonts({
-        Rajdhani_700Bold,
-    });
-
     const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
     const theme = getScreenTheme(themeMode);
 
@@ -324,13 +318,12 @@ export default function TrendingScreen({ navigation }: any) {
         outputRange: [12, 0],
     });
 
-    if (loading || !fontsLoaded) {
+    if (loading) {
         return (
             <SafeAreaView
                 edges={["left", "right"]}
                 style={[styles.safeArea, { backgroundColor: theme.bg }]}
             >
-                <AppHeader />
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="small" color={activeColor} />
                 </View>
@@ -343,7 +336,6 @@ export default function TrendingScreen({ navigation }: any) {
             edges={["left", "right"]}
             style={[styles.safeArea, { backgroundColor: theme.bg }]}
         >
-            <AppHeader />
 
             {refreshing && (
                 <View style={styles.refreshIndicator}>

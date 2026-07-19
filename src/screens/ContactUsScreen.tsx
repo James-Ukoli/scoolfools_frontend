@@ -15,11 +15,6 @@ import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as Clipboard from "expo-clipboard";
-import AppHeader from "../components/AppHeader";
-import {
-    useFonts,
-    Rajdhani_700Bold,
-} from "@expo-google-fonts/rajdhani";
 
 const CONTACT_EMAIL = "scoolfools@gmail.com";
 
@@ -62,10 +57,6 @@ export default function ContactUsScreen() {
     const themeMode = getCurrentThemeMode();
     const theme = useMemo(() => getTheme(themeMode), [themeMode]);
     const styles = useMemo(() => createStyles(theme), [theme]);
-
-    const [fontsLoaded] = useFonts({
-        Rajdhani_700Bold,
-    });
 
     const toastAnim = useRef(new Animated.Value(0)).current;
     const [toastVisible, setToastVisible] = useState(false);
@@ -122,17 +113,8 @@ export default function ContactUsScreen() {
         }
     };
 
-    if (!fontsLoaded) {
-        return (
-            <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
-                <AppHeader />
-            </SafeAreaView>
-        );
-    }
-
     return (
         <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
-            <AppHeader />
 
             <View style={styles.content}>
                 <View style={styles.topRow}>
