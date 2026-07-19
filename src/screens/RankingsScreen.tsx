@@ -1010,15 +1010,15 @@ const styles = StyleSheet.create({
     },
 
     rankNumber: {
-        width: 29,
-        fontSize: 20,
+        width: 25,
+        fontSize: 15,
         textAlign: "center",
         fontFamily: "Rajdhani_700Bold",
     },
 
     logoWrap: {
-        width: 42,
-        height: 42,
+        width: 36,
+        height: 36,
         marginLeft: 4,
         marginRight: 8,
         alignItems: "center",
@@ -1026,13 +1026,13 @@ const styles = StyleSheet.create({
     },
 
     collegeLogo: {
-        width: 40,
-        height: 40,
+        width: 34,
+        height: 34,
     },
 
     logoFallback: {
-        width: 38,
-        height: 38,
+        width: 32,
+        height: 32,
         borderRadius: 10,
         borderWidth: 1,
         alignItems: "center",
@@ -1050,23 +1050,23 @@ const styles = StyleSheet.create({
     },
 
     teamName: {
-        fontSize: 16.5,
-        lineHeight: 18,
+        fontSize: 15.5,
+        lineHeight: 17,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.1,
     },
 
     recordText: {
-        fontSize: 11.5,
-        lineHeight: 14,
+        fontSize: 10.5,
+        lineHeight: 12,
         fontFamily: "Rajdhani_600SemiBold",
         marginTop: 1,
     },
 
     movementBadge: {
-        minWidth: 44,
-        height: 27,
-        borderRadius: 14,
+        minWidth: 40,
+        height: 23,
+        borderRadius: 12,
         paddingHorizontal: 7,
         borderWidth: 1,
         alignItems: "center",
