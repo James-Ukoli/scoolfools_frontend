@@ -16,11 +16,18 @@ import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
 import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { useNotifications } from "../context/NotificationsContext";
 
 const HEADER_CYAN = "#06B6D4";
 
 type TimeTheme = "day" | "night";
+
+type StoredUser = {
+    selectedAvatar?: string | null;
+    providerAvatar?: string | null;
+    avatar?: string | null;
+};
 
 const AVATAR_IMAGES: Record<
     string,
@@ -36,10 +43,22 @@ const AVATAR_IMAGES: Record<
     diamondGirl: require("../../assets/images/profileimages/diamondGirl.png"),
 };
 
-type StoredUser = {
-    selectedAvatar?: string | null;
-    providerAvatar?: string | null;
-    avatar?: string | null;
+/*
+ * Only the solid background surrounding the white header card
+ * changes based on the selected avatar.
+ */
+const AVATAR_BACKGROUND_COLORS: Record<
+    string,
+    string
+> = {
+    basicBlue: "#06B6D4",
+    basicGreen: "#22C55E",
+    basicPurple: "#8B5CF6",
+    basicOrange: "#F97316",
+    basicPink: "#EC4899",
+    basicYellow: "#FACC15",
+    diamondBoy: "#0891B2",
+    diamondGirl: "#DB2777",
 };
 
 const getCurrentThemeMode = (): TimeTheme => {
@@ -50,33 +69,67 @@ const getCurrentThemeMode = (): TimeTheme => {
         : "night";
 };
 
-const getHeaderTheme = (mode: TimeTheme) => {
+const getHeaderTheme = (
+    mode: TimeTheme,
+    selectedAvatar?: string | null
+) => {
     const isDay = mode === "day";
 
+    /*
+     * Keep the original night mode unchanged.
+     */
+    if (!isDay) {
+        return {
+            mode,
+
+            background: "#020617",
+            card: "#07111F",
+            surface: "#0B1728",
+
+            icon: "#FFFFFF",
+            cyan: HEADER_CYAN,
+            yellow: "#FACC15",
+
+            border: "rgba(255,255,255,0.09)",
+            buttonBorder:
+                "rgba(255,255,255,0.12)",
+            activeBackground:
+                "rgba(34,211,238,0.12)",
+            activeBorder:
+                "rgba(34,211,238,0.35)",
+        };
+    }
+
+    /*
+     * Determine the selected avatar color for day mode.
+     */
+    const avatarBackground =
+        selectedAvatar &&
+            AVATAR_BACKGROUND_COLORS[selectedAvatar]
+            ? AVATAR_BACKGROUND_COLORS[
+            selectedAvatar
+            ]
+            : HEADER_CYAN;
+
+    /*
+     * Day mode:
+     * white outer area and colored rounded card.
+     */
     return {
         mode,
 
-        // Match the rest of the app instead of using a cyan banner.
-        background: isDay ? "#FFFFFF" : "#020617",
-        card: isDay ? "#FFFFFF" : "#07111F",
-        surface: isDay ? "#F8FDFF" : "#0B1728",
+        background: "#FFFFFF",
+        card: avatarBackground,
+        surface: "#FFFFFF",
 
-        icon: isDay ? "#07111F" : "#FFFFFF",
+        icon: "#07111F",
         cyan: HEADER_CYAN,
         yellow: "#FACC15",
 
-        border: isDay
-            ? "rgba(7,17,31,0.10)"
-            : "rgba(255,255,255,0.09)",
-        buttonBorder: isDay
-            ? "rgba(7,17,31,0.10)"
-            : "rgba(255,255,255,0.12)",
-        activeBackground: isDay
-            ? "rgba(6,182,212,0.10)"
-            : "rgba(34,211,238,0.12)",
-        activeBorder: isDay
-            ? "rgba(6,182,212,0.30)"
-            : "rgba(34,211,238,0.35)",
+        border: "rgba(7,17,31,0.10)",
+        buttonBorder: "rgba(7,17,31,0.10)",
+        activeBackground: "#FFFFFF",
+        activeBorder: "rgba(7,17,31,0.15)",
     };
 };
 
@@ -99,9 +152,32 @@ export default function AppHeader() {
             getCurrentThemeMode()
         );
 
+    /*
+     * Use selectedAvatar first. If the server stored the
+     * avatar ID inside avatar, that value also works.
+     */
+    const selectedAvatarId = useMemo(() => {
+        if (user?.selectedAvatar) {
+            return user.selectedAvatar;
+        }
+
+        if (
+            user?.avatar &&
+            !user.avatar.startsWith("http")
+        ) {
+            return user.avatar;
+        }
+
+        return null;
+    }, [user]);
+
     const theme = useMemo(
-        () => getHeaderTheme(themeMode),
-        [themeMode]
+        () =>
+            getHeaderTheme(
+                themeMode,
+                selectedAvatarId
+            ),
+        [themeMode, selectedAvatarId]
     );
 
     const styles = useMemo(
@@ -147,6 +223,10 @@ export default function AppHeader() {
         []
     );
 
+    /*
+     * Check every minute in case the app moves between
+     * day and night mode while it remains open.
+     */
     useEffect(() => {
         const interval = setInterval(
             updateThemeMode,
@@ -157,6 +237,9 @@ export default function AppHeader() {
             clearInterval(interval);
     }, [updateThemeMode]);
 
+    /*
+     * Load the saved user when the header mounts.
+     */
     useEffect(() => {
         loadStoredUser();
         updateThemeMode();
@@ -165,10 +248,31 @@ export default function AppHeader() {
         updateThemeMode,
     ]);
 
+    /*
+     * Reload the saved user after navigation changes.
+     * This helps the header update after Account Settings.
+     */
+    useEffect(() => {
+        const unsubscribe =
+            navigation.addListener(
+                "state",
+                () => {
+                    loadStoredUser();
+                    updateThemeMode();
+                }
+            );
+
+        return unsubscribe;
+    }, [
+        navigation,
+        loadStoredUser,
+        updateThemeMode,
+    ]);
+
     const selectedAvatarSource =
-        user?.selectedAvatar
+        selectedAvatarId
             ? AVATAR_IMAGES[
-            user.selectedAvatar
+            selectedAvatarId
             ]
             : null;
 
@@ -268,9 +372,11 @@ export default function AppHeader() {
                                 navigation.navigate(
                                     "MainTabs",
                                     {
-                                        screen: "MainTabs",
+                                        screen:
+                                            "MainTabs",
                                         params: {
-                                            screen: "Home",
+                                            screen:
+                                                "Home",
                                         },
                                     }
                                 )
@@ -288,12 +394,16 @@ export default function AppHeader() {
                         </TouchableOpacity>
                     </View>
 
-                    <View style={styles.sideRight}>
+                    <View
+                        style={styles.sideRight}
+                    >
                         <TouchableOpacity
                             style={[
                                 styles.iconButton,
+
                                 isOneEnabled &&
                                 styles.iconButtonActive,
+
                                 isBothEnabled &&
                                 styles.iconButtonFullyActive,
                             ]}
@@ -302,7 +412,8 @@ export default function AppHeader() {
                                 navigation.navigate(
                                     "MainTabs",
                                     {
-                                        screen: "Notifications",
+                                        screen:
+                                            "Notifications",
                                     }
                                 )
                             }
@@ -327,11 +438,14 @@ const createStyles = (
 ) =>
     StyleSheet.create({
         safeArea: {
-            backgroundColor: theme.background,
+            backgroundColor:
+                theme.background,
         },
 
         headerBackground: {
-            backgroundColor: theme.background,
+            backgroundColor:
+                theme.background,
+
             paddingHorizontal: 14,
             paddingTop: 5,
             paddingBottom: 5,
@@ -339,21 +453,26 @@ const createStyles = (
 
         card: {
             height: 68,
-            backgroundColor:
-                theme.card,
+
+            /*
+             * White during the day and dark
+             * during the night.
+             */
+            backgroundColor: theme.card,
+
             borderRadius: 20,
 
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent:
+                "space-between",
 
             paddingHorizontal: 16,
 
             position: "relative",
 
             borderWidth: 1,
-            borderColor:
-                theme.border,
+            borderColor: theme.border,
 
             shadowColor: "#000",
             shadowOffset: {
@@ -362,7 +481,7 @@ const createStyles = (
             },
             shadowOpacity:
                 theme.mode === "day"
-                    ? 0.05
+                    ? 0.12
                     : 0.14,
             shadowRadius: 9,
 
@@ -397,10 +516,12 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor: theme.surface,
+            backgroundColor:
+                theme.surface,
 
             borderWidth: 1.5,
-            borderColor: theme.buttonBorder,
+            borderColor:
+                theme.buttonBorder,
 
             overflow: "hidden",
 
@@ -450,10 +571,18 @@ const createStyles = (
             height: 52,
 
             transform: [
-                { scale: 1.98 },   // was 2.10
-                { translateX: -3 }, // was -4
-                { translateY: 3 },  // was 2
-                { rotate: "1deg" },
+                {
+                    scale: 1.98,
+                },
+                {
+                    translateX: -3,
+                },
+                {
+                    translateY: 3,
+                },
+                {
+                    rotate: "1deg",
+                },
             ],
         },
 
@@ -465,10 +594,12 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor: theme.surface,
+            backgroundColor:
+                theme.surface,
 
             borderWidth: 1,
-            borderColor: theme.buttonBorder,
+            borderColor:
+                theme.buttonBorder,
 
             shadowColor: theme.cyan,
             shadowOffset: {
@@ -484,6 +615,7 @@ const createStyles = (
         iconButtonActive: {
             backgroundColor:
                 theme.activeBackground,
+
             borderColor:
                 theme.activeBorder,
         },
@@ -491,6 +623,7 @@ const createStyles = (
         iconButtonFullyActive: {
             backgroundColor:
                 theme.yellow,
+
             borderColor:
                 theme.yellow,
         },
