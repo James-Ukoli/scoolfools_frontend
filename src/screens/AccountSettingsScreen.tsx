@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -17,18 +17,42 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import { COLLEGES } from "../../assets/data/colleges";
+import BlogsPaywallModal from "../components/BlogsPaywallModal";
+import {
+    initializeIAP,
+    getBlogsSubscriptionProduct,
+    buyBlogsSubscription,
+    setupPurchaseListeners,
+    cleanupIAP,
+} from "../services/iap";
+import { finishTransaction } from "react-native-iap";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
+const MINIMUM_LOADING_DURATION_MS = 2000;
+
+const waitForMinimumLoadingDuration = async (startedAt: number) => {
+    const elapsed = Date.now() - startedAt;
+    const remaining = MINIMUM_LOADING_DURATION_MS - elapsed;
+
+    if (remaining > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+    }
+};
 
 type SchoolLevel = "college" | "highSchool";
 type AthleteChoice = boolean | null;
+type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
 
 type AvatarOption = {
     id: string;
     source: any;
+    subscriberOnly?: boolean;
 };
 
 const AVATARS: AvatarOption[] = [
@@ -40,451 +64,39 @@ const AVATARS: AvatarOption[] = [
     {
         id: "basicGreen",
         source: require("../../assets/images/profileimages/basicGreen.png"),
+        subscriberOnly: true,
     },
     {
         id: "basicPurple",
         source: require("../../assets/images/profileimages/basicPurple.png"),
+        subscriberOnly: true,
     },
     {
         id: "diamondBoy",
         source: require("../../assets/images/profileimages/diamondBoy.png"),
+        subscriberOnly: true,
     },
 
     // Bottom row
-    {
-        id: "basicOrange",
-        source: require("../../assets/images/profileimages/basicOrange.png"),
-    },
-    {
-        id: "basicPink",
-        source: require("../../assets/images/profileimages/basicPink.png"),
-    },
     {
         id: "basicYellow",
         source: require("../../assets/images/profileimages/basicYellow.png"),
     },
     {
+        id: "basicOrange",
+        source: require("../../assets/images/profileimages/basicOrange.png"),
+        subscriberOnly: true,
+    },
+    {
+        id: "basicPink",
+        source: require("../../assets/images/profileimages/basicPink.png"),
+        subscriberOnly: true,
+    },
+    {
         id: "diamondGirl",
         source: require("../../assets/images/profileimages/diamondGirl.png"),
+        subscriberOnly: true,
     },
-];
-
-const COLLEGES = [
-    "Other College",
-    "Not Listed",
-    "Alabama",
-    "American",
-    "Appalachian State",
-    "Arizona",
-    "Arizona State",
-    "Arkansas",
-    "Arkansas State",
-    "Auburn",
-    "Ball State",
-    "Baylor",
-    "Belmont",
-    "Boise State",
-    "Boston College",
-    "Boston University",
-    "Bowling Green",
-    "Brown",
-    "Bucknell",
-    "BYU",
-    "Cal Poly",
-    "Cal Poly Pomona",
-    "Cal State Bakersfield",
-    "Cal State Channel Islands",
-    "Cal State Chico",
-    "Cal State Dominguez Hills",
-    "Cal State East Bay",
-    "Cal State Fullerton",
-    "Cal State Long Beach",
-    "Cal State Los Angeles",
-    "Cal State Monterey Bay",
-    "Cal State Northridge",
-    "Cal State Sacramento",
-    "Cal State San Bernardino",
-    "Cal State San Marcos",
-    "Cal State Stanislaus",
-    "Caltech",
-    "Carnegie Mellon",
-    "Case Western Reserve",
-    "Chapman",
-    "Charleston",
-    "Clemson",
-    "Coastal Carolina",
-    "Colorado",
-    "Colorado School of Mines",
-    "Colorado State",
-    "Columbia",
-    "Cornell",
-    "Creighton",
-    "Dartmouth",
-    "Davidson",
-    "DePaul",
-    "Drexel",
-    "Duke",
-    "East Carolina",
-    "East Tennessee State",
-    "Elon",
-    "Emory",
-    "Fairfield",
-    "FAU",
-    "FGCU",
-    "FIU",
-    "Florida",
-    "Florida State",
-    "Fordham",
-    "Furman",
-    "George Mason",
-    "George Washington",
-    "Georgetown",
-    "Georgia",
-    "Georgia Southern",
-    "Georgia State",
-    "Georgia Tech",
-    "Gonzaga",
-    "Grand Canyon",
-    "Hampton",
-    "Harvard",
-    "High Point",
-    "Hofstra",
-    "Howard",
-    "Illinois",
-    "Illinois State",
-    "Indiana",
-    "Iowa",
-    "Iowa State",
-    "Jackson State",
-    "James Madison",
-    "Johns Hopkins",
-    "Kansas",
-    "Kansas State",
-    "Kent State",
-    "Kentucky",
-    "Liberty",
-    "Longwood",
-    "Louisville",
-    "LSU",
-    "Loyola Chicago",
-    "Loyola Marymount",
-    "Marquette",
-    "Marshall",
-    "Maryland",
-    "Mercer",
-    "Miami",
-    "Miami (OH)",
-    "Michigan",
-    "Michigan State",
-    "Middle Tennessee",
-    "Minnesota",
-    "Mississippi State",
-    "Missouri",
-    "Montana",
-    "Montana State",
-    "Morgan State",
-    "NC A&T",
-    "NC Central",
-    "NC State",
-    "Nebraska",
-    "Nevada",
-    "New Hampshire",
-    "New Mexico",
-    "New Mexico State",
-    "New Jersey Institute of Technology",
-    "North Texas",
-    "Northern Arizona",
-    "Northern Illinois",
-    "Northwestern",
-    "Notre Dame",
-    "Nova Southeastern",
-    "NYU",
-    "Ohio",
-    "Ohio State",
-    "Oklahoma",
-    "Oklahoma State",
-    "Old Dominion",
-    "Ole Miss",
-    "Oregon",
-    "Oregon State",
-    "Penn",
-    "Penn State",
-    "Pepperdine",
-    "Pitt",
-    "Princeton",
-    "Providence",
-    "Purdue",
-    "Quinnipiac",
-    "Rice",
-    "RIT",
-    "Rutgers",
-    "Saint Louis",
-    "Saint Mary's",
-    "Sam Houston State",
-    "San Diego State",
-    "San Francisco State",
-    "San Jose State",
-    "Santa Clara",
-    "Seattle",
-    "Seton Hall",
-    "SMU",
-    "South Alabama",
-    "South Carolina",
-    "South Dakota State",
-    "South Florida",
-    "Southeastern Louisiana",
-    "Southern",
-    "Southern Illinois",
-    "Stanford",
-    "Stephen F. Austin State",
-    "Stony Brook",
-    "Syracuse",
-    "Tarleton State",
-    "TCU",
-    "Temple",
-    "Tennessee",
-    "Texas A&M",
-    "Texas State",
-    "Texas Tech",
-    "Towson",
-    "Troy",
-    "Tulane",
-    "Tulsa",
-    "UAB",
-    "UC Berkeley",
-    "UC Davis",
-    "UC Irvine",
-    "UC Merced",
-    "UC Riverside",
-    "UC San Diego",
-    "UC Santa Barbara",
-    "UC Santa Cruz",
-    "UCF",
-    "UCLA",
-    "UConn",
-    "UIC",
-    "UMass Amherst",
-    "UMass Lowell",
-    "UMBC",
-    "UMKC",
-    "UNC Asheville",
-    "UNC Charlotte",
-    "UNC Chapel Hill",
-    "UNC Greensboro",
-    "UNC Wilmington",
-    "UNLV",
-    "USC",
-    "UT Arlington",
-    "UT Austin",
-    "UT Dallas",
-    "UT El Paso",
-    "UT Rio Grande Valley",
-    "UT San Antonio",
-    "UT Tyler",
-    "Utah",
-    "Utah State",
-    "UTEP",
-    "UTRGV",
-    "UTSA",
-    "Valparaiso",
-    "Vanderbilt",
-    "VCU",
-    "Villanova",
-    "Virginia",
-    "Virginia State",
-    "Virginia Tech",
-    "Wake Forest",
-    "Washington",
-    "Washington State",
-    "Weber State",
-    "West Chester",
-    "West Florida",
-    "West Virginia",
-    "Western Carolina",
-    "Western Illinois",
-    "Western Kentucky",
-    "Western Michigan",
-    "Wichita State",
-    "William & Mary",
-    "Winthrop",
-    "Wisconsin",
-    "Wofford",
-    "Wright State",
-    "Xavier",
-    "Yale",
-    "Youngstown State",
-    "Adelphi",
-    "Albany",
-    "Alcorn State",
-    "Alfred",
-    "Assumption",
-    "Augusta",
-    "Austin Peay",
-    "Bellarmine",
-    "Bentley",
-    "Binghamton",
-    "Bridgewater State",
-    "Bryant",
-    "Buffalo",
-    "Butler",
-    "Canisius",
-    "Central Arkansas",
-    "Central Connecticut State",
-    "Central Michigan",
-    "Chicago State",
-    "Christopher Newport",
-    "Citadel",
-    "Clark Atlanta",
-    "Cleveland State",
-    "College of New Jersey",
-    "Concordia Irvine",
-    "Connecticut College",
-    "Coppin State",
-    "Delaware",
-    "Delaware State",
-    "Delta State",
-    "Denver",
-    "Drake",
-    "Duquesne",
-    "Eastern Illinois",
-    "Eastern Kentucky",
-    "Eastern Michigan",
-    "Eastern Washington",
-    "Evansville",
-    "Fayetteville State",
-    "Fisk",
-    "Francis Marion",
-    "Fresno State",
-    "Gardner-Webb",
-    "Grambling State",
-    "Hawaii",
-    "Holy Cross",
-    "Houston Christian",
-    "Idaho",
-    "Idaho State",
-    "Incarnate Word",
-    "Jacksonville",
-    "Jacksonville State",
-    "Kennesaw State",
-    "Lehigh",
-    "Lincoln",
-    "Long Beach State",
-    "Long Island University",
-    "Louisiana Tech",
-    "Maine",
-    "Manhattan",
-    "McNeese State",
-    "Merrimack",
-    "Minnesota Duluth",
-    "Missouri State",
-    "Morehead State",
-    "Community College",
-    "Abilene Christian",
-    "Alaska Anchorage",
-    "Alaska Fairbanks",
-    "Alcorn State",
-    "Alabama A&M",
-    "Alabama State",
-    "Albany State",
-    "Arkansas Tech",
-    "Armstrong State",
-    "Ashland",
-    "Augusta University",
-    "Austin College",
-    "Austin Peay",
-    "Bellarmine",
-    "Benedict College",
-    "Bethune-Cookman",
-    "Black Hills State",
-    "Bloomsburg",
-    "Bluefield State",
-    "Bridgewater College",
-    "California Baptist",
-    "Campbell",
-    "Capital University",
-    "Catawba",
-    "Central Missouri",
-    "Central Oklahoma",
-    "Charleston Southern",
-    "Claflin",
-    "Clark University",
-    "Colby",
-    "Colorado Mesa",
-    "Columbus State",
-    "Concord",
-    "Converse",
-    "Cornell College",
-    "Dakota State",
-    "Dakota Wesleyan",
-    "Delaware Valley",
-    "East Stroudsburg",
-    "Eastern New Mexico",
-    "Embry-Riddle",
-    "Ferris State",
-    "Flagler",
-    "Florida Memorial",
-    "Fort Hays State",
-    "Franciscan University",
-    "Friends University",
-    "Gannon",
-    "Georgia College",
-    "Glenville State",
-    "Harding",
-    "Henderson State",
-    "Hillsdale",
-    "Humboldt",
-    "Kean",
-    "La Salle",
-    "Lenoir-Rhyne",
-    "Lincoln Memorial",
-    "Livingstone",
-    "Lock Haven",
-    "Mansfield",
-    "Mary Hardin-Baylor",
-    "Marymount",
-    "Millsaps",
-    "Minot State",
-    "Missouri Western",
-    "Mount St. Mary's",
-    "Murray State",
-    "Nebraska Omaha",
-    "Nebraska Kearney",
-    "Nicholls State",
-    "Norfolk State",
-    "North Alabama",
-    "North Dakota",
-    "North Dakota State",
-    "Northeastern",
-    "Northern Colorado",
-    "Northwestern State",
-    "Ouachita Baptist",
-    "Pacific",
-    "Palm Beach Atlantic",
-    "Presbyterian College",
-    "Radford",
-    "Regis",
-    "Rhode Island",
-    "Sacred Heart",
-    "Saginaw Valley State",
-    "Salem State",
-    "Shaw University",
-    "Shepherd",
-    "Shippensburg",
-    "South Dakota",
-    "Southeastern Oklahoma State",
-    "Southern Arkansas",
-    "Southern Connecticut State",
-    "Southern Miss",
-    "Texas A&M Commerce",
-    "Texas A&M Corpus Christi",
-    "Texas A&M Kingsville",
-    "Texas Woman's",
-    "Tuskegee",
-    "Valdosta State",
-    "Washburn",
-    "Wayne State",
-    "Western Oregon",
-    "Western Washington",
 ];
 
 const SPORTS = [
@@ -508,6 +120,76 @@ const SPORTS = [
     "Other",
 ];
 
+const SOCIAL_PLATFORMS: Array<{
+    value: SocialPlatform;
+    label: string;
+    icon: "instagram" | "x-twitter" | "youtube" | "snapchat";
+    iconColor: string;
+    placeholder: string;
+}> = [
+        {
+            value: "instagram",
+            label: "Instagram",
+            icon: "instagram",
+            iconColor: "#E4405F",
+            placeholder: "https://instagram.com/yourusername",
+        },
+        {
+            value: "x",
+            label: "X",
+            icon: "x-twitter",
+            iconColor: "#000000",
+            placeholder: "https://x.com/yourusername",
+        },
+        {
+            value: "youtube",
+            label: "YouTube",
+            icon: "youtube",
+            iconColor: "#FF0000",
+            placeholder: "https://youtube.com/@yourchannel",
+        },
+        {
+            value: "snapchat",
+            label: "Snapchat",
+            icon: "snapchat",
+            iconColor: "#F2DE00",
+            placeholder: "https://snapchat.com/add/yourusername",
+        },
+    ];
+
+const SOCIAL_DOMAINS: Record<SocialPlatform, string[]> = {
+    instagram: ["instagram.com"],
+    x: ["x.com", "twitter.com"],
+    youtube: ["youtube.com", "youtu.be"],
+    snapchat: ["snapchat.com"],
+};
+
+const normalizeSocialUrl = (value: string) => {
+    const trimmed = value.trim();
+
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+
+    return `https://${trimmed}`;
+};
+
+const isValidSocialUrl = (platform: SocialPlatform, value: string) => {
+    try {
+        const parsedUrl = new URL(normalizeSocialUrl(value));
+        const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+
+        if (!["https:", "http:"].includes(parsedUrl.protocol)) {
+            return false;
+        }
+
+        return SOCIAL_DOMAINS[platform].some(
+            (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+        );
+    } catch {
+        return false;
+    }
+};
+
 const normalizeUsername = (value: string) => {
     return value
         .toLowerCase()
@@ -520,23 +202,202 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const [username, setUsername] = useState("");
     const [usernameError, setUsernameError] = useState("");
 
-    const [schoolLevel, setSchoolLevel] =
-        useState<SchoolLevel | null>(null);
+    const [schoolLevel, setSchoolLevel] = useState<SchoolLevel | null>(null);
 
     const [collegeName, setCollegeName] = useState("");
     const [collegeSearch, setCollegeSearch] = useState("");
-    const [collegeModalVisible, setCollegeModalVisible] =
-        useState(false);
+    const [collegeModalVisible, setCollegeModalVisible] = useState(false);
 
-    const [isStudentAthlete, setIsStudentAthlete] =
-        useState<AthleteChoice>(null);
+    const [isStudentAthlete, setIsStudentAthlete] = useState<AthleteChoice>(null);
 
     const [selectedSport, setSelectedSport] = useState("");
-    const [sportModalVisible, setSportModalVisible] =
-        useState(false);
+    const [sportModalVisible, setSportModalVisible] = useState(false);
+
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [socialPlatform, setSocialPlatform] = useState<SocialPlatform | null>(
+        null,
+    );
+    const [socialMediaUrl, setSocialMediaUrl] = useState("");
+    const [socialMediaError, setSocialMediaError] = useState("");
 
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+
+    const updateStoredSubscriptionState = useCallback(
+        async (subscribed: boolean) => {
+            const storedUserRaw = await AsyncStorage.getItem("user");
+
+            if (!storedUserRaw) return;
+
+            try {
+                const storedUser = JSON.parse(storedUserRaw);
+
+                await AsyncStorage.setItem(
+                    "user",
+                    JSON.stringify({
+                        ...storedUser,
+                        isSubscribed: subscribed,
+                    }),
+                );
+            } catch (error) {
+                console.log("Stored subscription update error:", error);
+            }
+        },
+        [],
+    );
+
+    const fetchEntitlements = useCallback(async () => {
+        try {
+            const token = await AsyncStorage.getItem("token");
+            if (!token || !API_BASE_URL) return;
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data?.success) {
+                const subscribed = !!data?.entitlements?.isSubscribed;
+
+                setIsSubscribed(subscribed);
+                await updateStoredSubscriptionState(subscribed);
+            }
+        } catch (error) {
+            console.log("Account settings entitlement fetch error:", error);
+        }
+    }, [updateStoredSubscriptionState]);
+
+    const loadSubscriptionProduct = async () => {
+        try {
+            await initializeIAP();
+            const product = await getBlogsSubscriptionProduct();
+            setSubscriptionProduct(product);
+        } catch (error) {
+            console.log("Account settings subscription load error:", error);
+        }
+    };
+
+    const verifySubscriptionOnBackend = useCallback(
+        async (purchase: any) => {
+            try {
+                const token = await AsyncStorage.getItem("token");
+
+                if (!token || !API_BASE_URL) {
+                    throw new Error("Missing token or API base URL");
+                }
+
+                const response = await fetch(
+                    `${API_BASE_URL}/api/subscriptions/verify`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            platform: Platform.OS === "ios" ? "ios" : "android",
+                            productId:
+                                purchase?.productId || purchase?.productIdIOS || "sfs_399_2y",
+                            transactionId:
+                                purchase?.transactionId ||
+                                purchase?.transactionIdIOS ||
+                                purchase?.id ||
+                                null,
+                            purchaseToken:
+                                purchase?.purchaseToken ||
+                                purchase?.purchaseTokenAndroid ||
+                                null,
+                        }),
+                    },
+                );
+
+                const rawResponse = await response.text();
+
+                let data: any = {};
+
+                try {
+                    data = rawResponse ? JSON.parse(rawResponse) : {};
+                } catch {
+                    data = {
+                        rawResponse,
+                    };
+                }
+
+                console.log("SUBSCRIPTION VERIFY RESPONSE:", {
+                    status: response.status,
+                    ok: response.ok,
+                    data,
+                });
+
+                if (!response.ok) {
+                    throw new Error(
+                        data?.message ||
+                        data?.error ||
+                        `Subscription verification failed with status ${response.status}`
+                    );
+                }
+
+                await finishTransaction({
+                    purchase,
+                    isConsumable: false,
+                });
+
+                const subscribed = !!data?.isSubscribed;
+
+                setIsSubscribed(subscribed);
+                setPaywallVisible(false);
+                await updateStoredSubscriptionState(subscribed);
+                await fetchEntitlements();
+
+                if (subscribed) {
+                    setShowConfetti(true);
+                    Alert.alert(
+                        "Subscribed 🎉",
+                        "Your ScoolFools subscriber avatars are now unlocked.",
+                    );
+                }
+            } catch (error) {
+                console.log("Account settings subscription verification error:", error);
+
+                Alert.alert(
+                    "Purchase Complete",
+                    "Your purchase was received, but verifying it with your account failed.",
+                );
+            } finally {
+                setLoadingSubscription(false);
+            }
+        },
+        [fetchEntitlements, updateStoredSubscriptionState],
+    );
+
+    const handleSubscribePress = async () => {
+        try {
+            setLoadingSubscription(true);
+            await initializeIAP();
+            await buyBlogsSubscription();
+        } catch (error) {
+            setLoadingSubscription(false);
+            console.log("Account settings subscription request error:", error);
+
+            Alert.alert(
+                "Subscription Failed",
+                "Something went wrong while starting the subscription.",
+            );
+        }
+    };
+
+    const openSubscriberPaywall = () => {
+        setPaywallVisible(true);
+        void loadSubscriptionProduct();
+    };
 
     useEffect(() => {
         let isMounted = true;
@@ -549,7 +410,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
                 if (!storedUserRaw) {
                     throw new Error(
-                        "Your saved profile could not be found. Please sign in again."
+                        "Your saved profile could not be found. Please sign in again.",
                     );
                 }
 
@@ -558,19 +419,14 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 try {
                     profile = JSON.parse(storedUserRaw);
                 } catch {
-                    throw new Error(
-                        "Your saved profile information could not be read."
-                    );
+                    throw new Error("Your saved profile information could not be read.");
                 }
 
                 if (!isMounted) {
                     return;
                 }
 
-                const avatarValue =
-                    profile?.selectedAvatar ||
-                    profile?.avatar ||
-                    "";
+                const avatarValue = profile?.selectedAvatar || profile?.avatar || "";
 
                 const level =
                     profile?.schoolLevel === "college" ||
@@ -579,9 +435,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         : null;
 
                 const savedCollege =
-                    level === "college"
-                        ? profile?.collegeName || ""
-                        : "";
+                    level === "college" ? profile?.collegeName || "" : "";
 
                 const athleteValue =
                     typeof profile?.isStudentAthlete === "boolean"
@@ -594,27 +448,32 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 setCollegeName(savedCollege);
                 setCollegeSearch(savedCollege);
                 setIsStudentAthlete(athleteValue);
-                setSelectedSport(
-                    athleteValue
-                        ? profile?.sport || ""
-                        : ""
+                setSelectedSport(athleteValue ? profile?.sport || "" : "");
+
+                const savedSocialPlatform = SOCIAL_PLATFORMS.some(
+                    (platform) => platform.value === profile?.socialMediaPlatform,
+                )
+                    ? (profile.socialMediaPlatform as SocialPlatform)
+                    : null;
+
+                setIsSubscribed(!!profile?.isSubscribed);
+                setSocialPlatform(savedSocialPlatform);
+                setSocialMediaUrl(
+                    savedSocialPlatform ? profile?.socialMediaUrl || "" : "",
                 );
+                setSocialMediaError("");
             } catch (error: any) {
-                console.log(
-                    "Account settings load error:",
-                    error
-                );
+                console.log("Account settings load error:", error);
 
                 Alert.alert(
                     "Unable to Load Profile",
-                    error?.message ||
-                    "Something went wrong while loading your profile.",
+                    error?.message || "Something went wrong while loading your profile.",
                     [
                         {
                             text: "Go Back",
                             onPress: () => navigation.goBack(),
                         },
-                    ]
+                    ],
                 );
             } finally {
                 if (isMounted) {
@@ -629,6 +488,27 @@ export default function AccountSettingsScreen({ navigation }: any) {
             isMounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        void fetchEntitlements();
+
+        setupPurchaseListeners({
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async (purchase: any) => {
+                await verifySubscriptionOnBackend(purchase);
+            },
+            onPurchaseError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Account settings subscription listener error:", error);
+            },
+        });
+
+        return () => {
+            void cleanupIAP();
+        };
+    }, [fetchEntitlements, verifySubscriptionOnBackend]);
+
     const filteredColleges = useMemo(() => {
         const search = collegeSearch.trim().toLowerCase();
 
@@ -636,9 +516,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return COLLEGES;
         }
 
-        return COLLEGES.filter((college) =>
-            college.toLowerCase().includes(search)
-        );
+        return COLLEGES.filter((college) => college.toLowerCase().includes(search));
     }, [collegeSearch]);
 
     const filteredSports = useMemo(() => {
@@ -647,11 +525,19 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const isUsernameValid = useMemo(() => {
         return (
-            username.length >= 6 &&
+            username.length >= 3 &&
             username.length <= 20 &&
             /^[a-z0-9._]+$/.test(username)
         );
     }, [username]);
+
+    const isSocialMediaValid = useMemo(() => {
+        if (!socialPlatform) {
+            return true;
+        }
+
+        return isValidSocialUrl(socialPlatform, socialMediaUrl);
+    }, [socialMediaUrl, socialPlatform]);
 
     const canContinue = useMemo(() => {
         if (!selectedAvatar) {
@@ -666,10 +552,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
-        if (
-            schoolLevel === "college" &&
-            !COLLEGES.includes(collegeName)
-        ) {
+        if (schoolLevel === "college" && !COLLEGES.includes(collegeName)) {
             return false;
         }
 
@@ -681,6 +564,10 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
+        if (!isSocialMediaValid) {
+            return false;
+        }
+
         return true;
     }, [
         selectedAvatar,
@@ -689,6 +576,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         collegeName,
         isStudentAthlete,
         selectedSport,
+        isSocialMediaValid,
     ]);
 
     const handleUsernameChange = (value: string) => {
@@ -698,9 +586,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         setUsernameError("");
     };
 
-    const handleSchoolLevelChange = (
-        level: SchoolLevel
-    ) => {
+    const handleSchoolLevelChange = (level: SchoolLevel) => {
         setSchoolLevel(level);
 
         if (level === "highSchool") {
@@ -717,6 +603,46 @@ export default function AccountSettingsScreen({ navigation }: any) {
         }
     };
 
+    const handleSocialPlatformPress = (platform: SocialPlatform) => {
+        if (socialPlatform === platform) {
+            setSocialPlatform(null);
+            setSocialMediaUrl("");
+            setSocialMediaError("");
+            return;
+        }
+
+        setSocialPlatform(platform);
+        setSocialMediaUrl("");
+        setSocialMediaError("");
+    };
+
+    const validateSocialMediaLink = () => {
+        if (!socialPlatform) {
+            setSocialMediaError("");
+            return true;
+        }
+
+        if (!socialMediaUrl.trim()) {
+            setSocialMediaError("Add your social media profile link.");
+            return false;
+        }
+
+        if (!isValidSocialUrl(socialPlatform, socialMediaUrl)) {
+            const platformLabel = SOCIAL_PLATFORMS.find(
+                (platform) => platform.value === socialPlatform,
+            )?.label;
+
+            setSocialMediaError(
+                `Enter a valid ${platformLabel || "social media"} link.`,
+            );
+            return false;
+        }
+
+        setSocialMediaUrl(normalizeSocialUrl(socialMediaUrl));
+        setSocialMediaError("");
+        return true;
+    };
+
     const openCollegePicker = () => {
         setCollegeSearch(collegeName);
         setCollegeModalVisible(true);
@@ -729,13 +655,11 @@ export default function AccountSettingsScreen({ navigation }: any) {
         Keyboard.dismiss();
     };
 
-
-
     const validateForm = () => {
         if (!selectedAvatar) {
             Alert.alert(
                 "Choose an avatar",
-                "Select a ScoolFools avatar to continue."
+                "Select a ScoolFools avatar to continue.",
             );
             return false;
         }
@@ -745,59 +669,45 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
-        if (username.length < 6) {
-            setUsernameError(
-                "Your username must contain at least 3 characters."
-            );
+        if (username.length < 3) {
+            setUsernameError("Your username must contain at least 3 characters.");
             return false;
         }
 
         if (username.length > 20) {
-            setUsernameError(
-                "Your username cannot exceed 20 characters."
-            );
+            setUsernameError("Your username cannot exceed 20 characters.");
             return false;
         }
 
         if (!/^[a-z0-9._]+$/.test(username)) {
-            setUsernameError(
-                "Use only letters, numbers, periods, and underscores."
-            );
+            setUsernameError("Use only letters, numbers, periods, and underscores.");
             return false;
         }
 
         if (!schoolLevel) {
-            Alert.alert(
-                "Choose your school level",
-                "Select College or High School."
-            );
+            Alert.alert("Choose your school level", "Select College or High School.");
             return false;
         }
 
-        if (
-            schoolLevel === "college" &&
-            !COLLEGES.includes(collegeName)
-        ) {
+        if (schoolLevel === "college" && !COLLEGES.includes(collegeName)) {
             Alert.alert(
                 "Choose your college",
-                "Please select an option from the college list."
+                "Please select an option from the college list.",
             );
             return false;
         }
 
         if (isStudentAthlete === null) {
-            Alert.alert(
-                "Student athlete",
-                "Choose Yes or No to continue."
-            );
+            Alert.alert("Student athlete", "Choose Yes or No to continue.");
             return false;
         }
 
         if (isStudentAthlete && !selectedSport) {
-            Alert.alert(
-                "Choose your sport",
-                "Select the sport you play."
-            );
+            Alert.alert("Choose your sport", "Select the sport you play.");
+            return false;
+        }
+
+        if (!validateSocialMediaLink()) {
             return false;
         }
 
@@ -811,21 +721,19 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return;
         }
 
+        const loadingStartedAt = Date.now();
+
         try {
             setLoading(true);
 
             if (!API_BASE_URL) {
-                throw new Error(
-                    "EXPO_PUBLIC_API_BASE_URL is missing."
-                );
+                throw new Error("EXPO_PUBLIC_API_BASE_URL is missing.");
             }
 
             const token = await AsyncStorage.getItem("token");
 
             if (!token) {
-                throw new Error(
-                    "Your session has expired. Please sign in again."
-                );
+                throw new Error("Your session has expired. Please sign in again.");
             }
 
             const payload = {
@@ -833,13 +741,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 avatar: selectedAvatar,
                 selectedAvatar,
                 schoolLevel,
-                collegeName:
-                    schoolLevel === "college"
-                        ? collegeName.trim()
-                        : "",
+                collegeName: schoolLevel === "college" ? collegeName.trim() : "",
                 isStudentAthlete,
-                sport: isStudentAthlete
-                    ? selectedSport
+                sport: isStudentAthlete ? selectedSport : "",
+                socialMediaPlatform: socialPlatform || "",
+                socialMediaUrl: socialPlatform
+                    ? normalizeSocialUrl(socialMediaUrl)
                     : "",
             };
 
@@ -852,7 +759,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         Authorization: `Bearer ${token}`,
                     },
                     body: JSON.stringify(payload),
-                }
+                },
             );
 
             let data: any = {};
@@ -865,9 +772,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
             if (!response.ok) {
                 const backendMessage =
-                    data?.message ||
-                    data?.error ||
-                    "Unable to save your profile.";
+                    data?.message || data?.error || "Unable to save your profile.";
 
                 const usernameHasError =
                     response.status === 409 ||
@@ -880,10 +785,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     data?.code === "USERNAME_RESERVED";
 
                 if (usernameHasError) {
-                    setUsernameError(
-                        backendMessage ||
-                        "Please choose another username."
-                    );
+                    setUsernameError(backendMessage || "Please choose another username.");
 
                     throw new Error("USERNAME_ERROR");
                 }
@@ -891,20 +793,15 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 throw new Error(backendMessage);
             }
 
-            const returnedUser =
-                data?.user ||
-                data?.updatedUser ||
-                data;
+            const returnedUser = data?.user || data?.updatedUser || data;
 
-            const currentStoredUser =
-                await AsyncStorage.getItem("user");
+            const currentStoredUser = await AsyncStorage.getItem("user");
 
             let existingUser = {};
 
             if (currentStoredUser) {
                 try {
-                    existingUser =
-                        JSON.parse(currentStoredUser);
+                    existingUser = JSON.parse(currentStoredUser);
                 } catch {
                     existingUser = {};
                 }
@@ -914,59 +811,43 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 ...existingUser,
                 ...returnedUser,
                 username: returnedUser?.username || username,
-                avatar:
-                    returnedUser?.avatar ||
-                    selectedAvatar,
-                selectedAvatar:
-                    returnedUser?.selectedAvatar ||
-                    selectedAvatar,
-                schoolLevel:
-                    returnedUser?.schoolLevel ||
-                    schoolLevel,
-                collegeName:
-                    returnedUser?.collegeName ??
-                    payload.collegeName,
-                isStudentAthlete:
-                    returnedUser?.isStudentAthlete ??
-                    isStudentAthlete,
-                sport:
-                    returnedUser?.sport ??
-                    payload.sport,
+                avatar: returnedUser?.avatar || selectedAvatar,
+                selectedAvatar: returnedUser?.selectedAvatar || selectedAvatar,
+                schoolLevel: returnedUser?.schoolLevel || schoolLevel,
+                collegeName: returnedUser?.collegeName ?? payload.collegeName,
+                isStudentAthlete: returnedUser?.isStudentAthlete ?? isStudentAthlete,
+                sport: returnedUser?.sport ?? payload.sport,
+                socialMediaPlatform:
+                    returnedUser?.socialMediaPlatform ?? payload.socialMediaPlatform,
+                socialMediaUrl: returnedUser?.socialMediaUrl ?? payload.socialMediaUrl,
                 onboardingStage:
                     returnedUser?.onboardingStage ||
                     (existingUser as any)?.onboardingStage ||
                     "complete",
             };
 
-            await AsyncStorage.setItem(
-                "user",
-                JSON.stringify(userToStore)
-            );
+            await AsyncStorage.setItem("user", JSON.stringify(userToStore));
 
-            Alert.alert(
-                "Profile Updated",
-                "Your account settings have been saved.",
-                [
-                    {
-                        text: "Done",
-                        onPress: () => navigation.goBack(),
-                    },
-                ]
-            );
+            await waitForMinimumLoadingDuration(loadingStartedAt);
+
+            Alert.alert("Profile Updated", "Your account settings have been saved.", [
+                {
+                    text: "Done",
+                    onPress: () => navigation.goBack(),
+                },
+            ]);
         } catch (error: any) {
+            await waitForMinimumLoadingDuration(loadingStartedAt);
+
             if (error?.message === "USERNAME_ERROR") {
                 return;
             }
 
-            console.log(
-                "Account settings update error:",
-                error
-            );
+            console.log("Account settings update error:", error);
 
             Alert.alert(
                 "Update Failed",
-                error?.message ||
-                "Something went wrong while updating your profile."
+                error?.message || "Something went wrong while updating your profile.",
             );
         } finally {
             setLoading(false);
@@ -975,43 +856,26 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     if (initialLoading) {
         return (
-            <SafeAreaView
-                style={styles.safeArea}
-                edges={["left", "right"]}
-            >
+            <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
                 <View style={styles.initialLoadingContainer}>
-                    <ActivityIndicator
-                        size="large"
-                        color="#06B6D4"
-                    />
-                    <Text style={styles.initialLoadingText}>
-                        Loading your profile...
-                    </Text>
+                    <ActivityIndicator size="large" color="#06B6D4" />
+                    <Text style={styles.initialLoadingText}>Loading your profile...</Text>
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView
-            style={styles.safeArea}
-            edges={["left", "right"]}
-        >
+        <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
             <KeyboardAvoidingView
                 style={styles.keyboardView}
-                behavior={
-                    Platform.OS === "ios"
-                        ? "padding"
-                        : undefined
-                }
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
                 keyboardVerticalOffset={0}
             >
                 <View style={styles.screen}>
                     <ScrollView
                         style={styles.scrollView}
-                        contentContainerStyle={
-                            styles.scrollContent
-                        }
+                        contentContainerStyle={styles.scrollContent}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                     >
@@ -1025,9 +889,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 <Text style={styles.backText}>Back</Text>
                             </TouchableOpacity>
 
-                            <Text style={styles.title}>
-                                Account Settings
-                            </Text>
+                            <Text style={styles.title}>Account Settings</Text>
 
                             <Text style={styles.subtitle}>
                                 Update how you appear on ScoolFools.
@@ -1035,54 +897,58 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </View>
 
                         <View style={styles.formSection}>
-                            <Text style={styles.label}>
-                                Choose an avatar
-                            </Text>
+                            <Text style={styles.label}>Choose an avatar</Text>
 
                             <View style={styles.avatarGrid}>
                                 {AVATARS.map((avatar) => {
-                                    const isSelected =
-                                        selectedAvatar ===
-                                        avatar.id;
+                                    const isSelected = selectedAvatar === avatar.id;
+                                    const isLocked = !!avatar.subscriberOnly && !isSubscribed;
 
                                     return (
                                         <TouchableOpacity
                                             key={avatar.id}
                                             style={[
                                                 styles.avatarButton,
-                                                isSelected &&
-                                                styles.avatarButtonSelected,
+                                                isLocked && styles.avatarButtonLocked,
+                                                isSelected && styles.avatarButtonSelected,
                                             ]}
-                                            onPress={() =>
-                                                setSelectedAvatar(
-                                                    avatar.id
-                                                )
-                                            }
+                                            onPress={() => {
+                                                if (isLocked) {
+                                                    openSubscriberPaywall();
+                                                    return;
+                                                }
+
+                                                setSelectedAvatar(avatar.id);
+                                            }}
                                             activeOpacity={0.85}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={
+                                                isLocked
+                                                    ? "Locked subscriber avatar. Opens subscription options."
+                                                    : "Available profile avatar"
+                                            }
+                                            accessibilityState={{
+                                                selected: isSelected,
+                                            }}
                                         >
                                             <Image
-                                                source={
-                                                    avatar.source
-                                                }
-                                                style={
-                                                    styles.avatarImage
-                                                }
+                                                source={avatar.source}
+                                                style={[
+                                                    styles.avatarImage,
+                                                    isLocked && styles.avatarImageLocked,
+                                                ]}
                                                 resizeMode="cover"
                                             />
 
+                                            {isLocked && (
+                                                <View style={styles.avatarLockBadge}>
+                                                    <FontAwesome6 name="lock" size={7} color="#FFFFFF" />
+                                                </View>
+                                            )}
+
                                             {isSelected && (
-                                                <View
-                                                    style={
-                                                        styles.avatarCheck
-                                                    }
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.avatarCheckText
-                                                        }
-                                                    >
-                                                        ✓
-                                                    </Text>
+                                                <View style={styles.avatarCheck}>
+                                                    <Text style={styles.avatarCheckText}>✓</Text>
                                                 </View>
                                             )}
                                         </TouchableOpacity>
@@ -1092,34 +958,20 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </View>
 
                         <View style={styles.formSection}>
-                            <Text style={styles.label}>
-                                Username
-                            </Text>
+                            <Text style={styles.label}>Username</Text>
 
                             <View
                                 style={[
                                     styles.usernameContainer,
-                                    usernameError
-                                        ? styles.inputErrorBorder
-                                        : null,
+                                    usernameError ? styles.inputErrorBorder : null,
                                 ]}
                             >
-                                <Text
-                                    style={
-                                        styles.usernameAt
-                                    }
-                                >
-                                    @
-                                </Text>
+                                <Text style={styles.usernameAt}>@</Text>
 
                                 <TextInput
-                                    style={
-                                        styles.usernameInput
-                                    }
+                                    style={styles.usernameInput}
                                     value={username}
-                                    onChangeText={
-                                        handleUsernameChange
-                                    }
+                                    onChangeText={handleUsernameChange}
                                     placeholder="username"
                                     placeholderTextColor="#9AA4AE"
                                     autoCapitalize="none"
@@ -1130,60 +982,33 @@ export default function AccountSettingsScreen({ navigation }: any) {
                             </View>
 
                             {usernameError ? (
-                                <Text
-                                    style={
-                                        styles.errorText
-                                    }
-                                >
-                                    {usernameError}
-                                </Text>
+                                <Text style={styles.errorText}>{usernameError}</Text>
                             ) : (
-                                <Text
-                                    style={
-                                        styles.helperText
-                                    }
-                                >
-                                    6 to 20 characters. Letters,
-                                    numbers, periods, and
-                                    underscores only.
+                                <Text style={styles.helperText}>
+                                    3 to 20 characters. Letters, numbers, periods, and underscores
+                                    only.
                                 </Text>
                             )}
                         </View>
 
                         <View style={styles.formSection}>
-                            <Text style={styles.label}>
-                                School level
-                            </Text>
+                            <Text style={styles.label}>School level</Text>
 
                             <View style={styles.optionRow}>
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        schoolLevel ===
-                                        "college" &&
-                                        styles.optionButtonSelected,
+                                        schoolLevel === "college" && styles.optionButtonSelected,
                                     ]}
-                                    onPress={() =>
-                                        handleSchoolLevelChange(
-                                            "college"
-                                        )
-                                    }
+                                    onPress={() => handleSchoolLevelChange("college")}
                                     activeOpacity={0.85}
                                 >
-                                    <Text
-                                        style={
-                                            styles.optionEmoji
-                                        }
-                                    >
-                                        🎓
-                                    </Text>
+                                    <Text style={styles.optionEmoji}>🎓</Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            schoolLevel ===
-                                            "college" &&
-                                            styles.optionTextSelected,
+                                            schoolLevel === "college" && styles.optionTextSelected,
                                         ]}
                                     >
                                         College
@@ -1193,31 +1018,17 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        schoolLevel ===
-                                        "highSchool" &&
-                                        styles.optionButtonSelected,
+                                        schoolLevel === "highSchool" && styles.optionButtonSelected,
                                     ]}
-                                    onPress={() =>
-                                        handleSchoolLevelChange(
-                                            "highSchool"
-                                        )
-                                    }
+                                    onPress={() => handleSchoolLevelChange("highSchool")}
                                     activeOpacity={0.85}
                                 >
-                                    <Text
-                                        style={
-                                            styles.optionEmoji
-                                        }
-                                    >
-                                        📚
-                                    </Text>
+                                    <Text style={styles.optionEmoji}>🎒</Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            schoolLevel ===
-                                            "highSchool" &&
-                                            styles.optionTextSelected,
+                                            schoolLevel === "highSchool" && styles.optionTextSelected,
                                         ]}
                                     >
                                         High School
@@ -1227,81 +1038,47 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </View>
 
                         {schoolLevel === "college" && (
-                            <View
-                                style={
-                                    styles.formSection
-                                }
-                            >
-                                <Text style={styles.label}>
-                                    College
-                                </Text>
+                            <View style={styles.formSection}>
+                                <Text style={styles.label}>College</Text>
 
                                 <TouchableOpacity
-                                    style={
-                                        styles.dropdownButton
-                                    }
-                                    onPress={
-                                        openCollegePicker
-                                    }
+                                    style={styles.dropdownButton}
+                                    onPress={openCollegePicker}
                                     activeOpacity={0.85}
                                 >
                                     <Text
                                         numberOfLines={1}
                                         style={[
                                             styles.dropdownText,
-                                            !collegeName &&
-                                            styles.dropdownPlaceholder,
+                                            !collegeName && styles.dropdownPlaceholder,
                                         ]}
                                     >
-                                        {collegeName ||
-                                            "Search for your college"}
+                                        {collegeName || "Search for your college"}
                                     </Text>
 
-                                    <Text
-                                        style={
-                                            styles.dropdownArrow
-                                        }
-                                    >
-                                        ›
-                                    </Text>
+                                    <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
                         <View style={styles.formSection}>
-                            <Text style={styles.label}>
-                                Are you a student athlete?
-                            </Text>
+                            <Text style={styles.label}>Are you a student athlete?</Text>
 
                             <View style={styles.optionRow}>
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        isStudentAthlete ===
-                                        true &&
-                                        styles.optionButtonSelected,
+                                        isStudentAthlete === true && styles.optionButtonSelected,
                                     ]}
-                                    onPress={() =>
-                                        handleAthleteChoice(
-                                            true
-                                        )
-                                    }
+                                    onPress={() => handleAthleteChoice(true)}
                                     activeOpacity={0.85}
                                 >
-                                    <Text
-                                        style={
-                                            styles.optionEmoji
-                                        }
-                                    >
-                                        🏆
-                                    </Text>
+                                    <Text style={styles.optionEmoji}>🏆</Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            isStudentAthlete ===
-                                            true &&
-                                            styles.optionTextSelected,
+                                            isStudentAthlete === true && styles.optionTextSelected,
                                         ]}
                                     >
                                         Yes
@@ -1311,31 +1088,17 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        isStudentAthlete ===
-                                        false &&
-                                        styles.optionButtonSelected,
+                                        isStudentAthlete === false && styles.optionButtonSelected,
                                     ]}
-                                    onPress={() =>
-                                        handleAthleteChoice(
-                                            false
-                                        )
-                                    }
+                                    onPress={() => handleAthleteChoice(false)}
                                     activeOpacity={0.85}
                                 >
-                                    <Text
-                                        style={
-                                            styles.optionEmoji
-                                        }
-                                    >
-                                        🙌
-                                    </Text>
+                                    <Text style={styles.optionEmoji}>🙌</Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            isStudentAthlete ===
-                                            false &&
-                                            styles.optionTextSelected,
+                                            isStudentAthlete === false && styles.optionTextSelected,
                                         ]}
                                     >
                                         No
@@ -1345,52 +1108,120 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </View>
 
                         {isStudentAthlete === true && (
-                            <View
-                                style={
-                                    styles.formSection
-                                }
-                            >
-                                <Text style={styles.label}>
-                                    Sport
-                                </Text>
+                            <View style={styles.formSection}>
+                                <Text style={styles.label}>Sport</Text>
 
                                 <TouchableOpacity
-                                    style={
-                                        styles.dropdownButton
-                                    }
-                                    onPress={() =>
-                                        setSportModalVisible(
-                                            true
-                                        )
-                                    }
+                                    style={styles.dropdownButton}
+                                    onPress={() => setSportModalVisible(true)}
                                     activeOpacity={0.85}
                                 >
                                     <Text
                                         numberOfLines={1}
                                         style={[
                                             styles.dropdownText,
-                                            !selectedSport &&
-                                            styles.dropdownPlaceholder,
+                                            !selectedSport && styles.dropdownPlaceholder,
                                         ]}
                                     >
-                                        {selectedSport ||
-                                            "Select your sport"}
+                                        {selectedSport || "Select your sport"}
                                     </Text>
 
-                                    <Text
-                                        style={
-                                            styles.dropdownArrow
-                                        }
-                                    >
-                                        ›
-                                    </Text>
+                                    <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
 
+                        <View style={styles.formSection}>
+                            <Text style={styles.label}>
+                                Promote your social media with your Dumps
+                            </Text>
+
+                            <Text style={styles.socialOptionalText}>
+                                Optional. Choose one platform to attach to your posts.
+                            </Text>
+
+                            <View style={styles.socialPlatformGrid}>
+                                {SOCIAL_PLATFORMS.map((platform) => {
+                                    const isSelected = socialPlatform === platform.value;
+
+                                    return (
+                                        <TouchableOpacity
+                                            key={platform.value}
+                                            style={[
+                                                styles.socialPlatformButton,
+                                                isSelected && styles.socialPlatformButtonSelected,
+                                            ]}
+                                            onPress={() => handleSocialPlatformPress(platform.value)}
+                                            activeOpacity={0.85}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={platform.label}
+                                            accessibilityState={{
+                                                selected: isSelected,
+                                            }}
+                                        >
+                                            <FontAwesome6
+                                                name={platform.icon}
+                                                size={15}
+                                                color={platform.iconColor}
+                                            />
+
+                                            {isSelected && (
+                                                <View style={styles.socialSelectedCheck}>
+                                                    <Text style={styles.socialSelectedCheckText}>✓</Text>
+                                                </View>
+                                            )}
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+
+                            {socialPlatform && (
+                                <View style={styles.socialLinkSection}>
+                                    <Text style={styles.socialLinkLabel}>
+                                        {
+                                            SOCIAL_PLATFORMS.find(
+                                                (platform) => platform.value === socialPlatform,
+                                            )?.label
+                                        }{" "}
+                                        profile link
+                                    </Text>
+
+                                    <TextInput
+                                        style={[
+                                            styles.socialLinkInput,
+                                            socialMediaError ? styles.inputErrorBorder : null,
+                                        ]}
+                                        value={socialMediaUrl}
+                                        onChangeText={(value) => {
+                                            setSocialMediaUrl(value);
+                                            setSocialMediaError("");
+                                        }}
+                                        onBlur={validateSocialMediaLink}
+                                        placeholder={
+                                            SOCIAL_PLATFORMS.find(
+                                                (platform) => platform.value === socialPlatform,
+                                            )?.placeholder
+                                        }
+                                        placeholderTextColor="#9AA4AE"
+                                        keyboardType="url"
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                        returnKeyType="done"
+                                    />
+
+                                    {socialMediaError ? (
+                                        <Text style={styles.errorText}>{socialMediaError}</Text>
+                                    ) : (
+                                        <Text style={styles.helperText}>
+                                            Paste the full link to your profile or channel.
+                                        </Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
+
                         <Text style={styles.footerText}>
-                            You can update these details later
-                            in Account Settings.
+                            Your changes will appear across ScoolFools.
                         </Text>
                     </ScrollView>
 
@@ -1398,28 +1229,16 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         <TouchableOpacity
                             style={[
                                 styles.continueButton,
-                                (!canContinue ||
-                                    loading) &&
-                                styles.continueButtonDisabled,
+                                (!canContinue || loading) && styles.continueButtonDisabled,
                             ]}
                             onPress={handleSaveChanges}
-                            disabled={
-                                !canContinue || loading
-                            }
+                            disabled={!canContinue || loading}
                             activeOpacity={0.88}
                         >
                             {loading ? (
-                                <ActivityIndicator
-                                    color="#07111F"
-                                />
+                                <ActivityIndicator color="#07111F" />
                             ) : (
-                                <Text
-                                    style={
-                                        styles.continueButtonText
-                                    }
-                                >
-                                    Save Changes
-                                </Text>
+                                <Text style={styles.continueButtonText}>Save Changes</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -1429,48 +1248,20 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     visible={collegeModalVisible}
                     animationType="slide"
                     presentationStyle="pageSheet"
-                    onRequestClose={() =>
-                        setCollegeModalVisible(false)
-                    }
+                    onRequestClose={() => setCollegeModalVisible(false)}
                 >
-                    <SafeAreaView
-                        style={styles.modalSafeArea}
-                    >
+                    <SafeAreaView style={styles.modalSafeArea}>
                         <View style={styles.modalHeader}>
-                            <TouchableOpacity
-                                onPress={() =>
-                                    setCollegeModalVisible(
-                                        false
-                                    )
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.modalCancel
-                                    }
-                                >
-                                    Cancel
-                                </Text>
+                            <TouchableOpacity onPress={() => setCollegeModalVisible(false)}>
+                                <Text style={styles.modalCancel}>Cancel</Text>
                             </TouchableOpacity>
 
-                            <Text
-                                style={styles.modalTitle}
-                            >
-                                Choose College
-                            </Text>
+                            <Text style={styles.modalTitle}>Choose College</Text>
 
-                            <View
-                                style={
-                                    styles.modalHeaderSpacer
-                                }
-                            />
+                            <View style={styles.modalHeaderSpacer} />
                         </View>
 
-                        <View
-                            style={
-                                styles.modalSearchContainer
-                            }
-                        >
+                        <View style={styles.modalSearchContainer}>
                             <TextInput
                                 style={styles.modalSearchInput}
                                 value={collegeSearch}
@@ -1484,100 +1275,47 @@ export default function AccountSettingsScreen({ navigation }: any) {
                             />
                         </View>
 
-
                         <FlatList
                             data={filteredColleges}
-                            keyExtractor={(item, index) =>
-                                `${item}-${index}`
-                            }
+                            keyExtractor={(item, index) => `${item}-${index}`}
                             keyboardShouldPersistTaps="handled"
-                            contentContainerStyle={
-                                styles.modalListContent
-                            }
+                            contentContainerStyle={styles.modalListContent}
                             renderItem={({ item }) => {
                                 const showMainListMarker =
-                                    item === "Not Listed" &&
-                                    !collegeSearch.trim();
+                                    item === "Not Listed" && !collegeSearch.trim();
 
                                 return (
                                     <View>
                                         <TouchableOpacity
                                             style={styles.modalListItem}
-                                            onPress={() =>
-                                                selectCollege(item)
-                                            }
+                                            onPress={() => selectCollege(item)}
                                             activeOpacity={0.8}
                                         >
-                                            <Text
-                                                style={
-                                                    styles.modalListText
-                                                }
-                                            >
-                                                {item}
-                                            </Text>
+                                            <Text style={styles.modalListText}>{item}</Text>
 
                                             {collegeName === item && (
-                                                <Text
-                                                    style={
-                                                        styles.modalCheck
-                                                    }
-                                                >
-                                                    ✓
-                                                </Text>
+                                                <Text style={styles.modalCheck}>✓</Text>
                                             )}
                                         </TouchableOpacity>
 
                                         {showMainListMarker && (
-                                            <View
-                                                style={
-                                                    styles.collegeListDivider
-                                                }
-                                            >
-                                                <View
-                                                    style={
-                                                        styles.collegeDividerLine
-                                                    }
-                                                />
+                                            <View style={styles.collegeListDivider}>
+                                                <View style={styles.collegeDividerLine} />
 
-                                                <Text
-                                                    style={
-                                                        styles.collegeDividerText
-                                                    }
-                                                >
-                                                    COLLEGES
-                                                </Text>
+                                                <Text style={styles.collegeDividerText}>COLLEGES</Text>
 
-                                                <View
-                                                    style={
-                                                        styles.collegeDividerLine
-                                                    }
-                                                />
+                                                <View style={styles.collegeDividerLine} />
                                             </View>
                                         )}
                                     </View>
                                 );
                             }}
                             ListEmptyComponent={
-                                <View
-                                    style={
-                                        styles.emptyContainer
-                                    }
-                                >
-                                    <Text
-                                        style={
-                                            styles.emptyTitle
-                                        }
-                                    >
-                                        No matching college
-                                    </Text>
+                                <View style={styles.emptyContainer}>
+                                    <Text style={styles.emptyTitle}>No matching college</Text>
 
-                                    <Text
-                                        style={
-                                            styles.emptyText
-                                        }
-                                    >
-                                        Try another spelling, or select
-                                        Other College or Not Listed.
+                                    <Text style={styles.emptyText}>
+                                        Try another spelling, or select Other College or Not Listed.
                                     </Text>
                                 </View>
                             }
@@ -1589,90 +1327,65 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     visible={sportModalVisible}
                     animationType="slide"
                     presentationStyle="pageSheet"
-                    onRequestClose={() =>
-                        setSportModalVisible(false)
-                    }
+                    onRequestClose={() => setSportModalVisible(false)}
                 >
-                    <SafeAreaView
-                        style={styles.modalSafeArea}
-                    >
+                    <SafeAreaView style={styles.modalSafeArea}>
                         <View style={styles.modalHeader}>
-                            <TouchableOpacity
-                                onPress={() =>
-                                    setSportModalVisible(
-                                        false
-                                    )
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.modalCancel
-                                    }
-                                >
-                                    Cancel
-                                </Text>
+                            <TouchableOpacity onPress={() => setSportModalVisible(false)}>
+                                <Text style={styles.modalCancel}>Cancel</Text>
                             </TouchableOpacity>
 
-                            <Text
-                                style={styles.modalTitle}
-                            >
-                                Choose Sport
-                            </Text>
+                            <Text style={styles.modalTitle}>Choose Sport</Text>
 
-                            <View
-                                style={
-                                    styles.modalHeaderSpacer
-                                }
-                            />
+                            <View style={styles.modalHeaderSpacer} />
                         </View>
 
                         <FlatList
                             data={filteredSports}
-                            keyExtractor={(item, index) =>
-                                `${item}-${index}`
-                            }
-                            contentContainerStyle={
-                                styles.modalListContent
-                            }
+                            keyExtractor={(item, index) => `${item}-${index}`}
+                            contentContainerStyle={styles.modalListContent}
                             renderItem={({ item }) => (
                                 <TouchableOpacity
-                                    style={
-                                        styles.modalListItem
-                                    }
+                                    style={styles.modalListItem}
                                     onPress={() => {
-                                        setSelectedSport(
-                                            item
-                                        );
-                                        setSportModalVisible(
-                                            false
-                                        );
+                                        setSelectedSport(item);
+                                        setSportModalVisible(false);
                                     }}
                                     activeOpacity={0.8}
                                 >
-                                    <Text
-                                        style={
-                                            styles.modalListText
-                                        }
-                                    >
-                                        {item}
-                                    </Text>
+                                    <Text style={styles.modalListText}>{item}</Text>
 
-                                    {selectedSport ===
-                                        item && (
-                                            <Text
-                                                style={
-                                                    styles.modalCheck
-                                                }
-                                            >
-                                                ✓
-                                            </Text>
-                                        )}
+                                    {selectedSport === item && (
+                                        <Text style={styles.modalCheck}>✓</Text>
+                                    )}
                                 </TouchableOpacity>
                             )}
                         />
                     </SafeAreaView>
                 </Modal>
             </KeyboardAvoidingView>
+
+            <BlogsPaywallModal
+                visible={paywallVisible}
+                onClose={() => setPaywallVisible(false)}
+                onSubscribe={handleSubscribePress}
+                loading={loadingSubscription}
+                localizedPrice={subscriptionProduct?.localizedPrice ?? null}
+                billingPeriodLabel="every 6 months"
+                buttonLabel="Unlock Subscriber Access"
+                themeMode="day"
+            />
+
+            {showConfetti && (
+                <ConfettiCannon
+                    count={140}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut
+                    explosionSpeed={350}
+                    fallSpeed={2600}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -1768,10 +1481,32 @@ const styles = StyleSheet.create({
         borderColor: "#06B6D4",
     },
 
+    avatarButtonLocked: {
+        borderColor: "#E3E7EA",
+    },
+
     avatarImage: {
         width: "100%",
         height: "100%",
         borderRadius: 34,
+    },
+
+    avatarImageLocked: {
+        opacity: 0.62,
+    },
+
+    avatarLockBadge: {
+        position: "absolute",
+        top: -2,
+        right: -2,
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: "#07111F",
+        borderWidth: 1.5,
+        borderColor: "#FFFFFF",
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     avatarCheck: {
@@ -1881,6 +1616,89 @@ const styles = StyleSheet.create({
         fontWeight: "900",
     },
 
+    socialOptionalText: {
+        color: "#7D8892",
+        fontSize: 12,
+        lineHeight: 17,
+        fontWeight: "600",
+        marginTop: -4,
+        marginBottom: 12,
+    },
+
+    socialPlatformGrid: {
+        flexDirection: "row",
+        width: "100%",
+        gap: 6,
+    },
+
+    socialPlatformButton: {
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 0,
+        minWidth: 0,
+        height: 34,
+        borderRadius: 9,
+        borderWidth: 1,
+        borderColor: "#DDE3E7",
+        backgroundColor: "#F8F9FA",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+    },
+
+    socialPlatformButtonSelected: {
+        borderColor: "#06B6D4",
+        borderWidth: 2,
+        shadowColor: "#06B6D4",
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 4,
+    },
+
+    socialSelectedCheck: {
+        position: "absolute",
+        top: 2,
+        right: 3,
+        width: 11,
+        height: 11,
+        borderRadius: 6,
+        backgroundColor: "#06B6D4",
+        borderWidth: 1.5,
+        borderColor: "#FFFFFF",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    socialSelectedCheckText: {
+        color: "#FFFFFF",
+        fontSize: 6,
+        fontWeight: "900",
+    },
+
+    socialLinkSection: {
+        marginTop: 14,
+    },
+
+    socialLinkLabel: {
+        color: "#07111F",
+        fontSize: 13,
+        fontWeight: "900",
+        marginBottom: 8,
+    },
+
+    socialLinkInput: {
+        minHeight: 55,
+        borderRadius: 15,
+        borderWidth: 1.5,
+        borderColor: "#DDE3E7",
+        backgroundColor: "#F8F9FA",
+        color: "#07111F",
+        fontSize: 14,
+        fontWeight: "700",
+        paddingHorizontal: 15,
+    },
+
     dropdownButton: {
         minHeight: 55,
         borderRadius: 15,
@@ -1930,8 +1748,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#FFFFFF",
         paddingHorizontal: 22,
         paddingTop: 12,
-        paddingBottom:
-            Platform.OS === "ios" ? 22 : 16,
+        paddingBottom: Platform.OS === "ios" ? 22 : 16,
         borderTopWidth: 1,
         borderTopColor: "#EEF1F3",
     },
@@ -2001,7 +1818,6 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         paddingHorizontal: 15,
     },
-
 
     modalListContent: {
         paddingHorizontal: 18,

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
     View,
     Text,
@@ -12,9 +18,21 @@ import {
     Platform,
     NativeSyntheticEvent,
     NativeScrollEvent,
+    Alert,
     Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import BlogsPaywallModal from "../components/BlogsPaywallModal";
+import {
+    initializeIAP,
+    getBlogsSubscriptionProduct,
+    buyBlogsSubscription,
+    setupPurchaseListeners,
+    cleanupIAP,
+} from "../services/iap";
+import { finishTransaction } from "react-native-iap";
+import ConfettiCannon from "react-native-confetti-cannon";
 
 type ContentTab = "news" | "blog";
 type TimeTheme = "day" | "night";
@@ -60,6 +78,36 @@ const BLOG_CATEGORIES: CategoryOption[] = [
     { value: "Cheat Codes", label: "🎮 Cheat Codes" },
     { value: "Campus Culture", label: "🏫 Campus Culture" },
 ];
+
+const BLOG_CATEGORY_INFO: Record<
+    Exclude<(typeof BLOG_CATEGORIES)[number]["value"], "All">,
+    { emoji: string; title: string; description: string }
+> = {
+    "Campus Stories": {
+        emoji: "📖",
+        title: "Campus Stories",
+        description:
+            "Real stories, memorable moments, and student experiences from campuses everywhere.",
+    },
+    "Student Blogs": {
+        emoji: "✍️",
+        title: "Student Blogs",
+        description:
+            "Original perspectives and personal takes written for students, by the ScoolFools community.",
+    },
+    "Cheat Codes": {
+        emoji: "🎮",
+        title: "Cheat Codes",
+        description:
+            "Smart tips, shortcuts, and practical advice to help you navigate school and student life.",
+    },
+    "Campus Culture": {
+        emoji: "🏫",
+        title: "Campus Culture",
+        description:
+            "The trends, traditions, conversations, and social moments shaping student communities.",
+    },
+};
 
 const INITIAL_VISIBLE_STORIES = 6;
 const LOAD_MORE_COUNT = 6;
@@ -175,14 +223,24 @@ export default function TrendingScreen({ navigation }: any) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [visibleStoriesCount, setVisibleStoriesCount] = useState(INITIAL_VISIBLE_STORIES);
+    const [visibleStoriesCount, setVisibleStoriesCount] = useState(
+        INITIAL_VISIBLE_STORIES,
+    );
     const [loadingMore, setLoadingMore] = useState(false);
+
+    const [showConfetti, setShowConfetti] = useState(false);
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
 
     const slideAnim = useRef(new Animated.Value(0)).current;
     const feedFadeAnim = useRef(new Animated.Value(1)).current;
 
     const activeColor = activeTab === "news" ? theme.yellow : theme.cyan;
     const categories = activeTab === "news" ? NEWS_CATEGORIES : BLOG_CATEGORIES;
+
+    const getToken = async () => AsyncStorage.getItem("token");
 
     useEffect(() => {
         const interval = setInterval(() => {
@@ -202,6 +260,27 @@ export default function TrendingScreen({ navigation }: any) {
         }).start();
     }, [feedFadeAnim]);
 
+    const fetchEntitlements = useCallback(async () => {
+        try {
+            const token = await getToken();
+            if (!token || !API_BASE_URL) return;
+
+            const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const data = await response.json();
+
+            if (data?.success) {
+                setIsSubscribed(!!data?.entitlements?.isSubscribed);
+            }
+        } catch (error) {
+            console.log("Blog entitlement fetch error:", error);
+        }
+    }, []);
 
     const fetchPosts = useCallback(async () => {
         try {
@@ -211,7 +290,7 @@ export default function TrendingScreen({ navigation }: any) {
             const allPosts = (json.data || [])
                 .filter(
                     (post) =>
-                        post.content_type === "news" || post.content_type === "blog"
+                        post.content_type === "news" || post.content_type === "blog",
                 )
                 .sort((a, b) => {
                     const dateA = new Date(a.created_at).getTime();
@@ -227,10 +306,104 @@ export default function TrendingScreen({ navigation }: any) {
         }
     }, []);
 
+    const loadBlogSubscription = async () => {
+        try {
+            await initializeIAP();
+            const product = await getBlogsSubscriptionProduct();
+            setSubscriptionProduct(product);
+        } catch (error) {
+            console.log("Blog subscription load error:", error);
+        }
+    };
+
+    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
+        try {
+            const token = await getToken();
+
+            if (!token || !API_BASE_URL) {
+                throw new Error("Missing token or API base URL");
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    platform: Platform.OS === "ios" ? "ios" : "android",
+                    productId:
+                        purchase?.productId || purchase?.productIdIOS || "sfs_399_2y",
+                    transactionId:
+                        purchase?.transactionId ||
+                        purchase?.transactionIdIOS ||
+                        purchase?.id ||
+                        null,
+                    purchaseToken:
+                        purchase?.purchaseToken || purchase?.purchaseTokenAndroid || null,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || "Failed to verify subscription");
+            }
+
+            await finishTransaction({ purchase, isConsumable: false });
+
+            setIsSubscribed(!!data.isSubscribed);
+            setPaywallVisible(false);
+            setShowConfetti(true);
+            await fetchEntitlements();
+
+            Alert.alert("Subscribed 🎉", "Welcome to ScoolFools Blogs!");
+        } catch (error) {
+            console.log("Verify blog subscription error:", error);
+            Alert.alert(
+                "Purchase Complete",
+                "Purchase worked, but verifying the subscription with your account failed.",
+            );
+        } finally {
+            setLoadingSubscription(false);
+        }
+    };
+
+    const handleSubscribePress = async () => {
+        try {
+            setLoadingSubscription(true);
+            await initializeIAP();
+            await buyBlogsSubscription();
+        } catch (error) {
+            setLoadingSubscription(false);
+            console.log("Blog subscription request error:", error);
+            Alert.alert(
+                "Subscription Failed",
+                "Something went wrong while starting the subscription.",
+            );
+        }
+    };
 
     useEffect(() => {
         fetchPosts();
-    }, [fetchPosts]);
+        fetchEntitlements();
+
+        setupPurchaseListeners({
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async (purchase: any) => {
+                await verifyBlogSubscriptionOnBackend(purchase);
+            },
+            onPurchaseError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Blog subscription listener error:", error);
+            },
+        });
+
+        return () => {
+            void cleanupIAP();
+        };
+    }, [fetchEntitlements, fetchPosts]);
 
     useEffect(() => {
         setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
@@ -258,15 +431,18 @@ export default function TrendingScreen({ navigation }: any) {
 
         try {
             await fetchPosts();
+            await fetchEntitlements();
             setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
             await new Promise((resolve) => setTimeout(resolve, 700));
         } finally {
             setRefreshing(false);
         }
-    }, [fetchPosts]);
+    }, [fetchEntitlements, fetchPosts]);
 
     const filteredPosts = useMemo(() => {
-        const currentPosts = posts.filter((post) => post.content_type === activeTab);
+        const currentPosts = posts.filter(
+            (post) => post.content_type === activeTab,
+        );
 
         if (selectedCategory === "All") return currentPosts;
 
@@ -279,6 +455,12 @@ export default function TrendingScreen({ navigation }: any) {
     const hasMoreStories = visibleStoriesCount < topStories.length;
 
     const handleOpenPost = (post: Post) => {
+        if (post.content_type === "blog" && !isSubscribed) {
+            setPaywallVisible(true);
+            loadBlogSubscription();
+            return;
+        }
+
         navigation.navigate("ArticleScreen", { slug: post.slug });
     };
 
@@ -294,7 +476,8 @@ export default function TrendingScreen({ navigation }: any) {
 
     const handleScroll = useCallback(
         (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-            const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+            const { layoutMeasurement, contentOffset, contentSize } =
+                event.nativeEvent;
             const paddingToBottom = 220;
 
             const isNearBottom =
@@ -305,7 +488,7 @@ export default function TrendingScreen({ navigation }: any) {
                 loadMoreStories();
             }
         },
-        [hasMoreStories, loadingMore, loadMoreStories]
+        [hasMoreStories, loadingMore, loadMoreStories],
     );
 
     const sliderTranslate = slideAnim.interpolate({
@@ -336,7 +519,6 @@ export default function TrendingScreen({ navigation }: any) {
             edges={["left", "right"]}
             style={[styles.safeArea, { backgroundColor: theme.bg }]}
         >
-
             {refreshing && (
                 <View style={styles.refreshIndicator}>
                     <ActivityIndicator size="small" color={activeColor} />
@@ -373,9 +555,7 @@ export default function TrendingScreen({ navigation }: any) {
                             styles.mainTabSlider,
                             {
                                 backgroundColor:
-                                    activeTab === "news"
-                                        ? theme.yellow
-                                        : theme.cyan,
+                                    activeTab === "news" ? theme.yellow : theme.cyan,
                                 borderColor:
                                     activeTab === "news"
                                         ? "rgba(250,204,21,0.60)"
@@ -425,7 +605,6 @@ export default function TrendingScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
 
-
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -465,6 +644,44 @@ export default function TrendingScreen({ navigation }: any) {
                     })}
                 </ScrollView>
 
+                {activeTab === "blog" && selectedCategory !== "All" && (
+                    <View
+                        style={[
+                            styles.categoryInfoCard,
+                            {
+                                backgroundColor: theme.cardSoft,
+                                borderColor: theme.borderStrong,
+                                shadowColor: theme.cyan,
+                            },
+                        ]}
+                    >
+                        <View
+                            style={[
+                                styles.categoryInfoIcon,
+                                { backgroundColor: theme.cyanSoft },
+                            ]}
+                        >
+                            <Text style={styles.categoryInfoEmoji}>
+                                {BLOG_CATEGORY_INFO[selectedCategory]?.emoji}
+                            </Text>
+                        </View>
+
+                        <View style={styles.categoryInfoContent}>
+                            <Text style={[styles.categoryInfoTitle, { color: theme.cyan }]}>
+                                {BLOG_CATEGORY_INFO[selectedCategory]?.title}
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.categoryInfoDescription,
+                                    { color: theme.textSoft },
+                                ]}
+                            >
+                                {BLOG_CATEGORY_INFO[selectedCategory]?.description}
+                            </Text>
+                        </View>
+                    </View>
+                )}
+
                 <Animated.View
                     style={{
                         opacity: feedFadeAnim,
@@ -497,6 +714,16 @@ export default function TrendingScreen({ navigation }: any) {
                                         imageStyle={styles.featuredImage}
                                         resizeMode="cover"
                                     >
+                                        {activeTab === "blog" && !isSubscribed && (
+                                            <View
+                                                style={[
+                                                    styles.lockOverlay,
+                                                    { borderColor: theme.cyan },
+                                                ]}
+                                            >
+                                                <Text style={styles.lockText}>🔒 Subscriber Blog</Text>
+                                            </View>
+                                        )}
 
                                         <View style={styles.featuredBadgeOverlay}>
                                             <View
@@ -526,7 +753,10 @@ export default function TrendingScreen({ navigation }: any) {
                                         </Text>
 
                                         <Text
-                                            style={[styles.featuredSummary, { color: theme.textSoft }]}
+                                            style={[
+                                                styles.featuredSummary,
+                                                { color: theme.textSoft },
+                                            ]}
                                             numberOfLines={1}
                                         >
                                             {featuredPost.summary}
@@ -564,6 +794,16 @@ export default function TrendingScreen({ navigation }: any) {
                                             style={styles.storyImage}
                                         />
 
+                                        {activeTab === "blog" && !isSubscribed && (
+                                            <View
+                                                style={[
+                                                    styles.storyLockBadge,
+                                                    { borderColor: theme.cyan },
+                                                ]}
+                                            >
+                                                <Text style={styles.storyLockBadgeText}>🔒</Text>
+                                            </View>
+                                        )}
                                     </View>
 
                                     <View style={styles.storyContent}>
@@ -593,7 +833,9 @@ export default function TrendingScreen({ navigation }: any) {
                                                 </Text>
                                             </View>
 
-                                            <Text style={[styles.storyMetaText, { color: theme.muted }]}>
+                                            <Text
+                                                style={[styles.storyMetaText, { color: theme.muted }]}
+                                            >
                                                 {formatTimeAgo(post.created_at)}
                                             </Text>
                                         </View>
@@ -605,15 +847,19 @@ export default function TrendingScreen({ navigation }: any) {
                                 <View style={styles.loadMoreWrap}>
                                     <ActivityIndicator size="small" color={activeColor} />
                                     <Text style={[styles.loadMoreText, { color: activeColor }]}>
-                                        Loading more {activeTab === "news" ? "news stories" : "blogs"}...
+                                        Loading more{" "}
+                                        {activeTab === "news" ? "news stories" : "blogs"}...
                                     </Text>
                                 </View>
                             )}
 
                             {!loadingMore && hasMoreStories && (
                                 <View style={styles.loadMoreHintWrap}>
-                                    <Text style={[styles.loadMoreHintText, { color: theme.muted }]}>
-                                        Scroll for more {activeTab === "news" ? "news stories" : "blogs"}
+                                    <Text
+                                        style={[styles.loadMoreHintText, { color: theme.muted }]}
+                                    >
+                                        Scroll for more{" "}
+                                        {activeTab === "news" ? "news stories" : "blogs"}
                                     </Text>
                                 </View>
                             )}
@@ -621,14 +867,34 @@ export default function TrendingScreen({ navigation }: any) {
                     ) : (
                         <View style={styles.emptyState}>
                             <Text style={[styles.emptyStateText, { color: theme.muted }]}>
-                                No {activeTab === "news" ? "news posts" : "blog posts"} in this category yet.
+                                No {activeTab === "news" ? "news posts" : "blog posts"} in this
+                                category yet.
                             </Text>
                         </View>
                     )}
                 </Animated.View>
             </ScrollView>
 
+            <BlogsPaywallModal
+                visible={paywallVisible}
+                onClose={() => setPaywallVisible(false)}
+                onSubscribe={handleSubscribePress}
+                loading={loadingSubscription}
+                localizedPrice={subscriptionProduct?.localizedPrice ?? null}
+                billingPeriodLabel="every 6 months"
+                themeMode={themeMode}
+            />
 
+            {showConfetti && (
+                <ConfettiCannon
+                    count={140}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut
+                    explosionSpeed={350}
+                    fallSpeed={2600}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </SafeAreaView>
     );
 }
@@ -709,6 +975,44 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
+    },
+
+    categoryInfoCard: {
+        flexDirection: "row",
+        alignItems: "flex-start",
+        borderRadius: 18,
+        borderWidth: 1,
+        padding: 14,
+        marginBottom: 16,
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 3,
+    },
+    categoryInfoIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+    categoryInfoEmoji: {
+        fontSize: 21,
+    },
+    categoryInfoContent: {
+        flex: 1,
+    },
+    categoryInfoTitle: {
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.35,
+        marginBottom: 3,
+    },
+    categoryInfoDescription: {
+        fontSize: 13,
+        lineHeight: 18,
+        fontWeight: "600",
     },
 
     featuredWrapper: {
@@ -838,6 +1142,39 @@ const styles = StyleSheet.create({
         letterSpacing: 0.3,
     },
 
+    lockOverlay: {
+        position: "absolute",
+        top: 12,
+        right: 12,
+        zIndex: 2,
+        backgroundColor: "rgba(2,6,23,0.78)",
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderWidth: 1,
+    },
+    lockText: {
+        color: "#FFFFFF",
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
+    },
+    storyLockBadge: {
+        position: "absolute",
+        top: 6,
+        right: 18,
+        width: 27,
+        height: 27,
+        borderRadius: 14,
+        backgroundColor: "rgba(2,6,23,0.80)",
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+    },
+    storyLockBadgeText: {
+        fontSize: 12,
+    },
+
     loadMoreWrap: {
         paddingVertical: 18,
         alignItems: "center",
@@ -868,5 +1205,4 @@ const styles = StyleSheet.create({
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.35,
     },
-
 });

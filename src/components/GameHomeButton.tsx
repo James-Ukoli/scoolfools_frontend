@@ -1,18 +1,59 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import {
+    StyleSheet,
+    TouchableOpacity,
+} from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
 
-export default function GameHomeButton() {
-    const navigation = useNavigation<any>();
+type TimeTheme = "day" | "night";
+
+type Props = {
+    themeMode?: TimeTheme;
+};
+
+export default function GameHomeButton({
+    themeMode = "day",
+}: Props) {
+    const navigation =
+        useNavigation<any>();
+
+    const isNight =
+        themeMode === "night";
 
     return (
         <TouchableOpacity
-            style={styles.homeButton}
+            style={[
+                styles.homeButton,
+                {
+                    backgroundColor: isNight
+                        ? "#0B1A4A"
+                        : "#06B6D4",
+
+                    borderColor: isNight
+                        ? "#1C3D8F"
+                        : "#0891B2",
+
+                    shadowColor: isNight
+                        ? "#000000"
+                        : "#06B6D4",
+                },
+            ]}
             activeOpacity={0.85}
-            onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
+            onPress={() =>
+                navigation.navigate(
+                    "MainTabs",
+                    {
+                        screen: "Home",
+                    }
+                )
+            }
         >
-            <Ionicons name="home" size={20} color="#FFFFFF" />
+            <Ionicons
+                name="home"
+                size={20}
+                color="#FFFFFF"
+            />
         </TouchableOpacity>
     );
 }
@@ -22,15 +63,19 @@ const styles = StyleSheet.create({
         width: 58,
         height: 58,
         borderRadius: 29,
+
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#0B1A4A",
+
         borderWidth: 1.5,
-        borderColor: "#1C3D8F",
-        shadowColor: "#000000",
-        shadowOffset: { width: 0, height: 4 },
+
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
         shadowOpacity: 0.28,
         shadowRadius: 8,
+
         elevation: 8,
     },
 });

@@ -7,13 +7,10 @@ import {
     Text,
     View,
     RefreshControl,
-    ActivityIndicator,
     Platform,
     Animated,
     TouchableOpacity,
     Easing,
-    Modal,
-    Pressable,
     Alert,
     Share,
 } from "react-native";
@@ -26,6 +23,7 @@ import ConfettiCannon from "react-native-confetti-cannon";
 import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
+import BlogsPaywallModal from "../components/BlogsPaywallModal";
 import { finishTransaction } from "react-native-iap";
 
 import { s, vs, ms } from "react-native-size-matters";
@@ -242,6 +240,14 @@ export default function HomeScreen() {
         }
     };
 
+    const openBlogPaywall = async () => {
+        setPaywallVisible(true);
+
+        if (!subscriptionProduct) {
+            await loadBlogSubscription();
+        }
+    };
+
     const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
         try {
             const token = await getToken();
@@ -259,7 +265,7 @@ export default function HomeScreen() {
                 },
                 body: JSON.stringify({
                     platform: Platform.OS === "ios" ? "ios" : "android",
-                    productId: purchase?.productId || "jms_599_1y",
+                    productId: purchase?.productId,
                     transactionId:
                         purchase?.transactionId ||
                         purchase?.transactionIdIOS ||
@@ -459,19 +465,13 @@ export default function HomeScreen() {
                         posts={featuredPosts}
                         loading={loadingHome}
                         isSubscribed={isSubscribed}
-                        onRequireSubscription={async () => {
-                            setPaywallVisible(true);
-                            await loadBlogSubscription();
-                        }}
+                        onRequireSubscription={openBlogPaywall}
                     />
 
                     <SupportGrowthBanner
                         supporterCount={supporterCount}
                         isSubscribed={isSubscribed}
-                        onOpenBlogPaywall={async () => {
-                            setPaywallVisible(true);
-                            await loadBlogSubscription();
-                        }}
+                        onOpenBlogPaywall={openBlogPaywall}
                         theme={theme}
                     />
 
@@ -493,10 +493,7 @@ export default function HomeScreen() {
                         posts={featuredStories}
                         loading={loadingHome}
                         isSubscribed={isSubscribed}
-                        onRequireSubscription={async () => {
-                            setPaywallVisible(true);
-                            await loadBlogSubscription();
-                        }}
+                        onRequireSubscription={openBlogPaywall}
                     />
 
                     <PartyGamesPromo
@@ -515,96 +512,20 @@ export default function HomeScreen() {
                 </ScrollView>
             </View>
 
-            <Modal
+            <BlogsPaywallModal
                 visible={paywallVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setPaywallVisible(false)}
-            >
-                <View style={styles.paywallOverlay}>
-                    <Pressable
-                        style={[
-                            styles.paywallBackdrop,
-                            { backgroundColor: theme.modalBackdrop },
-                        ]}
-                        onPress={() => setPaywallVisible(false)}
-                    />
-
-                    <View
-                        style={[
-                            styles.paywallCard,
-                            {
-                                backgroundColor: theme.card,
-                                borderColor: theme.cyan,
-                            },
-                        ]}
-                    >
-                        <TouchableOpacity
-                            style={styles.closeButton}
-                            onPress={() => setPaywallVisible(false)}
-                        >
-                            <Text style={[styles.closeButtonText, { color: theme.text }]}>
-                                ×
-                            </Text>
-                        </TouchableOpacity>
-
-                        <Text style={styles.paywallEmoji}>♟️</Text>
-
-                        <Text style={[styles.paywallTitle, { color: theme.text }]}>
-                            Support ScoolFools
-                        </Text>
-
-                        <Text style={[styles.paywallSubtitle, { color: theme.textSoft }]}>
-                            Help support independent chess journalism and modern chess media.
-                        </Text>
-
-                        <View
-                            style={[
-                                styles.priceBox,
-                                {
-                                    backgroundColor: theme.cardDeep,
-                                    borderColor: theme.border,
-                                },
-                            ]}
-                        >
-                            <Text style={[styles.freeTrialText, { color: theme.cyan }]}>
-                                1 Month Free
-                            </Text>
-
-                            <Text style={[styles.priceText, { color: theme.text }]}>
-                                Then {subscriptionProduct?.localizedPrice || "$5.99"}/year
-                            </Text>
-                        </View>
-
-                        <TouchableOpacity
-                            style={[
-                                styles.subscribeButton,
-                                { backgroundColor: theme.cyan },
-                            ]}
-                            activeOpacity={0.9}
-                            onPress={handleSubscribePress}
-                            disabled={loadingSubscription}
-                        >
-                            {loadingSubscription ? (
-                                <ActivityIndicator color={theme.darkText} />
-                            ) : (
-                                <Text
-                                    style={[
-                                        styles.subscribeButtonText,
-                                        { color: theme.darkText },
-                                    ]}
-                                >
-                                    Start Free Month
-                                </Text>
-                            )}
-                        </TouchableOpacity>
-
-                        <Text style={[styles.paywallFinePrint, { color: theme.muted }]}>
-                            Cancel anytime.
-                        </Text>
-                    </View>
-                </View>
-            </Modal>
+                onClose={() => setPaywallVisible(false)}
+                onSubscribe={handleSubscribePress}
+                loading={loadingSubscription}
+                localizedPrice={
+                    subscriptionProduct?.displayPrice ||
+                    subscriptionProduct?.localizedPrice ||
+                    "$3.99"
+                }
+                billingPeriodLabel="every 6 months"
+                buttonLabel="Unlock Premium Access"
+                themeMode={themeMode}
+            />
 
             {showConfetti && (
                 <ConfettiCannon
@@ -1023,93 +944,4 @@ const styles = StyleSheet.create({
         fontWeight: "900",
     },
 
-    paywallOverlay: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 24,
-    },
-
-    paywallBackdrop: {
-        ...StyleSheet.absoluteFillObject,
-    },
-
-    paywallCard: {
-        width: "100%",
-        borderRadius: 28,
-        borderWidth: 1.5,
-        paddingHorizontal: 22,
-        paddingTop: 26,
-        paddingBottom: 22,
-        alignItems: "center",
-    },
-
-    closeButton: {
-        position: "absolute",
-        top: 12,
-        right: 14,
-        zIndex: 10,
-    },
-
-    closeButtonText: {
-        fontSize: 28,
-    },
-
-    paywallEmoji: {
-        fontSize: 40,
-        marginBottom: 10,
-    },
-
-    paywallTitle: {
-        fontSize: 24,
-        fontFamily: "Rajdhani_700Bold",
-        textAlign: "center",
-        marginBottom: 8,
-        letterSpacing: 0.4,
-    },
-
-    paywallSubtitle: {
-        fontSize: 14,
-        textAlign: "center",
-        marginBottom: 16,
-    },
-
-    priceBox: {
-        width: "100%",
-        borderRadius: 18,
-        paddingVertical: 14,
-        alignItems: "center",
-        marginBottom: 18,
-        borderWidth: 1,
-    },
-
-    freeTrialText: {
-        fontSize: 28,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.4,
-    },
-
-    priceText: {
-        fontSize: 13,
-        fontWeight: "800",
-        marginTop: 4,
-    },
-
-    subscribeButton: {
-        width: "100%",
-        height: 50,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    subscribeButtonText: {
-        fontSize: 15,
-        fontWeight: "900",
-    },
-
-    paywallFinePrint: {
-        fontSize: 11,
-        marginTop: 12,
-    },
 });

@@ -20,7 +20,7 @@ export default function AppShell() {
 
             <View style={styles.content}>
                 <AppStack.Navigator
-                    initialRouteName="MainTabs"
+                    initialRouteName="BottomTabs"
                     screenOptions={{
                         headerShown: false,
                         animation: "none",
@@ -30,7 +30,7 @@ export default function AppShell() {
                     }}
                 >
                     <AppStack.Screen
-                        name="MainTabs"
+                        name="BottomTabs"
                         component={BottomTabs}
                     />
 

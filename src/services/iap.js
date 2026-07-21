@@ -10,13 +10,13 @@ import {
 import { Platform } from "react-native";
 
 const GAMES_PACK_PRODUCT_ID = Platform.select({
-  ios: "jmpg_499_1t",
-  android: "jmpg_499_1t",
+  ios: "sbpg_499_1t",
+  android: "sbpg_499_1t",
 });
 
 const BLOGS_SUBSCRIPTION_PRODUCT_ID = Platform.select({
-  ios: "jms_599_1y",
-  android: "jms_599_1y",
+  ios: "sfs_399_2y",
+  android: "sfs_399_2y",
 });
 
 export const productIds = [GAMES_PACK_PRODUCT_ID].filter(Boolean);
