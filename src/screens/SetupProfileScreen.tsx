@@ -1,5 +1,12 @@
-import React, { useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import {
+    Animated,
     View,
     Text,
     StyleSheet,
@@ -14,13 +21,30 @@ import {
     Modal,
     FlatList,
     Keyboard,
+    Easing,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import { COLLEGES } from "../../assets/data/colleges";
+import BlogsPaywallModal from "../components/BlogsPaywallModal";
+import {
+    initializeIAP,
+    getBlogsSubscriptionProduct,
+    buyBlogsSubscription,
+    setupPurchaseListeners,
+    cleanupIAP,
+} from "../services/iap";
+import { finishTransaction } from "react-native-iap";
+import ConfettiCannon from "react-native-confetti-cannon";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 const MINIMUM_LOADING_DURATION_MS = 2000;
 
 const waitForMinimumLoadingDuration = async (startedAt: number) => {
@@ -33,13 +57,49 @@ const waitForMinimumLoadingDuration = async (startedAt: number) => {
 };
 
 type SchoolLevel = "college" | "highSchool";
+type HighSchoolClassification =
+    | "freshman"
+    | "sophomore"
+    | "junior"
+    | "senior";
 type AthleteChoice = boolean | null;
 type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
+type TimeTheme = "day" | "night";
+
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getSetupProfileTheme = (mode: TimeTheme) => {
+    const isNight = mode === "night";
+
+    return {
+        mode,
+        bg: isNight ? "#020617" : "#FFFFFF",
+        surface: isNight ? "#0F172A" : "#F8F9FA",
+        surfaceSoft: isNight ? "#111827" : "#F1F3F5",
+        text: isNight ? "#F8FAFC" : "#07111F",
+        subtext: isNight ? "#CBD5E1" : "#697580",
+        muted: isNight ? "#94A3B8" : "#89939D",
+        placeholder: isNight ? "#64748B" : "#9AA4AE",
+        border: isNight ? "rgba(255,255,255,0.12)" : "#DDE3E7",
+        divider: isNight ? "rgba(255,255,255,0.09)" : "#EEF1F3",
+        selected: isNight ? "rgba(34,211,238,0.12)" : "#E6FAFC",
+        errorBg: isNight ? "#2A1215" : "#FFF8F8",
+        error: isNight ? "#FF7A7A" : "#D92D20",
+        cyan: isNight ? "#22D3EE" : "#06B6D4",
+        cyanDark: isNight ? "#22D3EE" : "#06A8C0",
+        yellow: "#FACC15",
+        darkText: "#07111F",
+        white: "#FFFFFF",
+    };
+};
 
 type AvatarOption = {
     id: string;
     source: any;
-    locked?: boolean;
+    subscriberOnly?: boolean;
 };
 
 const AVATARS: AvatarOption[] = [
@@ -51,17 +111,17 @@ const AVATARS: AvatarOption[] = [
     {
         id: "basicGreen",
         source: require("../../assets/images/profileimages/basicGreen.png"),
-        locked: true,
+        subscriberOnly: true,
     },
     {
         id: "basicPurple",
         source: require("../../assets/images/profileimages/basicPurple.png"),
-        locked: true,
+        subscriberOnly: true,
     },
     {
         id: "diamondBoy",
         source: require("../../assets/images/profileimages/diamondBoy.png"),
-        locked: true,
+        subscriberOnly: true,
     },
 
     // Bottom row
@@ -72,19 +132,29 @@ const AVATARS: AvatarOption[] = [
     {
         id: "basicOrange",
         source: require("../../assets/images/profileimages/basicOrange.png"),
-        locked: true,
+        subscriberOnly: true,
     },
     {
         id: "basicPink",
         source: require("../../assets/images/profileimages/basicPink.png"),
-        locked: true,
+        subscriberOnly: true,
     },
     {
         id: "diamondGirl",
         source: require("../../assets/images/profileimages/diamondGirl.png"),
-        locked: true,
+        subscriberOnly: true,
     },
 ];
+
+const HIGH_SCHOOL_CLASSIFICATIONS: Array<{
+    value: HighSchoolClassification;
+    label: string;
+}> = [
+        { value: "freshman", label: "Freshman" },
+        { value: "sophomore", label: "Sophomore" },
+        { value: "junior", label: "Junior" },
+        { value: "senior", label: "Senior" },
+    ];
 const SPORTS = [
     "Basketball",
     "Football",
@@ -194,6 +264,15 @@ const normalizeUsername = (value: string) => {
 };
 
 export default function SetupProfileScreen({ navigation }: any) {
+    const insets = useSafeAreaInsets();
+    const [themeMode, setThemeMode] = useState<TimeTheme>(
+        getCurrentThemeMode(),
+    );
+    const theme = useMemo(
+        () => getSetupProfileTheme(themeMode),
+        [themeMode],
+    );
+    const styles = useMemo(() => createStyles(theme), [theme]);
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [username, setUsername] = useState("");
     const [usernameError, setUsernameError] = useState("");
@@ -203,6 +282,10 @@ export default function SetupProfileScreen({ navigation }: any) {
     const [collegeName, setCollegeName] = useState("");
     const [collegeSearch, setCollegeSearch] = useState("");
     const [collegeModalVisible, setCollegeModalVisible] = useState(false);
+    const [
+        highSchoolClassification,
+        setHighSchoolClassification,
+    ] = useState<HighSchoolClassification | null>(null);
 
     const [isStudentAthlete, setIsStudentAthlete] = useState<AthleteChoice>(null);
 
@@ -216,6 +299,226 @@ export default function SetupProfileScreen({ navigation }: any) {
     const [socialMediaError, setSocialMediaError] = useState("");
 
     const [loading, setLoading] = useState(false);
+    const [isSubscribed, setIsSubscribed] = useState(false);
+    const [paywallVisible, setPaywallVisible] = useState(false);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
+    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+    const [showConfetti, setShowConfetti] = useState(false);
+    const savingProgress = useRef(new Animated.Value(0)).current;
+    const avatarRotation = useRef(new Animated.Value(0)).current;
+
+    const selectedAvatarSource = useMemo(
+        () =>
+            AVATARS.find((avatar) => avatar.id === selectedAvatar)?.source ||
+            AVATARS[0].source,
+        [selectedAvatar],
+    );
+
+    const avatarSpin = avatarRotation.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0deg", "360deg"],
+    });
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (!loading) {
+            savingProgress.setValue(0);
+            avatarRotation.setValue(0);
+            return;
+        }
+
+        savingProgress.setValue(0);
+        avatarRotation.setValue(0);
+
+        const progressAnimation = Animated.timing(savingProgress, {
+            toValue: 1,
+            duration: MINIMUM_LOADING_DURATION_MS,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: false,
+        });
+
+        const spinAnimation = Animated.loop(
+            Animated.timing(avatarRotation, {
+                toValue: 1,
+                duration: 850,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            }),
+        );
+
+        progressAnimation.start();
+        spinAnimation.start();
+
+        return () => {
+            progressAnimation.stop();
+            spinAnimation.stop();
+        };
+    }, [avatarRotation, loading, savingProgress]);
+
+    const updateStoredSubscriptionState = useCallback(
+        async (subscribed: boolean) => {
+            const storedUserRaw = await AsyncStorage.getItem("user");
+            if (!storedUserRaw) return;
+
+            try {
+                const storedUser = JSON.parse(storedUserRaw);
+
+                await AsyncStorage.setItem(
+                    "user",
+                    JSON.stringify({
+                        ...storedUser,
+                        isSubscribed: subscribed,
+                    }),
+                );
+            } catch (error) {
+                console.log("Setup stored subscription update error:", error);
+            }
+        },
+        [],
+    );
+
+    const loadSubscriptionProduct = async () => {
+        try {
+            await initializeIAP();
+            const product = await getBlogsSubscriptionProduct();
+            setSubscriptionProduct(product);
+        } catch (error) {
+            console.log("Setup subscription load error:", error);
+        }
+    };
+
+    const verifySubscriptionOnBackend = useCallback(
+        async (purchase: any) => {
+            try {
+                const token = await AsyncStorage.getItem("token");
+
+                if (!token || !API_BASE_URL) {
+                    throw new Error("Missing token or API base URL");
+                }
+
+                const response = await fetch(
+                    `${API_BASE_URL}/api/subscriptions/verify`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${token}`,
+                        },
+                        body: JSON.stringify({
+                            platform: Platform.OS === "ios" ? "ios" : "android",
+                            productId: purchase?.productId,
+                            transactionId:
+                                purchase?.transactionId ||
+                                purchase?.transactionIdIOS ||
+                                purchase?.id ||
+                                null,
+                            purchaseToken:
+                                purchase?.purchaseToken ||
+                                purchase?.purchaseTokenAndroid ||
+                                null,
+                        }),
+                    },
+                );
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data?.message ||
+                        data?.error ||
+                        "Subscription verification failed",
+                    );
+                }
+
+                await finishTransaction({
+                    purchase,
+                    isConsumable: false,
+                });
+
+                const subscribed = !!data?.isSubscribed;
+
+                setIsSubscribed(subscribed);
+                setPaywallVisible(false);
+                await updateStoredSubscriptionState(subscribed);
+
+                if (subscribed) {
+                    setShowConfetti(true);
+                }
+            } catch (error) {
+                console.log("Setup subscription verification error:", error);
+
+                Alert.alert(
+                    "Purchase Complete",
+                    "Your purchase was received, but verifying it with your account failed.",
+                );
+            } finally {
+                setLoadingSubscription(false);
+            }
+        },
+        [updateStoredSubscriptionState],
+    );
+
+    const handleSubscribePress = async () => {
+        try {
+            setLoadingSubscription(true);
+            await initializeIAP();
+            await buyBlogsSubscription();
+        } catch (error) {
+            setLoadingSubscription(false);
+            console.log("Setup subscription request error:", error);
+
+            Alert.alert(
+                "Subscription Failed",
+                "Something went wrong while starting the subscription.",
+            );
+        }
+    };
+
+    const openSubscriberPaywall = () => {
+        setPaywallVisible(true);
+        void loadSubscriptionProduct();
+    };
+
+    useEffect(() => {
+        setupPurchaseListeners({
+            onPurchaseSuccess: async () => { },
+            onGamesPackSuccess: async () => { },
+            onBlogsSubscriptionSuccess: async (purchase: any) => {
+                await verifySubscriptionOnBackend(purchase);
+            },
+            onPurchaseError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Setup subscription listener error:", error);
+            },
+        });
+
+        return () => {
+            void cleanupIAP();
+        };
+    }, [verifySubscriptionOnBackend]);
+
+    useEffect(() => {
+        const loadStoredSubscription = async () => {
+            try {
+                const storedUserRaw = await AsyncStorage.getItem("user");
+                if (!storedUserRaw) return;
+
+                const storedUser = JSON.parse(storedUserRaw);
+                setIsSubscribed(!!storedUser?.isSubscribed);
+            } catch (error) {
+                console.log("Setup stored user load error:", error);
+            }
+        };
+
+        void loadStoredSubscription();
+    }, []);
 
     const filteredColleges = useMemo(() => {
         const search = collegeSearch.trim().toLowerCase();
@@ -264,6 +567,13 @@ export default function SetupProfileScreen({ navigation }: any) {
             return false;
         }
 
+        if (
+            schoolLevel === "highSchool" &&
+            !highSchoolClassification
+        ) {
+            return false;
+        }
+
         if (isStudentAthlete === null) {
             return false;
         }
@@ -282,6 +592,7 @@ export default function SetupProfileScreen({ navigation }: any) {
         isUsernameValid,
         schoolLevel,
         collegeName,
+        highSchoolClassification,
         isStudentAthlete,
         selectedSport,
         isSocialMediaValid,
@@ -300,6 +611,10 @@ export default function SetupProfileScreen({ navigation }: any) {
         if (level === "highSchool") {
             setCollegeName("");
             setCollegeSearch("");
+        }
+
+        if (level === "college") {
+            setHighSchoolClassification(null);
         }
     };
 
@@ -405,6 +720,17 @@ export default function SetupProfileScreen({ navigation }: any) {
             return false;
         }
 
+        if (
+            schoolLevel === "highSchool" &&
+            !highSchoolClassification
+        ) {
+            Alert.alert(
+                "Choose your classification",
+                "Select Freshman, Sophomore, Junior, or Senior.",
+            );
+            return false;
+        }
+
         if (isStudentAthlete === null) {
             Alert.alert("Student athlete", "Choose Yes or No to continue.");
             return false;
@@ -450,6 +776,10 @@ export default function SetupProfileScreen({ navigation }: any) {
                 selectedAvatar,
                 schoolLevel,
                 collegeName: schoolLevel === "college" ? collegeName.trim() : "",
+                highSchoolClassification:
+                    schoolLevel === "highSchool"
+                        ? highSchoolClassification
+                        : null,
                 isStudentAthlete,
                 sport: isStudentAthlete ? selectedSport : "",
                 socialMediaPlatform: socialPlatform || "",
@@ -523,6 +853,9 @@ export default function SetupProfileScreen({ navigation }: any) {
                 selectedAvatar: returnedUser?.selectedAvatar || selectedAvatar,
                 schoolLevel: returnedUser?.schoolLevel || schoolLevel,
                 collegeName: returnedUser?.collegeName ?? payload.collegeName,
+                highSchoolClassification:
+                    returnedUser?.highSchoolClassification ??
+                    payload.highSchoolClassification,
                 isStudentAthlete: returnedUser?.isStudentAthlete ?? isStudentAthlete,
                 sport: returnedUser?.sport ?? payload.sport,
                 socialMediaPlatform:
@@ -589,30 +922,33 @@ export default function SetupProfileScreen({ navigation }: any) {
                             <View style={styles.avatarGrid}>
                                 {AVATARS.map((avatar) => {
                                     const isSelected = selectedAvatar === avatar.id;
+                                    const isLocked =
+                                        !!avatar.subscriberOnly && !isSubscribed;
 
                                     return (
                                         <TouchableOpacity
                                             key={avatar.id}
                                             style={[
                                                 styles.avatarButton,
-                                                avatar.locked && styles.avatarButtonLocked,
+                                                isLocked && styles.avatarButtonLocked,
                                                 isSelected && styles.avatarButtonSelected,
                                             ]}
                                             onPress={() => {
-                                                if (!avatar.locked) {
-                                                    setSelectedAvatar(avatar.id);
+                                                if (isLocked) {
+                                                    openSubscriberPaywall();
+                                                    return;
                                                 }
+
+                                                setSelectedAvatar(avatar.id);
                                             }}
-                                            disabled={avatar.locked}
-                                            activeOpacity={avatar.locked ? 1 : 0.85}
+                                            activeOpacity={0.85}
                                             accessibilityRole="button"
                                             accessibilityLabel={
-                                                avatar.locked
-                                                    ? "Locked subscriber avatar"
+                                                isLocked
+                                                    ? "Locked subscriber avatar. Opens subscription options."
                                                     : "Available profile avatar"
                                             }
                                             accessibilityState={{
-                                                disabled: !!avatar.locked,
                                                 selected: isSelected,
                                             }}
                                         >
@@ -620,14 +956,14 @@ export default function SetupProfileScreen({ navigation }: any) {
                                                 source={avatar.source}
                                                 style={[
                                                     styles.avatarImage,
-                                                    avatar.locked && styles.avatarImageLocked,
+                                                    isLocked && styles.avatarImageLocked,
                                                 ]}
                                                 resizeMode="cover"
                                             />
 
-                                            {avatar.locked && (
+                                            {isLocked && (
                                                 <View style={styles.avatarLockBadge}>
-                                                    <FontAwesome6 name="lock" size={7} color="#FFFFFF" />
+                                                    <FontAwesome6 name="lock" size={11} color={theme.white} />
                                                 </View>
                                             )}
 
@@ -658,7 +994,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                                     value={username}
                                     onChangeText={handleUsernameChange}
                                     placeholder="username"
-                                    placeholderTextColor="#9AA4AE"
+                                    placeholderTextColor={theme.placeholder}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     maxLength={20}
@@ -670,7 +1006,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                                 <Text style={styles.errorText}>{usernameError}</Text>
                             ) : (
                                 <Text style={styles.helperText}>
-                                    6 to 20 characters. Letters, numbers, periods, and underscores
+                                    3 to 20 characters. Letters, numbers, periods, and underscores
                                     only.
                                 </Text>
                             )}
@@ -743,6 +1079,49 @@ export default function SetupProfileScreen({ navigation }: any) {
 
                                     <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {schoolLevel === "highSchool" && (
+                            <View style={styles.formSection}>
+                                <Text style={styles.label}>Classification</Text>
+
+                                <View style={styles.classificationGrid}>
+                                    {HIGH_SCHOOL_CLASSIFICATIONS.map(
+                                        (classification) => {
+                                            const isSelected =
+                                                highSchoolClassification ===
+                                                classification.value;
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={classification.value}
+                                                    style={[
+                                                        styles.classificationButton,
+                                                        isSelected &&
+                                                        styles.optionButtonSelected,
+                                                    ]}
+                                                    onPress={() =>
+                                                        setHighSchoolClassification(
+                                                            classification.value,
+                                                        )
+                                                    }
+                                                    activeOpacity={0.85}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.optionText,
+                                                            isSelected &&
+                                                            styles.optionTextSelected,
+                                                        ]}
+                                                    >
+                                                        {classification.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        },
+                                    )}
+                                </View>
                             </View>
                         )}
 
@@ -834,7 +1213,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                                             key={platform.value}
                                             style={[
                                                 styles.socialPlatformButton,
-                                                { backgroundColor: platform.backgroundColor },
+                                                { backgroundColor: theme.surface },
                                                 isSelected && styles.socialPlatformButtonSelected,
                                             ]}
                                             onPress={() => handleSocialPlatformPress(platform.value)}
@@ -846,7 +1225,12 @@ export default function SetupProfileScreen({ navigation }: any) {
                                             <FontAwesome6
                                                 name={platform.icon}
                                                 size={15}
-                                                color={platform.iconColor}
+                                                color={
+                                                    platform.value === "x" &&
+                                                        themeMode === "night"
+                                                        ? theme.white
+                                                        : platform.iconColor
+                                                }
                                             />
 
                                             {isSelected && (
@@ -886,7 +1270,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                                                 (platform) => platform.value === socialPlatform,
                                             )?.placeholder
                                         }
-                                        placeholderTextColor="#9AA4AE"
+                                        placeholderTextColor={theme.placeholder}
                                         keyboardType="url"
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -909,7 +1293,17 @@ export default function SetupProfileScreen({ navigation }: any) {
                         </Text>
                     </ScrollView>
 
-                    <View style={styles.bottomContainer}>
+                    <View
+                        style={[
+                            styles.bottomContainer,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom + 10,
+                                    Platform.OS === "android" ? 24 : 18,
+                                ),
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             style={[
                                 styles.continueButton,
@@ -920,7 +1314,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                             activeOpacity={0.88}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#07111F" />
+                                <ActivityIndicator color={theme.darkText} />
                             ) : (
                                 <Text style={styles.continueButtonText}>Continue</Text>
                             )}
@@ -951,7 +1345,7 @@ export default function SetupProfileScreen({ navigation }: any) {
                                 value={collegeSearch}
                                 onChangeText={setCollegeSearch}
                                 placeholder="Search colleges"
-                                placeholderTextColor="#9AA4AE"
+                                placeholderTextColor={theme.placeholder}
                                 autoCapitalize="words"
                                 autoCorrect={false}
                                 autoFocus
@@ -1048,489 +1442,656 @@ export default function SetupProfileScreen({ navigation }: any) {
                     </SafeAreaView>
                 </Modal>
             </KeyboardAvoidingView>
+
+            <Modal
+                visible={loading}
+                transparent
+                animationType="fade"
+                statusBarTranslucent
+                navigationBarTranslucent
+            >
+                <View style={styles.savingOverlay}>
+                    <View style={styles.savingCard}>
+                        <Animated.View
+                            style={[
+                                styles.savingAvatarWrap,
+                                {
+                                    transform: [
+                                        {
+                                            rotate: avatarSpin,
+                                        },
+                                    ],
+                                },
+                            ]}
+                        >
+                            <Image
+                                source={selectedAvatarSource}
+                                style={styles.savingAvatar}
+                                resizeMode="cover"
+                            />
+                        </Animated.View>
+
+                        <Text style={styles.savingTitle}>
+                            {username || "ScoolFools user"}, your profile is being created
+                        </Text>
+
+                        <Text style={styles.savingSubtitle}>
+                            Getting everything ready for you...
+                        </Text>
+
+                        <View style={styles.progressTrack}>
+                            <Animated.View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        width: savingProgress.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ["0%", "100%"],
+                                        }),
+                                    },
+                                ]}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
+            <BlogsPaywallModal
+                visible={paywallVisible}
+                onClose={() => setPaywallVisible(false)}
+                onSubscribe={handleSubscribePress}
+                loading={loadingSubscription}
+                localizedPrice={subscriptionProduct?.localizedPrice ?? null}
+                billingPeriodLabel="every 6 months"
+                buttonLabel="Unlock Subscriber Access"
+                themeMode={themeMode}
+            />
+
+            {showConfetti && (
+                <ConfettiCannon
+                    count={140}
+                    origin={{ x: -10, y: 0 }}
+                    fadeOut
+                    explosionSpeed={350}
+                    fallSpeed={2600}
+                    onAnimationEnd={() => setShowConfetti(false)}
+                />
+            )}
         </SafeAreaView>
     );
 }
 
-const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    keyboardView: {
-        flex: 1,
-    },
-
-    screen: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    scrollView: {
-        flex: 1,
-    },
-
-    scrollContent: {
-        paddingHorizontal: 22,
-        paddingTop: 22,
-        paddingBottom: 130,
-    },
-
-    header: {
-        marginBottom: 28,
-    },
-
-    title: {
-        color: "#07111F",
-        fontSize: 31,
-        lineHeight: 37,
-        fontWeight: "900",
-    },
-
-    subtitle: {
-        color: "#697580",
-        fontSize: 15,
-        lineHeight: 21,
-        fontWeight: "600",
-        marginTop: 6,
-    },
-
-    formSection: {
-        marginBottom: 25,
-    },
-
-    label: {
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "900",
-        marginBottom: 11,
-    },
-
-    avatarGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 12,
-    },
-
-    avatarButton: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        borderWidth: 3,
-        borderColor: "#EEF1F3",
-        backgroundColor: "#F5F7F8",
-        padding: 2,
-        position: "relative",
-    },
-
-    avatarButtonSelected: {
-        borderColor: "#06B6D4",
-    },
-
-    avatarButtonLocked: {
-        borderColor: "#E3E7EA",
-    },
-
-    avatarImage: {
-        width: "100%",
-        height: "100%",
-        borderRadius: 34,
-    },
-
-    avatarImageLocked: {
-        opacity: 0.62,
-    },
-
-    avatarLockBadge: {
-        position: "absolute",
-        top: -2,
-        right: -2,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: "#07111F",
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    avatarCheck: {
-        position: "absolute",
-        right: -3,
-        bottom: -3,
-        width: 23,
-        height: 23,
-        borderRadius: 12,
-        backgroundColor: "#FACC15",
-        borderWidth: 2,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    avatarCheckText: {
-        color: "#07111F",
-        fontSize: 12,
-        fontWeight: "900",
-    },
-
-    usernameContainer: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 15,
-    },
-
-    usernameAt: {
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "900",
-        marginRight: 2,
-    },
-
-    usernameInput: {
-        flex: 1,
-        minHeight: 52,
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "700",
-        paddingVertical: 0,
-    },
-
-    inputErrorBorder: {
-        borderColor: "#E5484D",
-        backgroundColor: "#FFF8F8",
-    },
-
-    helperText: {
-        color: "#89939D",
-        fontSize: 11,
-        lineHeight: 16,
-        fontWeight: "600",
-        marginTop: 7,
-    },
-
-    errorText: {
-        color: "#D92D20",
-        fontSize: 12,
-        lineHeight: 17,
-        fontWeight: "700",
-        marginTop: 7,
-    },
-
-    optionRow: {
-        flexDirection: "row",
-        gap: 11,
-    },
-
-    optionButton: {
-        flex: 1,
-        minHeight: 69,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 12,
-    },
-
-    optionButtonSelected: {
-        backgroundColor: "#E6FAFC",
-        borderColor: "#06B6D4",
-    },
-
-    optionEmoji: {
-        fontSize: 21,
-        marginRight: 8,
-    },
-
-    optionText: {
-        color: "#606C76",
-        fontSize: 14,
-        fontWeight: "800",
-    },
-
-    optionTextSelected: {
-        color: "#07111F",
-        fontWeight: "900",
-    },
-
-    socialOptionalText: {
-        color: "#7D8892",
-        fontSize: 12,
-        lineHeight: 17,
-        fontWeight: "600",
-        marginTop: -4,
-        marginBottom: 12,
-    },
-
-    socialPlatformGrid: {
-        flexDirection: "row",
-        width: "100%",
-        gap: 6,
-    },
-
-    socialPlatformButton: {
-        flexGrow: 1,
-        flexShrink: 1,
-        flexBasis: 0,
-        minWidth: 0,
-        height: 34,
-        borderRadius: 9,
-        borderWidth: 1,
-        borderColor: "#DDE3E7",
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-    },
-
-    socialPlatformButtonSelected: {
-        borderColor: "#06B6D4",
-        borderWidth: 2,
-        shadowColor: "#06B6D4",
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 4,
-    },
-
-    socialSelectedCheck: {
-        position: "absolute",
-        top: 2,
-        right: 3,
-        width: 11,
-        height: 11,
-        borderRadius: 6,
-        backgroundColor: "#06B6D4",
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    socialSelectedCheckText: {
-        color: "#FFFFFF",
-        fontSize: 6,
-        fontWeight: "900",
-    },
-
-    socialLinkSection: {
-        marginTop: 14,
-    },
-
-    socialLinkLabel: {
-        color: "#07111F",
-        fontSize: 13,
-        fontWeight: "900",
-        marginBottom: 8,
-    },
-
-    socialLinkInput: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        color: "#07111F",
-        fontSize: 14,
-        fontWeight: "700",
-        paddingHorizontal: 15,
-    },
-
-    dropdownButton: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 15,
-    },
-
-    dropdownText: {
-        flex: 1,
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        marginRight: 10,
-    },
-
-    dropdownPlaceholder: {
-        color: "#9AA4AE",
-        fontWeight: "600",
-    },
-
-    dropdownArrow: {
-        color: "#07111F",
-        fontSize: 27,
-        lineHeight: 27,
-        fontWeight: "500",
-    },
-
-    footerText: {
-        color: "#929BA4",
-        fontSize: 11,
-        lineHeight: 16,
-        textAlign: "center",
-        fontWeight: "600",
-        paddingHorizontal: 18,
-        marginTop: 2,
-    },
-
-    bottomContainer: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 22,
-        paddingTop: 12,
-        paddingBottom: Platform.OS === "ios" ? 22 : 16,
-        borderTopWidth: 1,
-        borderTopColor: "#EEF1F3",
-    },
-
-    continueButton: {
-        width: "100%",
-        height: 57,
-        borderRadius: 17,
-        backgroundColor: "#FACC15",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    continueButtonDisabled: {
-        opacity: 0.42,
-    },
-
-    continueButtonText: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    modalSafeArea: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    modalHeader: {
-        height: 58,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: "#EEF1F3",
-    },
-
-    modalCancel: {
-        color: "#06A8C0",
-        fontSize: 15,
-        fontWeight: "800",
-    },
-
-    modalTitle: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    modalHeaderSpacer: {
-        width: 52,
-    },
-
-    modalSearchContainer: {
-        paddingHorizontal: 18,
-        paddingTop: 15,
-        paddingBottom: 10,
-    },
-
-    modalSearchInput: {
-        height: 51,
-        borderRadius: 15,
-        backgroundColor: "#F1F3F5",
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        paddingHorizontal: 15,
-    },
-
-    modalListContent: {
-        paddingHorizontal: 18,
-        paddingBottom: 30,
-    },
-
-    modalListItem: {
-        minHeight: 55,
-        borderBottomWidth: 1,
-        borderBottomColor: "#EEF1F3",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 3,
-    },
-
-    modalListText: {
-        flex: 1,
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        paddingRight: 12,
-    },
-
-    modalCheck: {
-        color: "#06B6D4",
-        fontSize: 18,
-        fontWeight: "900",
-    },
-
-    emptyContainer: {
-        alignItems: "center",
-        paddingTop: 45,
-        paddingHorizontal: 25,
-    },
-
-    emptyTitle: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    emptyText: {
-        color: "#7D8892",
-        fontSize: 13,
-        lineHeight: 19,
-        textAlign: "center",
-        marginTop: 6,
-    },
-    collegeListDivider: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 5,
-        marginBottom: 7,
-    },
-
-    collegeDividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: "#DDE3E7",
-    },
-
-    collegeDividerText: {
-        color: "#8A949E",
-        fontSize: 11,
-        fontWeight: "900",
-        letterSpacing: 1.1,
-        marginHorizontal: 12,
-    },
-});
+const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
+    StyleSheet.create({
+        safeArea: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        keyboardView: {
+            flex: 1,
+        },
+
+        screen: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        scrollView: {
+            flex: 1,
+        },
+
+        scrollContent: {
+            paddingHorizontal: 22,
+            paddingTop: 22,
+            paddingBottom: 130,
+        },
+
+        header: {
+            marginBottom: 28,
+        },
+
+        title: {
+            color: theme.text,
+            fontSize: 31,
+            lineHeight: 37,
+            fontWeight: "900",
+        },
+
+        subtitle: {
+            color: theme.subtext,
+            fontSize: 15,
+            lineHeight: 21,
+            fontWeight: "600",
+            marginTop: 6,
+        },
+
+        formSection: {
+            marginBottom: 25,
+        },
+
+        label: {
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "900",
+            marginBottom: 11,
+        },
+
+        avatarGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: 12,
+        },
+
+        avatarButton: {
+            width: Platform.OS === "android" ? 64 : 72,
+            height: Platform.OS === "android" ? 64 : 72,
+            borderRadius: Platform.OS === "android" ? 32 : 36,
+            borderWidth: 3,
+            borderColor: theme.divider,
+            backgroundColor: theme.surface,
+            padding: 2,
+            position: "relative",
+        },
+
+        avatarButtonSelected: {
+            borderColor: theme.cyan,
+        },
+
+        avatarButtonLocked: {
+            borderColor: theme.border,
+        },
+
+        avatarImage: {
+            width: "100%",
+            height: "100%",
+            borderRadius: 34,
+        },
+
+        avatarImageLocked: {
+            opacity: 0.7,
+        },
+
+        avatarLockBadge: {
+            position: "absolute",
+            top: 2,
+            right: 2,
+            bottom: 2,
+            left: 2,
+            borderRadius: 999,
+            backgroundColor: "rgba(2,6,23,0.50)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        avatarCheck: {
+            position: "absolute",
+            right: -3,
+            bottom: -3,
+            width: 23,
+            height: 23,
+            borderRadius: 12,
+            backgroundColor: theme.yellow,
+            borderWidth: 2,
+            borderColor: theme.bg,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        avatarCheckText: {
+            color: theme.darkText,
+            fontSize: 12,
+            fontWeight: "900",
+        },
+
+        usernameContainer: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 15,
+        },
+
+        usernameAt: {
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "900",
+            marginRight: 2,
+        },
+
+        usernameInput: {
+            flex: 1,
+            minHeight: 52,
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "700",
+            paddingVertical: 0,
+        },
+
+        inputErrorBorder: {
+            borderColor: theme.error,
+            backgroundColor: theme.errorBg,
+        },
+
+        helperText: {
+            color: theme.muted,
+            fontSize: 11,
+            lineHeight: 16,
+            fontWeight: "600",
+            marginTop: 7,
+        },
+
+        errorText: {
+            color: theme.error,
+            fontSize: 12,
+            lineHeight: 17,
+            fontWeight: "700",
+            marginTop: 7,
+        },
+
+        optionRow: {
+            flexDirection: "row",
+            gap: 11,
+        },
+
+        classificationGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: 10,
+        },
+
+        classificationButton: {
+            width: "48.5%",
+            minHeight: 52,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 10,
+        },
+
+        optionButton: {
+            flex: 1,
+            minHeight: 69,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 12,
+        },
+
+        optionButtonSelected: {
+            backgroundColor: theme.selected,
+            borderColor: theme.cyan,
+        },
+
+        optionEmoji: {
+            fontSize: 21,
+            marginRight: 8,
+        },
+
+        optionText: {
+            color: theme.subtext,
+            fontSize: 14,
+            fontWeight: "800",
+        },
+
+        optionTextSelected: {
+            color: theme.text,
+            fontWeight: "900",
+        },
+
+        socialOptionalText: {
+            color: theme.muted,
+            fontSize: 12,
+            lineHeight: 17,
+            fontWeight: "600",
+            marginTop: -4,
+            marginBottom: 12,
+        },
+
+        socialPlatformGrid: {
+            flexDirection: "row",
+            width: "100%",
+            gap: 6,
+        },
+
+        socialPlatformButton: {
+            flexGrow: 1,
+            flexShrink: 1,
+            flexBasis: 0,
+            minWidth: 0,
+            height: 34,
+            borderRadius: 9,
+            borderWidth: 1,
+            borderColor: theme.border,
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+        },
+
+        socialPlatformButtonSelected: {
+            borderColor: theme.cyan,
+            borderWidth: 2,
+            shadowColor: theme.cyan,
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 4,
+        },
+
+        socialSelectedCheck: {
+            position: "absolute",
+            top: 2,
+            right: 3,
+            width: 11,
+            height: 11,
+            borderRadius: 6,
+            backgroundColor: theme.cyan,
+            borderWidth: 1.5,
+            borderColor: theme.bg,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        socialSelectedCheckText: {
+            color: theme.white,
+            fontSize: 6,
+            fontWeight: "900",
+        },
+
+        socialLinkSection: {
+            marginTop: 14,
+        },
+
+        socialLinkLabel: {
+            color: theme.text,
+            fontSize: 13,
+            fontWeight: "900",
+            marginBottom: 8,
+        },
+
+        socialLinkInput: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            color: theme.text,
+            fontSize: 14,
+            fontWeight: "700",
+            paddingHorizontal: 15,
+        },
+
+        dropdownButton: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 15,
+        },
+
+        dropdownText: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            marginRight: 10,
+        },
+
+        dropdownPlaceholder: {
+            color: theme.placeholder,
+            fontWeight: "600",
+        },
+
+        dropdownArrow: {
+            color: theme.text,
+            fontSize: 27,
+            lineHeight: 27,
+            fontWeight: "500",
+        },
+
+        footerText: {
+            color: theme.muted,
+            fontSize: 11,
+            lineHeight: 16,
+            textAlign: "center",
+            fontWeight: "600",
+            paddingHorizontal: 18,
+            marginTop: 2,
+        },
+
+        bottomContainer: {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: theme.bg,
+            paddingHorizontal: 22,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === "ios" ? 22 : 16,
+            borderTopWidth: 1,
+            borderTopColor: theme.divider,
+        },
+
+        continueButton: {
+            width: "100%",
+            height: 57,
+            borderRadius: 17,
+            backgroundColor: theme.yellow,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        continueButtonDisabled: {
+            opacity: 0.42,
+        },
+
+        continueButtonText: {
+            color: theme.darkText,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        savingOverlay: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+                theme.mode === "night"
+                    ? "rgba(0,0,0,0.86)"
+                    : "rgba(2,6,23,0.66)",
+            paddingHorizontal: 24,
+        },
+
+        savingCard: {
+            width: "100%",
+            maxWidth: 360,
+            alignItems: "center",
+            backgroundColor: theme.bg,
+            borderRadius: 24,
+            paddingHorizontal: 24,
+            paddingTop: 28,
+            paddingBottom: 26,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+
+        savingAvatarWrap: {
+            width: 78,
+            height: 78,
+            borderRadius: 39,
+            borderWidth: 3,
+            borderColor: theme.cyan,
+            padding: 3,
+            backgroundColor: theme.surface,
+            marginBottom: 18,
+        },
+
+        savingAvatar: {
+            width: "100%",
+            height: "100%",
+            borderRadius: 35,
+        },
+
+        savingTitle: {
+            color: theme.text,
+            fontSize: 20,
+            lineHeight: 25,
+            fontWeight: "900",
+            textAlign: "center",
+        },
+
+        savingSubtitle: {
+            color: theme.subtext,
+            fontSize: 13,
+            lineHeight: 18,
+            fontWeight: "600",
+            textAlign: "center",
+            marginTop: 7,
+        },
+
+        progressTrack: {
+            width: "100%",
+            height: 9,
+            borderRadius: 5,
+            overflow: "hidden",
+            backgroundColor: theme.surfaceSoft,
+            marginTop: 22,
+        },
+
+        progressFill: {
+            height: "100%",
+            borderRadius: 5,
+            backgroundColor: theme.cyan,
+        },
+
+        modalSafeArea: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        modalHeader: {
+            height: 58,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.divider,
+        },
+
+        modalCancel: {
+            color: theme.cyanDark,
+            fontSize: 15,
+            fontWeight: "800",
+        },
+
+        modalTitle: {
+            color: theme.text,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        modalHeaderSpacer: {
+            width: 52,
+        },
+
+        modalSearchContainer: {
+            paddingHorizontal: 18,
+            paddingTop: 15,
+            paddingBottom: 10,
+        },
+
+        modalSearchInput: {
+            height: 51,
+            borderRadius: 15,
+            backgroundColor: theme.surfaceSoft,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            paddingHorizontal: 15,
+        },
+
+        modalListContent: {
+            paddingHorizontal: 18,
+            paddingBottom: 30,
+        },
+
+        modalListItem: {
+            minHeight: 55,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.divider,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 3,
+        },
+
+        modalListText: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            paddingRight: 12,
+        },
+
+        modalCheck: {
+            color: theme.cyan,
+            fontSize: 18,
+            fontWeight: "900",
+        },
+
+        emptyContainer: {
+            alignItems: "center",
+            paddingTop: 45,
+            paddingHorizontal: 25,
+        },
+
+        emptyTitle: {
+            color: theme.text,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        emptyText: {
+            color: theme.muted,
+            fontSize: 13,
+            lineHeight: 19,
+            textAlign: "center",
+            marginTop: 6,
+        },
+        collegeListDivider: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 5,
+            marginBottom: 7,
+        },
+
+        collegeDividerLine: {
+            flex: 1,
+            height: 1,
+            backgroundColor: theme.border,
+        },
+
+        collegeDividerText: {
+            color: theme.muted,
+            fontSize: 11,
+            fontWeight: "900",
+            letterSpacing: 1.1,
+            marginHorizontal: 12,
+        },
+    });

@@ -3,9 +3,9 @@ import {
   endConnection,
   purchaseUpdatedListener,
   purchaseErrorListener,
-  finishTransaction,
   fetchProducts,
   requestPurchase,
+  getAvailablePurchases,
 } from "react-native-iap";
 import { Platform } from "react-native";
 
@@ -46,6 +46,23 @@ export const getGamesPackProduct = async () => {
   } catch (error) {
     console.log("❌ Get game products error:", error);
     return null;
+  }
+};
+
+export const getOwnedGamesPackPurchase = async () => {
+  try {
+    const purchases = await getAvailablePurchases();
+
+    const gamePurchase = purchases.find(
+      (purchase) => purchase.productId === GAMES_PACK_PRODUCT_ID
+    );
+
+    console.log("✅ Existing game purchase:", gamePurchase);
+
+    return gamePurchase || null;
+  } catch (error) {
+    console.log("❌ Restore game purchase error:", error);
+    throw error;
   }
 };
 
@@ -160,19 +177,14 @@ export const setupPurchaseListeners = ({
       const productId = purchase.productId;
 
 if (productId === GAMES_PACK_PRODUCT_ID) {
-  // Do NOT finish here anymore.
-  // GameHomeScreen will verify with backend first, then finishTransaction.
-  onGamesPackSuccess?.(purchase);
+  await onGamesPackSuccess?.(purchase);
   return;
 }
 
-      if (productId === BLOGS_SUBSCRIPTION_PRODUCT_ID) {
-        // IMPORTANT:
-        // Do NOT finish the subscription transaction here anymore.
-        // HomeScreen will verify with backend first, then finishTransaction.
-        onBlogsSubscriptionSuccess?.(purchase);
-        return;
-      }
+     if (productId === BLOGS_SUBSCRIPTION_PRODUCT_ID) {
+  await onBlogsSubscriptionSuccess?.(purchase);
+  return;
+}
     } catch (error) {
       console.log("❌ Purchase listener error:", error);
       onPurchaseError?.(error);

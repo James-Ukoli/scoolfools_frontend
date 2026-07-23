@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+    Animated,
     View,
     Text,
     StyleSheet,
@@ -14,8 +15,12 @@ import {
     Modal,
     FlatList,
     Keyboard,
+    Easing,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+    SafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import { COLLEGES } from "../../assets/data/colleges";
@@ -46,8 +51,44 @@ const waitForMinimumLoadingDuration = async (startedAt: number) => {
 };
 
 type SchoolLevel = "college" | "highSchool";
+type HighSchoolClassification =
+    | "freshman"
+    | "sophomore"
+    | "junior"
+    | "senior";
 type AthleteChoice = boolean | null;
 type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
+type TimeTheme = "day" | "night";
+
+const getCurrentThemeMode = (): TimeTheme => {
+    const hour = new Date().getHours();
+    return hour >= 6 && hour < 19 ? "day" : "night";
+};
+
+const getAccountSettingsTheme = (mode: TimeTheme) => {
+    const isNight = mode === "night";
+
+    return {
+        mode,
+        bg: isNight ? "#020617" : "#FFFFFF",
+        surface: isNight ? "#0F172A" : "#F8F9FA",
+        surfaceSoft: isNight ? "#111827" : "#F1F3F5",
+        text: isNight ? "#F8FAFC" : "#07111F",
+        subtext: isNight ? "#CBD5E1" : "#697580",
+        muted: isNight ? "#94A3B8" : "#89939D",
+        placeholder: isNight ? "#64748B" : "#9AA4AE",
+        border: isNight ? "rgba(255,255,255,0.12)" : "#DDE3E7",
+        divider: isNight ? "rgba(255,255,255,0.09)" : "#EEF1F3",
+        selected: isNight ? "rgba(34,211,238,0.12)" : "#E6FAFC",
+        errorBg: isNight ? "#2A1215" : "#FFF8F8",
+        error: isNight ? "#FF7A7A" : "#D92D20",
+        cyan: isNight ? "#22D3EE" : "#06B6D4",
+        cyanDark: isNight ? "#22D3EE" : "#06A8C0",
+        yellow: "#FACC15",
+        darkText: "#07111F",
+        white: "#FFFFFF",
+    };
+};
 
 type AvatarOption = {
     id: string;
@@ -98,6 +139,22 @@ const AVATARS: AvatarOption[] = [
         subscriberOnly: true,
     },
 ];
+
+const SUBSCRIBER_AVATAR_IDS = new Set(
+    AVATARS
+        .filter((avatar) => avatar.subscriberOnly)
+        .map((avatar) => avatar.id),
+);
+
+const HIGH_SCHOOL_CLASSIFICATIONS: Array<{
+    value: HighSchoolClassification;
+    label: string;
+}> = [
+        { value: "freshman", label: "Freshman" },
+        { value: "sophomore", label: "Sophomore" },
+        { value: "junior", label: "Junior" },
+        { value: "senior", label: "Senior" },
+    ];
 
 const SPORTS = [
     "Basketball",
@@ -198,6 +255,16 @@ const normalizeUsername = (value: string) => {
 };
 
 export default function AccountSettingsScreen({ navigation }: any) {
+    const insets = useSafeAreaInsets();
+    const [themeMode, setThemeMode] = useState<TimeTheme>(
+        getCurrentThemeMode(),
+    );
+    const theme = useMemo(
+        () => getAccountSettingsTheme(themeMode),
+        [themeMode],
+    );
+    const styles = useMemo(() => createStyles(theme), [theme]);
+
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [username, setUsername] = useState("");
     const [usernameError, setUsernameError] = useState("");
@@ -207,6 +274,10 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const [collegeName, setCollegeName] = useState("");
     const [collegeSearch, setCollegeSearch] = useState("");
     const [collegeModalVisible, setCollegeModalVisible] = useState(false);
+    const [
+        highSchoolClassification,
+        setHighSchoolClassification,
+    ] = useState<HighSchoolClassification | null>(null);
 
     const [isStudentAthlete, setIsStudentAthlete] = useState<AthleteChoice>(null);
 
@@ -226,6 +297,63 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const [loading, setLoading] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
+    const savingProgress = useRef(new Animated.Value(0)).current;
+    const avatarRotation = useRef(new Animated.Value(0)).current;
+
+    const selectedAvatarSource = useMemo(
+        () =>
+            AVATARS.find((avatar) => avatar.id === selectedAvatar)?.source ||
+            AVATARS[0].source,
+        [selectedAvatar],
+    );
+
+    const avatarSpin = avatarRotation.interpolate({
+        inputRange: [0, 1],
+        outputRange: ["0deg", "360deg"],
+    });
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setThemeMode(getCurrentThemeMode());
+        }, 60000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+        if (!loading) {
+            savingProgress.setValue(0);
+            avatarRotation.setValue(0);
+            return;
+        }
+
+        savingProgress.setValue(0);
+        avatarRotation.setValue(0);
+
+        const progressAnimation = Animated.timing(savingProgress, {
+            toValue: 1,
+            duration: MINIMUM_LOADING_DURATION_MS,
+            easing: Easing.inOut(Easing.cubic),
+            useNativeDriver: false,
+        });
+
+        const spinAnimation = Animated.loop(
+            Animated.timing(avatarRotation, {
+                toValue: 1,
+                duration: 850,
+                easing: Easing.linear,
+                useNativeDriver: true,
+            }),
+        );
+
+        progressAnimation.start();
+        spinAnimation.start();
+
+        return () => {
+            progressAnimation.stop();
+            spinAnimation.stop();
+        };
+    }, [avatarRotation, loading, savingProgress]);
 
     const updateStoredSubscriptionState = useCallback(
         async (subscribed: boolean) => {
@@ -241,6 +369,15 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     JSON.stringify({
                         ...storedUser,
                         isSubscribed: subscribed,
+                        ...(!subscribed &&
+                            SUBSCRIBER_AVATAR_IDS.has(
+                                storedUser?.selectedAvatar || storedUser?.avatar || "",
+                            )
+                            ? {
+                                avatar: "basicBlue",
+                                selectedAvatar: "basicBlue",
+                            }
+                            : {}),
                     }),
                 );
             } catch (error) {
@@ -268,12 +405,20 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 const subscribed = !!data?.entitlements?.isSubscribed;
 
                 setIsSubscribed(subscribed);
+
+                if (
+                    !subscribed &&
+                    SUBSCRIBER_AVATAR_IDS.has(selectedAvatar)
+                ) {
+                    setSelectedAvatar("basicBlue");
+                }
+
                 await updateStoredSubscriptionState(subscribed);
             }
         } catch (error) {
             console.log("Account settings entitlement fetch error:", error);
         }
-    }, [updateStoredSubscriptionState]);
+    }, [selectedAvatar, updateStoredSubscriptionState]);
 
     const loadSubscriptionProduct = async () => {
         try {
@@ -437,6 +582,16 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 const savedCollege =
                     level === "college" ? profile?.collegeName || "" : "";
 
+                const savedClassification =
+                    level === "highSchool" &&
+                        HIGH_SCHOOL_CLASSIFICATIONS.some(
+                            (classification) =>
+                                classification.value ===
+                                profile?.highSchoolClassification,
+                        )
+                        ? (profile.highSchoolClassification as HighSchoolClassification)
+                        : null;
+
                 const athleteValue =
                     typeof profile?.isStudentAthlete === "boolean"
                         ? profile.isStudentAthlete
@@ -447,6 +602,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 setSchoolLevel(level);
                 setCollegeName(savedCollege);
                 setCollegeSearch(savedCollege);
+                setHighSchoolClassification(savedClassification);
                 setIsStudentAthlete(athleteValue);
                 setSelectedSport(athleteValue ? profile?.sport || "" : "");
 
@@ -556,6 +712,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
+        if (
+            schoolLevel === "highSchool" &&
+            !highSchoolClassification
+        ) {
+            return false;
+        }
+
         if (isStudentAthlete === null) {
             return false;
         }
@@ -574,6 +737,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         isUsernameValid,
         schoolLevel,
         collegeName,
+        highSchoolClassification,
         isStudentAthlete,
         selectedSport,
         isSocialMediaValid,
@@ -592,6 +756,10 @@ export default function AccountSettingsScreen({ navigation }: any) {
         if (level === "highSchool") {
             setCollegeName("");
             setCollegeSearch("");
+        }
+
+        if (level === "college") {
+            setHighSchoolClassification(null);
         }
     };
 
@@ -697,6 +865,17 @@ export default function AccountSettingsScreen({ navigation }: any) {
             return false;
         }
 
+        if (
+            schoolLevel === "highSchool" &&
+            !highSchoolClassification
+        ) {
+            Alert.alert(
+                "Choose your classification",
+                "Select Freshman, Sophomore, Junior, or Senior.",
+            );
+            return false;
+        }
+
         if (isStudentAthlete === null) {
             Alert.alert("Student athlete", "Choose Yes or No to continue.");
             return false;
@@ -742,6 +921,10 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 selectedAvatar,
                 schoolLevel,
                 collegeName: schoolLevel === "college" ? collegeName.trim() : "",
+                highSchoolClassification:
+                    schoolLevel === "highSchool"
+                        ? highSchoolClassification
+                        : null,
                 isStudentAthlete,
                 sport: isStudentAthlete ? selectedSport : "",
                 socialMediaPlatform: socialPlatform || "",
@@ -815,6 +998,9 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 selectedAvatar: returnedUser?.selectedAvatar || selectedAvatar,
                 schoolLevel: returnedUser?.schoolLevel || schoolLevel,
                 collegeName: returnedUser?.collegeName ?? payload.collegeName,
+                highSchoolClassification:
+                    returnedUser?.highSchoolClassification ??
+                    payload.highSchoolClassification,
                 isStudentAthlete: returnedUser?.isStudentAthlete ?? isStudentAthlete,
                 sport: returnedUser?.sport ?? payload.sport,
                 socialMediaPlatform:
@@ -829,13 +1015,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             await AsyncStorage.setItem("user", JSON.stringify(userToStore));
 
             await waitForMinimumLoadingDuration(loadingStartedAt);
-
-            Alert.alert("Profile Updated", "Your account settings have been saved.", [
-                {
-                    text: "Done",
-                    onPress: () => navigation.goBack(),
-                },
-            ]);
+            navigation.goBack();
         } catch (error: any) {
             await waitForMinimumLoadingDuration(loadingStartedAt);
 
@@ -858,7 +1038,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         return (
             <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
                 <View style={styles.initialLoadingContainer}>
-                    <ActivityIndicator size="large" color="#06B6D4" />
+                    <ActivityIndicator size="large" color={theme.cyan} />
                     <Text style={styles.initialLoadingText}>Loading your profile...</Text>
                 </View>
             </SafeAreaView>
@@ -942,7 +1122,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
                                             {isLocked && (
                                                 <View style={styles.avatarLockBadge}>
-                                                    <FontAwesome6 name="lock" size={7} color="#FFFFFF" />
+                                                    <FontAwesome6 name="lock" size={11} color={theme.white} />
                                                 </View>
                                             )}
 
@@ -973,7 +1153,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                     value={username}
                                     onChangeText={handleUsernameChange}
                                     placeholder="username"
-                                    placeholderTextColor="#9AA4AE"
+                                    placeholderTextColor={theme.placeholder}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                     maxLength={20}
@@ -1058,6 +1238,49 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
                                     <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
+                            </View>
+                        )}
+
+                        {schoolLevel === "highSchool" && (
+                            <View style={styles.formSection}>
+                                <Text style={styles.label}>Classification</Text>
+
+                                <View style={styles.classificationGrid}>
+                                    {HIGH_SCHOOL_CLASSIFICATIONS.map(
+                                        (classification) => {
+                                            const isSelected =
+                                                highSchoolClassification ===
+                                                classification.value;
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={classification.value}
+                                                    style={[
+                                                        styles.classificationButton,
+                                                        isSelected &&
+                                                        styles.optionButtonSelected,
+                                                    ]}
+                                                    onPress={() =>
+                                                        setHighSchoolClassification(
+                                                            classification.value,
+                                                        )
+                                                    }
+                                                    activeOpacity={0.85}
+                                                >
+                                                    <Text
+                                                        style={[
+                                                            styles.optionText,
+                                                            isSelected &&
+                                                            styles.optionTextSelected,
+                                                        ]}
+                                                    >
+                                                        {classification.label}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        },
+                                    )}
+                                </View>
                             </View>
                         )}
 
@@ -1162,7 +1385,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                             <FontAwesome6
                                                 name={platform.icon}
                                                 size={15}
-                                                color={platform.iconColor}
+                                                color={
+                                                    platform.value === "x" &&
+                                                        themeMode === "night"
+                                                        ? theme.white
+                                                        : platform.iconColor
+                                                }
                                             />
 
                                             {isSelected && (
@@ -1202,7 +1430,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                                 (platform) => platform.value === socialPlatform,
                                             )?.placeholder
                                         }
-                                        placeholderTextColor="#9AA4AE"
+                                        placeholderTextColor={theme.placeholder}
                                         keyboardType="url"
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -1225,7 +1453,17 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </Text>
                     </ScrollView>
 
-                    <View style={styles.bottomContainer}>
+                    <View
+                        style={[
+                            styles.bottomContainer,
+                            {
+                                paddingBottom: Math.max(
+                                    insets.bottom + 10,
+                                    Platform.OS === "android" ? 24 : 18,
+                                ),
+                            },
+                        ]}
+                    >
                         <TouchableOpacity
                             style={[
                                 styles.continueButton,
@@ -1236,7 +1474,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                             activeOpacity={0.88}
                         >
                             {loading ? (
-                                <ActivityIndicator color="#07111F" />
+                                <ActivityIndicator color={theme.darkText} />
                             ) : (
                                 <Text style={styles.continueButtonText}>Save Changes</Text>
                             )}
@@ -1267,7 +1505,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 value={collegeSearch}
                                 onChangeText={setCollegeSearch}
                                 placeholder="Search colleges"
-                                placeholderTextColor="#9AA4AE"
+                                placeholderTextColor={theme.placeholder}
                                 autoCapitalize="words"
                                 autoCorrect={false}
                                 autoFocus
@@ -1365,6 +1603,59 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 </Modal>
             </KeyboardAvoidingView>
 
+            <Modal
+                visible={loading}
+                transparent
+                animationType="fade"
+                statusBarTranslucent
+                navigationBarTranslucent
+            >
+                <View style={styles.savingOverlay}>
+                    <View style={styles.savingCard}>
+                        <Animated.View
+                            style={[
+                                styles.savingAvatarWrap,
+                                {
+                                    transform: [
+                                        {
+                                            rotate: avatarSpin,
+                                        },
+                                    ],
+                                },
+                            ]}
+                        >
+                            <Image
+                                source={selectedAvatarSource}
+                                style={styles.savingAvatar}
+                                resizeMode="cover"
+                            />
+                        </Animated.View>
+
+                        <Text style={styles.savingTitle}>
+                            {username || "ScoolFools user"}, your profile is updating
+                        </Text>
+
+                        <Text style={styles.savingSubtitle}>
+                            Saving your latest profile changes...
+                        </Text>
+
+                        <View style={styles.progressTrack}>
+                            <Animated.View
+                                style={[
+                                    styles.progressFill,
+                                    {
+                                        width: savingProgress.interpolate({
+                                            inputRange: [0, 1],
+                                            outputRange: ["0%", "100%"],
+                                        }),
+                                    },
+                                ]}
+                            />
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <BlogsPaywallModal
                 visible={paywallVisible}
                 onClose={() => setPaywallVisible(false)}
@@ -1373,7 +1664,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 localizedPrice={subscriptionProduct?.localizedPrice ?? null}
                 billingPeriodLabel="every 6 months"
                 buttonLabel="Unlock Subscriber Access"
-                themeMode="day"
+                themeMode={themeMode}
             />
 
             {showConfetti && (
@@ -1390,521 +1681,613 @@ export default function AccountSettingsScreen({ navigation }: any) {
     );
 }
 
-const styles = StyleSheet.create({
-    initialLoadingContainer: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 24,
-    },
-
-    initialLoadingText: {
-        color: "#697580",
-        fontSize: 15,
-        fontWeight: "700",
-        marginTop: 12,
-    },
-
-    safeArea: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    keyboardView: {
-        flex: 1,
-    },
-
-    screen: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    scrollView: {
-        flex: 1,
-    },
-
-    scrollContent: {
-        paddingHorizontal: 22,
-        paddingTop: 14,
-        paddingBottom: 130,
-    },
-
-    header: {
-        marginBottom: 28,
-    },
-
-    title: {
-        color: "#07111F",
-        fontSize: 31,
-        lineHeight: 37,
-        fontWeight: "900",
-    },
-
-    subtitle: {
-        color: "#697580",
-        fontSize: 15,
-        lineHeight: 21,
-        fontWeight: "600",
-        marginTop: 6,
-    },
-
-    formSection: {
-        marginBottom: 25,
-    },
-
-    label: {
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "900",
-        marginBottom: 11,
-    },
-
-    avatarGrid: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 12,
-    },
-
-    avatarButton: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        borderWidth: 3,
-        borderColor: "#EEF1F3",
-        backgroundColor: "#F5F7F8",
-        padding: 2,
-        position: "relative",
-    },
-
-    avatarButtonSelected: {
-        borderColor: "#06B6D4",
-    },
-
-    avatarButtonLocked: {
-        borderColor: "#E3E7EA",
-    },
-
-    avatarImage: {
-        width: "100%",
-        height: "100%",
-        borderRadius: 34,
-    },
-
-    avatarImageLocked: {
-        opacity: 0.62,
-    },
-
-    avatarLockBadge: {
-        position: "absolute",
-        top: -2,
-        right: -2,
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: "#07111F",
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    avatarCheck: {
-        position: "absolute",
-        right: -3,
-        bottom: -3,
-        width: 23,
-        height: 23,
-        borderRadius: 12,
-        backgroundColor: "#FACC15",
-        borderWidth: 2,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    avatarCheckText: {
-        color: "#07111F",
-        fontSize: 12,
-        fontWeight: "900",
-    },
-
-    usernameContainer: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 15,
-    },
-
-    usernameAt: {
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "900",
-        marginRight: 2,
-    },
-
-    usernameInput: {
-        flex: 1,
-        minHeight: 52,
-        color: "#07111F",
-        fontSize: 16,
-        fontWeight: "700",
-        paddingVertical: 0,
-    },
-
-    inputErrorBorder: {
-        borderColor: "#E5484D",
-        backgroundColor: "#FFF8F8",
-    },
-
-    helperText: {
-        color: "#89939D",
-        fontSize: 11,
-        lineHeight: 16,
-        fontWeight: "600",
-        marginTop: 7,
-    },
-
-    errorText: {
-        color: "#D92D20",
-        fontSize: 12,
-        lineHeight: 17,
-        fontWeight: "700",
-        marginTop: 7,
-    },
-
-    optionRow: {
-        flexDirection: "row",
-        gap: 11,
-    },
-
-    optionButton: {
-        flex: 1,
-        minHeight: 69,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: 12,
-    },
-
-    optionButtonSelected: {
-        backgroundColor: "#E6FAFC",
-        borderColor: "#06B6D4",
-    },
-
-    optionEmoji: {
-        fontSize: 21,
-        marginRight: 8,
-    },
-
-    optionText: {
-        color: "#606C76",
-        fontSize: 14,
-        fontWeight: "800",
-    },
-
-    optionTextSelected: {
-        color: "#07111F",
-        fontWeight: "900",
-    },
-
-    socialOptionalText: {
-        color: "#7D8892",
-        fontSize: 12,
-        lineHeight: 17,
-        fontWeight: "600",
-        marginTop: -4,
-        marginBottom: 12,
-    },
-
-    socialPlatformGrid: {
-        flexDirection: "row",
-        width: "100%",
-        gap: 6,
-    },
-
-    socialPlatformButton: {
-        flexGrow: 1,
-        flexShrink: 1,
-        flexBasis: 0,
-        minWidth: 0,
-        height: 34,
-        borderRadius: 9,
-        borderWidth: 1,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        alignItems: "center",
-        justifyContent: "center",
-        position: "relative",
-    },
-
-    socialPlatformButtonSelected: {
-        borderColor: "#06B6D4",
-        borderWidth: 2,
-        shadowColor: "#06B6D4",
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 4,
-    },
-
-    socialSelectedCheck: {
-        position: "absolute",
-        top: 2,
-        right: 3,
-        width: 11,
-        height: 11,
-        borderRadius: 6,
-        backgroundColor: "#06B6D4",
-        borderWidth: 1.5,
-        borderColor: "#FFFFFF",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    socialSelectedCheckText: {
-        color: "#FFFFFF",
-        fontSize: 6,
-        fontWeight: "900",
-    },
-
-    socialLinkSection: {
-        marginTop: 14,
-    },
-
-    socialLinkLabel: {
-        color: "#07111F",
-        fontSize: 13,
-        fontWeight: "900",
-        marginBottom: 8,
-    },
-
-    socialLinkInput: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        color: "#07111F",
-        fontSize: 14,
-        fontWeight: "700",
-        paddingHorizontal: 15,
-    },
-
-    dropdownButton: {
-        minHeight: 55,
-        borderRadius: 15,
-        borderWidth: 1.5,
-        borderColor: "#DDE3E7",
-        backgroundColor: "#F8F9FA",
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 15,
-    },
-
-    dropdownText: {
-        flex: 1,
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        marginRight: 10,
-    },
-
-    dropdownPlaceholder: {
-        color: "#9AA4AE",
-        fontWeight: "600",
-    },
-
-    dropdownArrow: {
-        color: "#07111F",
-        fontSize: 27,
-        lineHeight: 27,
-        fontWeight: "500",
-    },
-
-    footerText: {
-        color: "#929BA4",
-        fontSize: 11,
-        lineHeight: 16,
-        textAlign: "center",
-        fontWeight: "600",
-        paddingHorizontal: 18,
-        marginTop: 2,
-    },
-
-    bottomContainer: {
-        position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 22,
-        paddingTop: 12,
-        paddingBottom: Platform.OS === "ios" ? 22 : 16,
-        borderTopWidth: 1,
-        borderTopColor: "#EEF1F3",
-    },
-
-    continueButton: {
-        width: "100%",
-        height: 57,
-        borderRadius: 17,
-        backgroundColor: "#FACC15",
-        alignItems: "center",
-        justifyContent: "center",
-    },
-
-    continueButtonDisabled: {
-        opacity: 0.42,
-    },
-
-    continueButtonText: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    modalSafeArea: {
-        flex: 1,
-        backgroundColor: "#FFFFFF",
-    },
-
-    modalHeader: {
-        height: 58,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-        borderBottomColor: "#EEF1F3",
-    },
-
-    modalCancel: {
-        color: "#06A8C0",
-        fontSize: 15,
-        fontWeight: "800",
-    },
-
-    modalTitle: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    modalHeaderSpacer: {
-        width: 52,
-    },
-
-    modalSearchContainer: {
-        paddingHorizontal: 18,
-        paddingTop: 15,
-        paddingBottom: 10,
-    },
-
-    modalSearchInput: {
-        height: 51,
-        borderRadius: 15,
-        backgroundColor: "#F1F3F5",
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        paddingHorizontal: 15,
-    },
-
-    modalListContent: {
-        paddingHorizontal: 18,
-        paddingBottom: 30,
-    },
-
-    modalListItem: {
-        minHeight: 55,
-        borderBottomWidth: 1,
-        borderBottomColor: "#EEF1F3",
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 3,
-    },
-
-    modalListText: {
-        flex: 1,
-        color: "#07111F",
-        fontSize: 15,
-        fontWeight: "700",
-        paddingRight: 12,
-    },
-
-    modalCheck: {
-        color: "#06B6D4",
-        fontSize: 18,
-        fontWeight: "900",
-    },
-
-    emptyContainer: {
-        alignItems: "center",
-        paddingTop: 45,
-        paddingHorizontal: 25,
-    },
-
-    emptyTitle: {
-        color: "#07111F",
-        fontSize: 17,
-        fontWeight: "900",
-    },
-
-    emptyText: {
-        color: "#7D8892",
-        fontSize: 13,
-        lineHeight: 19,
-        textAlign: "center",
-        marginTop: 6,
-    },
-    collegeListDivider: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginTop: 5,
-        marginBottom: 7,
-    },
-
-    collegeDividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: "#DDE3E7",
-    },
-
-    collegeDividerText: {
-        color: "#8A949E",
-        fontSize: 11,
-        fontWeight: "900",
-        letterSpacing: 1.1,
-        marginHorizontal: 12,
-    },
-    backButton: {
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "flex-start",
-        marginBottom: 18,
-    },
-
-    backIcon: {
-        color: "#06B6D4",
-        fontSize: 34,
-        lineHeight: 34,
-        fontWeight: "700",
-        marginRight: 2,
-    },
-
-    backText: {
-        color: "#06B6D4",
-        fontSize: 16,
-        fontWeight: "800",
-    },
-});
+const createStyles = (theme: ReturnType<typeof getAccountSettingsTheme>) =>
+    StyleSheet.create({
+        initialLoadingContainer: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.bg,
+            paddingHorizontal: 24,
+        },
+
+        initialLoadingText: {
+            color: theme.subtext,
+            fontSize: 15,
+            fontWeight: "700",
+            marginTop: 12,
+        },
+
+        safeArea: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        keyboardView: {
+            flex: 1,
+        },
+
+        screen: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        scrollView: {
+            flex: 1,
+        },
+
+        scrollContent: {
+            paddingHorizontal: 22,
+            paddingTop: 14,
+            paddingBottom: 130,
+        },
+
+        header: {
+            marginBottom: 28,
+        },
+
+        title: {
+            color: theme.text,
+            fontSize: 31,
+            lineHeight: 37,
+            fontWeight: "900",
+        },
+
+        subtitle: {
+            color: theme.subtext,
+            fontSize: 15,
+            lineHeight: 21,
+            fontWeight: "600",
+            marginTop: 6,
+        },
+
+        formSection: {
+            marginBottom: 25,
+        },
+
+        label: {
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "900",
+            marginBottom: 11,
+        },
+
+        avatarGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: 12,
+        },
+
+        avatarButton: {
+            width: Platform.OS === "android" ? 64 : 72,
+            height: Platform.OS === "android" ? 64 : 72,
+            borderRadius: Platform.OS === "android" ? 32 : 36,
+            borderWidth: 3,
+            borderColor: theme.divider,
+            backgroundColor: theme.surface,
+            padding: 2,
+            position: "relative",
+        },
+
+        avatarButtonSelected: {
+            borderColor: theme.cyan,
+        },
+
+        avatarButtonLocked: {
+            borderColor: theme.border,
+        },
+
+        avatarImage: {
+            width: "100%",
+            height: "100%",
+            borderRadius: 34,
+        },
+
+        avatarImageLocked: {
+            opacity: 0.7,
+        },
+
+        avatarLockBadge: {
+            position: "absolute",
+            top: 2,
+            right: 2,
+            bottom: 2,
+            left: 2,
+            borderRadius: 999,
+            backgroundColor: "rgba(2,6,23,0.50)",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        avatarCheck: {
+            position: "absolute",
+            right: -3,
+            bottom: -3,
+            width: 23,
+            height: 23,
+            borderRadius: 12,
+            backgroundColor: theme.yellow,
+            borderWidth: 2,
+            borderColor: theme.bg,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        avatarCheckText: {
+            color: theme.darkText,
+            fontSize: 12,
+            fontWeight: "900",
+        },
+
+        usernameContainer: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 15,
+        },
+
+        usernameAt: {
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "900",
+            marginRight: 2,
+        },
+
+        usernameInput: {
+            flex: 1,
+            minHeight: 52,
+            color: theme.text,
+            fontSize: 16,
+            fontWeight: "700",
+            paddingVertical: 0,
+        },
+
+        inputErrorBorder: {
+            borderColor: theme.error,
+            backgroundColor: theme.errorBg,
+        },
+
+        helperText: {
+            color: theme.muted,
+            fontSize: 11,
+            lineHeight: 16,
+            fontWeight: "600",
+            marginTop: 7,
+        },
+
+        errorText: {
+            color: theme.error,
+            fontSize: 12,
+            lineHeight: 17,
+            fontWeight: "700",
+            marginTop: 7,
+        },
+
+        optionRow: {
+            flexDirection: "row",
+            gap: 11,
+        },
+
+        classificationGrid: {
+            flexDirection: "row",
+            flexWrap: "wrap",
+            justifyContent: "space-between",
+            rowGap: 10,
+        },
+
+        classificationButton: {
+            width: "48.5%",
+            minHeight: 52,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 10,
+        },
+
+        optionButton: {
+            flex: 1,
+            minHeight: 69,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 12,
+        },
+
+        optionButtonSelected: {
+            backgroundColor: theme.selected,
+            borderColor: theme.cyan,
+        },
+
+        optionEmoji: {
+            fontSize: 21,
+            marginRight: 8,
+        },
+
+        optionText: {
+            color: theme.subtext,
+            fontSize: 14,
+            fontWeight: "800",
+        },
+
+        optionTextSelected: {
+            color: theme.text,
+            fontWeight: "900",
+        },
+
+        socialOptionalText: {
+            color: theme.muted,
+            fontSize: 12,
+            lineHeight: 17,
+            fontWeight: "600",
+            marginTop: -4,
+            marginBottom: 12,
+        },
+
+        socialPlatformGrid: {
+            flexDirection: "row",
+            width: "100%",
+            gap: 6,
+        },
+
+        socialPlatformButton: {
+            flexGrow: 1,
+            flexShrink: 1,
+            flexBasis: 0,
+            minWidth: 0,
+            height: 34,
+            borderRadius: 9,
+            borderWidth: 1,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+        },
+
+        socialPlatformButtonSelected: {
+            borderColor: theme.cyan,
+            borderWidth: 2,
+            shadowColor: theme.cyan,
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 4,
+        },
+
+        socialSelectedCheck: {
+            position: "absolute",
+            top: 2,
+            right: 3,
+            width: 11,
+            height: 11,
+            borderRadius: 6,
+            backgroundColor: theme.cyan,
+            borderWidth: 1.5,
+            borderColor: theme.bg,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        socialSelectedCheckText: {
+            color: theme.white,
+            fontSize: 6,
+            fontWeight: "900",
+        },
+
+        socialLinkSection: {
+            marginTop: 14,
+        },
+
+        socialLinkLabel: {
+            color: theme.text,
+            fontSize: 13,
+            fontWeight: "900",
+            marginBottom: 8,
+        },
+
+        socialLinkInput: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            color: theme.text,
+            fontSize: 14,
+            fontWeight: "700",
+            paddingHorizontal: 15,
+        },
+
+        dropdownButton: {
+            minHeight: 55,
+            borderRadius: 15,
+            borderWidth: 1.5,
+            borderColor: theme.border,
+            backgroundColor: theme.surface,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 15,
+        },
+
+        dropdownText: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            marginRight: 10,
+        },
+
+        dropdownPlaceholder: {
+            color: theme.placeholder,
+            fontWeight: "600",
+        },
+
+        dropdownArrow: {
+            color: theme.text,
+            fontSize: 27,
+            lineHeight: 27,
+            fontWeight: "500",
+        },
+
+        footerText: {
+            color: theme.muted,
+            fontSize: 11,
+            lineHeight: 16,
+            textAlign: "center",
+            fontWeight: "600",
+            paddingHorizontal: 18,
+            marginTop: 2,
+        },
+
+        bottomContainer: {
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: theme.bg,
+            paddingHorizontal: 22,
+            paddingTop: 12,
+            paddingBottom: Platform.OS === "ios" ? 22 : 16,
+            borderTopWidth: 1,
+            borderTopColor: theme.divider,
+        },
+
+        continueButton: {
+            width: "100%",
+            height: 57,
+            borderRadius: 17,
+            backgroundColor: theme.yellow,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+
+        continueButtonDisabled: {
+            opacity: 0.42,
+        },
+
+        continueButtonText: {
+            color: theme.darkText,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        savingOverlay: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor:
+                theme.mode === "night"
+                    ? "rgba(0,0,0,0.86)"
+                    : "rgba(2,6,23,0.66)",
+            paddingHorizontal: 24,
+        },
+
+        savingCard: {
+            width: "100%",
+            maxWidth: 360,
+            alignItems: "center",
+            backgroundColor: theme.bg,
+            borderRadius: 24,
+            paddingHorizontal: 24,
+            paddingTop: 28,
+            paddingBottom: 26,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+
+        savingAvatarWrap: {
+            width: 78,
+            height: 78,
+            borderRadius: 39,
+            borderWidth: 3,
+            borderColor: theme.cyan,
+            padding: 3,
+            backgroundColor: theme.surface,
+            marginBottom: 18,
+        },
+
+        savingAvatar: {
+            width: "100%",
+            height: "100%",
+            borderRadius: 35,
+        },
+
+        savingTitle: {
+            color: theme.text,
+            fontSize: 20,
+            lineHeight: 25,
+            fontWeight: "900",
+            textAlign: "center",
+        },
+
+        savingSubtitle: {
+            color: theme.subtext,
+            fontSize: 13,
+            lineHeight: 18,
+            fontWeight: "600",
+            textAlign: "center",
+            marginTop: 7,
+        },
+
+        progressTrack: {
+            width: "100%",
+            height: 9,
+            borderRadius: 5,
+            overflow: "hidden",
+            backgroundColor: theme.surfaceSoft,
+            marginTop: 22,
+        },
+
+        progressFill: {
+            height: "100%",
+            borderRadius: 5,
+            backgroundColor: theme.cyan,
+        },
+
+        modalSafeArea: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        modalHeader: {
+            height: 58,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.divider,
+        },
+
+        modalCancel: {
+            color: theme.cyanDark,
+            fontSize: 15,
+            fontWeight: "800",
+        },
+
+        modalTitle: {
+            color: theme.text,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        modalHeaderSpacer: {
+            width: 52,
+        },
+
+        modalSearchContainer: {
+            paddingHorizontal: 18,
+            paddingTop: 15,
+            paddingBottom: 10,
+        },
+
+        modalSearchInput: {
+            height: 51,
+            borderRadius: 15,
+            backgroundColor: theme.surfaceSoft,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            paddingHorizontal: 15,
+        },
+
+        modalListContent: {
+            paddingHorizontal: 18,
+            paddingBottom: 30,
+        },
+
+        modalListItem: {
+            minHeight: 55,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.divider,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 3,
+        },
+
+        modalListText: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 15,
+            fontWeight: "700",
+            paddingRight: 12,
+        },
+
+        modalCheck: {
+            color: theme.cyan,
+            fontSize: 18,
+            fontWeight: "900",
+        },
+
+        emptyContainer: {
+            alignItems: "center",
+            paddingTop: 45,
+            paddingHorizontal: 25,
+        },
+
+        emptyTitle: {
+            color: theme.text,
+            fontSize: 17,
+            fontWeight: "900",
+        },
+
+        emptyText: {
+            color: theme.muted,
+            fontSize: 13,
+            lineHeight: 19,
+            textAlign: "center",
+            marginTop: 6,
+        },
+        collegeListDivider: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 5,
+            marginBottom: 7,
+        },
+
+        collegeDividerLine: {
+            flex: 1,
+            height: 1,
+            backgroundColor: theme.border,
+        },
+
+        collegeDividerText: {
+            color: theme.muted,
+            fontSize: 11,
+            fontWeight: "900",
+            letterSpacing: 1.1,
+            marginHorizontal: 12,
+        },
+        backButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            alignSelf: "flex-start",
+            marginBottom: 18,
+        },
+
+        backIcon: {
+            color: theme.cyan,
+            fontSize: 34,
+            lineHeight: 34,
+            fontWeight: "700",
+            marginRight: 2,
+        },
+
+        backText: {
+            color: theme.cyan,
+            fontSize: 16,
+            fontWeight: "800",
+        },
+    });

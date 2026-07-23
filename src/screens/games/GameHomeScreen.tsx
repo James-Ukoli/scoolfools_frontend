@@ -29,6 +29,7 @@ import {
     initializeIAP,
     getGamesPackProduct,
     buyGamesPack,
+    getOwnedGamesPackPurchase,
     setupPurchaseListeners,
     cleanupIAP,
 } from "../../services/iap";
@@ -591,6 +592,34 @@ export default function GameHomeScreen() {
         }
     };
 
+    const handleRestorePurchase = async () => {
+        try {
+            setLoadingPurchase(true);
+
+            const existingPurchase = await getOwnedGamesPackPurchase();
+
+            if (!existingPurchase) {
+                Alert.alert(
+                    "No Purchase Found",
+                    "No previous game purchase was found for this Google Play account.",
+                );
+
+                return;
+            }
+
+            await verifyGamePurchaseOnBackend(existingPurchase);
+        } catch (error) {
+            console.log("Restore purchase error:", error);
+
+            Alert.alert(
+                "Restore Failed",
+                "We couldn’t restore your purchase. Please try again.",
+            );
+        } finally {
+            setLoadingPurchase(false);
+        }
+    };
+
     const animatedShadowOpacity = bannerGlow.interpolate({
         inputRange: [0, 1],
         outputRange: theme.isNight ? [0.25, 0.95] : [0.12, 0.42],
@@ -881,8 +910,14 @@ export default function GameHomeScreen() {
                                 )}
                             </TouchableOpacity>
 
-                            <TouchableOpacity activeOpacity={0.8}>
-                                <Text style={styles.restoreText}>Restore Purchase</Text>
+                            <TouchableOpacity
+                                activeOpacity={0.8}
+                                onPress={handleRestorePurchase}
+                                disabled={loadingPurchase}
+                            >
+                                <Text style={styles.restoreText}>
+                                    {loadingPurchase ? "Restoring..." : "Restore Purchase"}
+                                </Text>
                             </TouchableOpacity>
 
                             <Text style={styles.finePrint}>

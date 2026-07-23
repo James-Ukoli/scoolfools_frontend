@@ -23,7 +23,7 @@
         "foregroundImage": "./assets/images/iconandroid.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.scoolfools.app",
+      "package": "com.scoolfools",
       "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

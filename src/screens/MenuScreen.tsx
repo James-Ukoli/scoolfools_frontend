@@ -187,7 +187,7 @@ export default function MenuScreen() {
                         <MenuItem
                             icon="person-circle-outline"
                             color={theme.cyan}
-                            title="Account Settings"
+                            title="Profile Settings"
                             onPress={() => navigation.navigate("AccountSettings")}
                             styles={styles}
                             theme={theme}
@@ -196,7 +196,7 @@ export default function MenuScreen() {
                         <MenuItem icon="mail-outline" color={theme.cyan} title="Contact Us" onPress={() => navigation.navigate("ContactUs")} styles={styles} theme={theme} />
                         <MenuItem icon="notifications-outline" color={theme.cyan} title="Notifications" onPress={() => navigation.navigate("Notifications")} styles={styles} theme={theme} />
                         <MenuItem icon="calendar-outline" color={theme.cyan} title="Events" onPress={() => navigation.navigate("EventsScreen")} styles={styles} theme={theme} />
-                        <MenuItem icon="game-controller-outline" color={theme.yellow} title="Party Games! 🎉" onPress={() => navigation.navigate("GameHome")} styles={styles} theme={theme} />
+                        <MenuItem icon="game-controller-outline" color={theme.yellow} title="Party Games! 🎉" onPress={() => navigation.navigate("GameHome")} styles={styles} theme={theme} last />
                     </View>
 
                     <View style={styles.sectionGap} />
@@ -216,15 +216,7 @@ export default function MenuScreen() {
                     <View style={styles.bottomSpacer} />
                 </ScrollView>
 
-                <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
-                    <TouchableOpacity
-                        style={styles.homeButton}
-                        activeOpacity={0.85}
-                        onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
-                    >
-                        <Ionicons name="home" size={21} color="#FFFFFF" />
-                    </TouchableOpacity>
-                </View>
+
             </View>
 
             <Modal visible={aboutVisible} transparent animationType="fade" onRequestClose={() => setAboutVisible(false)}>
@@ -280,7 +272,7 @@ function MenuItem({
             onPress={onPress}
         >
             <View style={styles.menuLeft}>
-                <View style={[styles.iconBubble, { borderColor: `${color}55` }]}>
+                <View style={styles.iconBubble}>
                     <Ionicons name={icon} size={21} color={color} />
                 </View>
 
@@ -302,30 +294,21 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         },
         content: {
             flex: 1,
-            paddingHorizontal: 16,
-            paddingTop: 12,
+            paddingHorizontal: 20,
+            paddingTop: 8,
         },
         hero: {
-            minHeight: 78,
-            borderRadius: 24,
-            backgroundColor: theme.hero,
-            borderWidth: 1,
-            borderColor: theme.cyan + "55",
+            minHeight: 68,
             flexDirection: "row",
             alignItems: "center",
-            paddingHorizontal: 14,
-            marginBottom: 18,
+            marginBottom: 10,
         },
         backButton: {
-            width: 42,
-            height: 42,
-            borderRadius: 21,
+            width: 36,
+            height: 36,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: theme.bubble,
-            borderWidth: 1,
-            borderColor: theme.border,
-            marginRight: 13,
+            marginRight: 10,
         },
         heroTextWrap: {
             flex: 1,
@@ -350,18 +333,14 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             paddingBottom: Platform.OS === "android" ? 210 : 150,
         },
         card: {
-            backgroundColor: theme.card,
-            borderRadius: 22,
-            borderWidth: 1,
-            borderColor: theme.border,
-            overflow: "hidden",
+            backgroundColor: "transparent",
         },
         sectionGap: {
-            height: 14,
+            height: 18,
         },
         menuItem: {
-            minHeight: 64,
-            paddingHorizontal: 15,
+            minHeight: 58,
+            paddingHorizontal: 2,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -378,11 +357,8 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             paddingRight: 12,
         },
         iconBubble: {
-            width: 36,
+            width: 32,
             height: 36,
-            borderRadius: 18,
-            backgroundColor: theme.bubble,
-            borderWidth: 1,
             alignItems: "center",
             justifyContent: "center",
         },
@@ -391,7 +367,7 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             fontSize: 18,
             fontFamily: "Rajdhani_700Bold",
             letterSpacing: 0.35,
-            marginLeft: 13,
+            marginLeft: 10,
         },
         deleteText: {
             color: theme.danger,
@@ -399,24 +375,8 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         bottomSpacer: {
             height: 30,
         },
-        fixedHomeButtonWrap: {
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: Platform.OS === "android" ? 78 : 28,
-            alignItems: "center",
-            justifyContent: "center",
-        },
-        homeButton: {
-            width: 60,
-            height: 60,
-            borderRadius: 30,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.homeBg,
-            borderWidth: 1.5,
-            borderColor: theme.cyan,
-        },
+
+
         modalOverlay: {
             flex: 1,
             backgroundColor: "rgba(0,0,0,0.72)",
