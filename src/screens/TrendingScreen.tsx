@@ -33,9 +33,13 @@ import {
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 type ContentTab = "news" | "blog";
-type TimeTheme = "day" | "night";
+
 
 type Post = {
     _id: string;
@@ -117,10 +121,7 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
+
 
 const getScreenTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -215,7 +216,7 @@ function getCategoryBadgeStyle(category: string) {
 }
 
 export default function TrendingScreen({ navigation }: any) {
-    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const { mode: themeMode } = useTimeTheme();
     const theme = getScreenTheme(themeMode);
 
     const [activeTab, setActiveTab] = useState<ContentTab>("news");
@@ -242,13 +243,7 @@ export default function TrendingScreen({ navigation }: any) {
 
     const getToken = async () => AsyncStorage.getItem("token");
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60 * 1000);
 
-        return () => clearInterval(interval);
-    }, []);
 
     const animateFeed = useCallback(() => {
         feedFadeAnim.setValue(0);

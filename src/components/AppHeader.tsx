@@ -18,10 +18,12 @@ import { useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useNotifications } from "../context/NotificationsContext";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 const HEADER_CYAN = "#06B6D4";
-
-type TimeTheme = "day" | "night";
 
 type StoredUser = {
     selectedAvatar?: string | null;
@@ -44,7 +46,7 @@ const AVATAR_IMAGES: Record<
 };
 
 /*
- * Only the solid background surrounding the white header card
+ * Only the solid background surrounding the header card
  * changes based on the selected avatar.
  */
 const AVATAR_BACKGROUND_COLORS: Record<
@@ -61,71 +63,42 @@ const AVATAR_BACKGROUND_COLORS: Record<
     diamondGirl: "#DB2777",
 };
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-
-    return hour >= 6 && hour < 19
-        ? "day"
-        : "night";
-};
-
 const getHeaderTheme = (
     mode: TimeTheme,
     selectedAvatar?: string | null
 ) => {
     const isDay = mode === "day";
 
-    /*
-     * Keep the original night mode unchanged.
-     */
     if (!isDay) {
         return {
             mode,
-
             background: "#020617",
             card: "#07111F",
             surface: "#0B1728",
-
             icon: "#FFFFFF",
             cyan: HEADER_CYAN,
             yellow: "#FACC15",
-
             border: "rgba(255,255,255,0.09)",
-            buttonBorder:
-                "rgba(255,255,255,0.12)",
-            activeBackground:
-                "rgba(34,211,238,0.12)",
-            activeBorder:
-                "rgba(34,211,238,0.35)",
+            buttonBorder: "rgba(255,255,255,0.12)",
+            activeBackground: "rgba(34,211,238,0.12)",
+            activeBorder: "rgba(34,211,238,0.35)",
         };
     }
 
-    /*
-     * Determine the selected avatar color for day mode.
-     */
     const avatarBackground =
         selectedAvatar &&
             AVATAR_BACKGROUND_COLORS[selectedAvatar]
-            ? AVATAR_BACKGROUND_COLORS[
-            selectedAvatar
-            ]
+            ? AVATAR_BACKGROUND_COLORS[selectedAvatar]
             : HEADER_CYAN;
 
-    /*
-     * Day mode:
-     * white outer area and colored rounded card.
-     */
     return {
         mode,
-
         background: "#FFFFFF",
         card: avatarBackground,
         surface: "#FFFFFF",
-
         icon: "#07111F",
         cyan: HEADER_CYAN,
         yellow: "#FACC15",
-
         border: "rgba(7,17,31,0.10)",
         buttonBorder: "rgba(7,17,31,0.10)",
         activeBackground: "#FFFFFF",
@@ -135,6 +108,7 @@ const getHeaderTheme = (
 
 export default function AppHeader() {
     const navigation = useNavigation<any>();
+    const { mode: themeMode } = useTimeTheme();
 
     const {
         featuredEnabled,
@@ -146,11 +120,6 @@ export default function AppHeader() {
 
     const [userLoaded, setUserLoaded] =
         useState(false);
-
-    const [themeMode, setThemeMode] =
-        useState<TimeTheme>(
-            getCurrentThemeMode()
-        );
 
     /*
      * Use selectedAvatar first. If the server stored the
@@ -185,13 +154,6 @@ export default function AppHeader() {
         [theme]
     );
 
-    const updateThemeMode =
-        useCallback(() => {
-            setThemeMode(
-                getCurrentThemeMode()
-            );
-        }, []);
-
     const loadStoredUser = useCallback(
         async () => {
             try {
@@ -224,29 +186,12 @@ export default function AppHeader() {
     );
 
     /*
-     * Check every minute in case the app moves between
-     * day and night mode while it remains open.
-     */
-    useEffect(() => {
-        const interval = setInterval(
-            updateThemeMode,
-            60000
-        );
-
-        return () =>
-            clearInterval(interval);
-    }, [updateThemeMode]);
-
-    /*
      * Load the saved user when the header mounts.
+     * Theme updates now come from TimeThemeProvider.
      */
     useEffect(() => {
         loadStoredUser();
-        updateThemeMode();
-    }, [
-        loadStoredUser,
-        updateThemeMode,
-    ]);
+    }, [loadStoredUser]);
 
     /*
      * Reload the saved user after navigation changes.
@@ -258,7 +203,6 @@ export default function AppHeader() {
                 "state",
                 () => {
                     loadStoredUser();
-                    updateThemeMode();
                 }
             );
 
@@ -266,7 +210,6 @@ export default function AppHeader() {
     }, [
         navigation,
         loadStoredUser,
-        updateThemeMode,
     ]);
 
     const selectedAvatarSource =
@@ -454,10 +397,6 @@ const createStyles = (
         card: {
             height: 68,
 
-            /*
-             * White during the day and dark
-             * during the night.
-             */
             backgroundColor: theme.card,
 
             borderRadius: 20,

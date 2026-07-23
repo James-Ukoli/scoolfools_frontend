@@ -19,6 +19,7 @@ import {
 
 import RankingsLeaderCard from "../components/RankingsLeaderCard";
 import { getCollegeLogo } from "../../assets/data/collegeLogos";
+import { useTimeTheme } from "../context/TimeThemeContext";
 
 type Sport =
     | "college-chess"
@@ -184,30 +185,6 @@ const DARK_THEME: Theme = {
     errorBorder: "rgba(255,92,92,0.45)",
     errorText: "#FF8B8B",
 };
-
-function isNightTime(date = new Date()): boolean {
-    const hour = date.getHours();
-
-    // Light: 7:00 AM through 6:59 PM
-    // Dark: 7:00 PM through 6:59 AM
-    return hour < 7 || hour >= 19;
-}
-
-function millisecondsUntilNextThemeChange(date = new Date()): number {
-    const next = new Date(date);
-    const hour = date.getHours();
-
-    if (hour < 7) {
-        next.setHours(7, 0, 0, 0);
-    } else if (hour < 19) {
-        next.setHours(19, 0, 0, 0);
-    } else {
-        next.setDate(next.getDate() + 1);
-        next.setHours(7, 0, 0, 0);
-    }
-
-    return Math.max(next.getTime() - date.getTime(), 1000);
-}
 
 function extractRanking(payload: RankingApiResponse): SportsRanking | null {
     return payload?.ranking ?? payload?.item ?? payload?.data ?? null;
@@ -418,7 +395,7 @@ function RankingRow({
 export default function RankingsScreen() {
     const scrollRef = useRef<ScrollView>(null);
 
-    const [isDark, setIsDark] = useState(() => isNightTime());
+    const { isDark } = useTimeTheme();
     const theme = isDark ? DARK_THEME : LIGHT_THEME;
 
     const [fontsLoaded] = useFonts({
@@ -447,26 +424,6 @@ export default function RankingsScreen() {
 
     const leader = sortedEntries[0] ?? null;
     const remainingEntries = sortedEntries.slice(1);
-
-    useEffect(() => {
-        let timeout: ReturnType<typeof setTimeout> | null = null;
-
-        const scheduleThemeUpdate = () => {
-            setIsDark(isNightTime());
-
-            timeout = setTimeout(() => {
-                scheduleThemeUpdate();
-            }, millisecondsUntilNextThemeChange());
-        };
-
-        scheduleThemeUpdate();
-
-        return () => {
-            if (timeout) {
-                clearTimeout(timeout);
-            }
-        };
-    }, []);
 
     const fetchJson = useCallback(
         async (url: string): Promise<RankingApiResponse> => {

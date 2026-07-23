@@ -35,8 +35,10 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
-
-type TimeTheme = "day" | "night";
+import {
+    TimeTheme,
+    useTimeTheme,
+} from "../context/TimeThemeContext";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -44,11 +46,6 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const SUPPORTER_MILESTONES = [100, 1000, 10000, 50000];
-
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
 
 const getHomeTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -103,7 +100,7 @@ const getHomeTheme = (mode: TimeTheme) => {
 export default function HomeScreen() {
     const navigation = useNavigation<any>();
 
-    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const { mode: themeMode } = useTimeTheme();
     const theme = getHomeTheme(themeMode);
 
     const [featuredPosts, setFeaturedPosts] = useState<any[]>([]);
@@ -121,14 +118,6 @@ export default function HomeScreen() {
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60000);
-
-        return () => clearInterval(interval);
-    }, []);
 
     const getToken = async () => {
         return await AsyncStorage.getItem("token");

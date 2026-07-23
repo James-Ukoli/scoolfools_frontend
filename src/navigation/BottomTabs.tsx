@@ -12,6 +12,10 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 import HomeScreen from "../screens/HomeScreen";
 import TrendingScreen from "../screens/TrendingScreen";
@@ -21,12 +25,7 @@ import RankingsScreen from "../screens/RankingsScreen";
 const Tab = createBottomTabNavigator();
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-type TimeTheme = "day" | "night";
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
 
 const getTabTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -110,7 +109,10 @@ function getLabel(routeName: string) {
 
 function AnimatedTabBar({ state, navigation }: any) {
     const insets = useSafeAreaInsets();
-    const theme = getTabTheme(getCurrentThemeMode());
+    const { mode } = useTimeTheme();
+    const theme = getTabTheme(mode);
+
+
 
     const tabWidth = SCREEN_WIDTH / state.routes.length;
     const bubbleWidth = tabWidth - 12;
@@ -207,6 +209,7 @@ function AnimatedTabBar({ state, navigation }: any) {
 }
 
 export default function BottomTabs() {
+    const { isDark } = useTimeTheme();
     return (
         <Tab.Navigator
             initialRouteName="Home"
@@ -219,7 +222,7 @@ export default function BottomTabs() {
                 lazy: false,
                 animation: "none",
                 sceneStyle: {
-                    backgroundColor: "#FFFFFF",
+                    backgroundColor: isDark ? "#020617" : "#FFFFFF",
                 },
             }}
         >

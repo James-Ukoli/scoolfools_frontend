@@ -15,6 +15,10 @@ import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import * as Clipboard from "expo-clipboard";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 const CONTACT_EMAIL = "scoolfools@gmail.com";
 
@@ -25,14 +29,7 @@ const socials = [
     { label: "Facebook", icon: "facebook", url: "https://facebook.com/ScoolFools" },
 ];
 
-type ThemeMode = "day" | "night";
-
-const getCurrentThemeMode = (): ThemeMode => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
-
-const getTheme = (mode: ThemeMode) => {
+const getTheme = (mode: TimeTheme) => {
     const isDay = mode === "day";
 
     return {
@@ -54,7 +51,7 @@ export default function ContactUsScreen() {
     const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
 
-    const themeMode = getCurrentThemeMode();
+    const { mode: themeMode } = useTimeTheme();
     const theme = useMemo(() => getTheme(themeMode), [themeMode]);
     const styles = useMemo(() => createStyles(theme), [theme]);
 

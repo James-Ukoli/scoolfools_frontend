@@ -34,6 +34,10 @@ import {
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -58,12 +62,9 @@ type HighSchoolClassification =
     | "senior";
 type AthleteChoice = boolean | null;
 type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
-type TimeTheme = "day" | "night";
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
+
+
 
 const getAccountSettingsTheme = (mode: TimeTheme) => {
     const isNight = mode === "night";
@@ -256,9 +257,7 @@ const normalizeUsername = (value: string) => {
 
 export default function AccountSettingsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
-    const [themeMode, setThemeMode] = useState<TimeTheme>(
-        getCurrentThemeMode(),
-    );
+    const { mode: themeMode } = useTimeTheme();
     const theme = useMemo(
         () => getAccountSettingsTheme(themeMode),
         [themeMode],
@@ -312,13 +311,6 @@ export default function AccountSettingsScreen({ navigation }: any) {
         outputRange: ["0deg", "360deg"],
     });
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60000);
-
-        return () => clearInterval(interval);
-    }, []);
 
     useEffect(() => {
         if (!loading) {

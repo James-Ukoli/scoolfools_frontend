@@ -10,12 +10,26 @@ import AccountSettingsScreen from "../screens/AccountSettingsScreen";
 import ContactUsScreen from "../screens/ContactUsScreen";
 import NotificationsScreen from "../screens/NotificationsScreen";
 import EventsScreen from "../screens/EventsScreen";
+import { useTimeTheme } from "../context/TimeThemeContext";
 
 const AppStack = createNativeStackNavigator();
 
 export default function AppShell() {
+    const { isDark } = useTimeTheme();
+    const shellBackground = isDark
+        ? "#020617"
+        : "#FFFFFF";
+
     return (
-        <View style={styles.container}>
+        <View
+            style={[
+                styles.container,
+                {
+                    backgroundColor:
+                        shellBackground,
+                },
+            ]}
+        >
             <AppHeader />
 
             <View style={styles.content}>
@@ -25,7 +39,8 @@ export default function AppShell() {
                         headerShown: false,
                         animation: "none",
                         contentStyle: {
-                            backgroundColor: "#FFFFFF",
+                            backgroundColor:
+                                shellBackground,
                         },
                     }}
                 >
@@ -41,7 +56,9 @@ export default function AppShell() {
 
                     <AppStack.Screen
                         name="AccountSettings"
-                        component={AccountSettingsScreen}
+                        component={
+                            AccountSettingsScreen
+                        }
                     />
 
                     <AppStack.Screen
@@ -51,7 +68,9 @@ export default function AppShell() {
 
                     <AppStack.Screen
                         name="Notifications"
-                        component={NotificationsScreen}
+                        component={
+                            NotificationsScreen
+                        }
                     />
 
                     <AppStack.Screen
@@ -67,7 +86,6 @@ export default function AppShell() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFFFFF",
     },
     content: {
         flex: 1,

@@ -12,8 +12,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
-type TimeTheme = "day" | "night";
+
 
 type Broadcaster = {
     name: string;
@@ -87,10 +91,7 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
+
 
 const getEventsTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -195,7 +196,7 @@ function groupEventsByMonth(events: EventItem[]) {
 }
 
 export default function EventsScreen({ navigation }: any) {
-    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const { mode: themeMode } = useTimeTheme();
     const theme = getEventsTheme(themeMode);
 
     const [events, setEvents] = useState<EventItem[]>([]);
@@ -225,13 +226,7 @@ export default function EventsScreen({ navigation }: any) {
         }
     }, []);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60000);
 
-        return () => clearInterval(interval);
-    }, []);
 
     useEffect(() => {
         fetchEvents();
@@ -645,22 +640,7 @@ export default function EventsScreen({ navigation }: any) {
                 )}
             </ScrollView>
 
-            <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
-                <TouchableOpacity
-                    style={[
-                        styles.homeButton,
-                        {
-                            backgroundColor: theme.homeBg,
-                            borderColor: theme.cyan,
-                            shadowColor: theme.shadow,
-                        },
-                    ]}
-                    activeOpacity={0.85}
-                    onPress={() => navigation.navigate("MainTabs", { screen: "Home" })}
-                >
-                    <Ionicons name="home" size={21} color={theme.homeIcon} />
-                </TouchableOpacity>
-            </View>
+
         </SafeAreaView>
     );
 }

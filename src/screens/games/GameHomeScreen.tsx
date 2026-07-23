@@ -823,9 +823,7 @@ export default function GameHomeScreen() {
                     <View style={styles.bottomSpacer} />
                 </ScrollView>
 
-                <View style={styles.fixedHomeButtonWrap} pointerEvents="box-none">
-                    <GameHomeButton themeMode={themeMode} />
-                </View>
+
 
                 <Modal
                     visible={paywallVisible}
@@ -1202,16 +1200,7 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             height: 30,
         },
 
-        fixedHomeButtonWrap: {
-            position: "absolute",
-            left: 0,
-            right: 0,
 
-            bottom: Platform.OS === "android" ? 78 : 28,
-
-            alignItems: "center",
-            justifyContent: "center",
-        },
 
         modalOverlay: {
             flex: 1,

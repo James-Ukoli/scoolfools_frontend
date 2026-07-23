@@ -15,8 +15,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -29,14 +33,7 @@ const PRIVACY_POLICY_URL =
 const TERMS_URL =
     "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
 
-type ThemeMode = "day" | "night";
-
-const getCurrentThemeMode = (): ThemeMode => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
-
-const getMenuTheme = (mode: ThemeMode) => {
+const getMenuTheme = (mode: TimeTheme) => {
     const isDay = mode === "day";
 
     return {
@@ -47,8 +44,12 @@ const getMenuTheme = (mode: ThemeMode) => {
         text: isDay ? "#07111F" : "#FFFFFF",
         subtext: isDay ? "#475569" : "#D7DBE3",
         muted: isDay ? "#64748B" : "#8A8F98",
-        border: isDay ? "rgba(7,17,31,0.10)" : "#12203A",
-        divider: isDay ? "rgba(7,17,31,0.08)" : "#101A2E",
+        border: isDay
+            ? "rgba(7,17,31,0.10)"
+            : "#12203A",
+        divider: isDay
+            ? "rgba(7,17,31,0.08)"
+            : "#101A2E",
         cyan: "#06B6D4",
         yellow: "#FACC15",
         danger: "#FF6B6B",
@@ -58,53 +59,97 @@ const getMenuTheme = (mode: ThemeMode) => {
 
 export default function MenuScreen() {
     const navigation = useNavigation<any>();
-    const [aboutVisible, setAboutVisible] = useState(false);
+    const { mode: themeMode } = useTimeTheme();
 
-    const themeMode = getCurrentThemeMode();
-    const theme = useMemo(() => getMenuTheme(themeMode), [themeMode]);
-    const styles = useMemo(() => createStyles(theme), [theme]);
+    const [aboutVisible, setAboutVisible] =
+        useState(false);
 
-    const handleOpenLink = async (url: string, label: string) => {
+    const theme = useMemo(
+        () => getMenuTheme(themeMode),
+        [themeMode]
+    );
+
+    const styles = useMemo(
+        () => createStyles(theme),
+        [theme]
+    );
+
+    const handleOpenLink = async (
+        url: string,
+        label: string
+    ) => {
         try {
-            const supported = await Linking.canOpenURL(url);
+            const supported =
+                await Linking.canOpenURL(url);
 
             if (!supported) {
-                Alert.alert("Link unavailable", `Unable to open ${label} right now.`);
+                Alert.alert(
+                    "Link unavailable",
+                    `Unable to open ${label} right now.`
+                );
                 return;
             }
 
             await Linking.openURL(url);
         } catch (error) {
-            console.log(`Open ${label} error:`, error);
-            Alert.alert("Error", `Failed to open ${label}.`);
+            console.log(
+                `Open ${label} error:`,
+                error
+            );
+            Alert.alert(
+                "Error",
+                `Failed to open ${label}.`
+            );
         }
     };
 
     const handleLogout = () => {
-        Alert.alert("Logout", "Are you sure you want to log out?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Logout",
-                style: "destructive",
-                onPress: async () => {
-                    try {
-                        try {
-                            await GoogleSignin.signOut();
-                        } catch (error) {
-                            console.log("Google sign out warning:", error);
-                        }
-
-                        await AsyncStorage.removeItem("token");
-                        await AsyncStorage.removeItem("user");
-
-                        navigation.replace("GoogleSignIn");
-                    } catch (error) {
-                        console.log("Logout error:", error);
-                        Alert.alert("Error", "Failed to log out.");
-                    }
+        Alert.alert(
+            "Logout",
+            "Are you sure you want to log out?",
+            [
+                {
+                    text: "Cancel",
+                    style: "cancel",
                 },
-            },
-        ]);
+                {
+                    text: "Logout",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            try {
+                                await GoogleSignin.signOut();
+                            } catch (error) {
+                                console.log(
+                                    "Google sign out warning:",
+                                    error
+                                );
+                            }
+
+                            await AsyncStorage.removeItem(
+                                "token"
+                            );
+                            await AsyncStorage.removeItem(
+                                "user"
+                            );
+
+                            navigation.replace(
+                                "GoogleSignIn"
+                            );
+                        } catch (error) {
+                            console.log(
+                                "Logout error:",
+                                error
+                            );
+                            Alert.alert(
+                                "Error",
+                                "Failed to log out."
+                            );
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleDeleteAccount = () => {
@@ -112,46 +157,81 @@ export default function MenuScreen() {
             "Delete Account",
             "Are you sure you want to delete your account? This action cannot be undone.",
             [
-                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Cancel",
+                    style: "cancel",
+                },
                 {
                     text: "Delete",
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            const token = await AsyncStorage.getItem("token");
+                            const token =
+                                await AsyncStorage.getItem(
+                                    "token"
+                                );
 
                             if (!token) {
-                                throw new Error("No auth token found.");
+                                throw new Error(
+                                    "No auth token found."
+                                );
                             }
 
-                            const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-                                method: "DELETE",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    Authorization: `Bearer ${token}`,
-                                },
-                            });
+                            const res = await fetch(
+                                `${API_BASE_URL}/api/auth/me`,
+                                {
+                                    method: "DELETE",
+                                    headers: {
+                                        "Content-Type":
+                                            "application/json",
+                                        Authorization:
+                                            `Bearer ${token}`,
+                                    },
+                                }
+                            );
 
-                            const data = await res.json();
+                            const data =
+                                await res.json();
 
                             if (!res.ok) {
-                                throw new Error(data?.message || "Failed to delete account");
+                                throw new Error(
+                                    data?.message ||
+                                    "Failed to delete account"
+                                );
                             }
 
                             try {
                                 await GoogleSignin.signOut();
                             } catch (error) {
-                                console.log("Google sign out warning:", error);
+                                console.log(
+                                    "Google sign out warning:",
+                                    error
+                                );
                             }
 
-                            await AsyncStorage.removeItem("token");
-                            await AsyncStorage.removeItem("user");
+                            await AsyncStorage.removeItem(
+                                "token"
+                            );
+                            await AsyncStorage.removeItem(
+                                "user"
+                            );
 
-                            Alert.alert("Account deleted");
-                            navigation.replace("GoogleSignIn");
+                            Alert.alert(
+                                "Account deleted"
+                            );
+                            navigation.replace(
+                                "GoogleSignIn"
+                            );
                         } catch (error: any) {
-                            console.log("Delete account error:", error);
-                            Alert.alert("Error", error?.message || "Failed to delete account.");
+                            console.log(
+                                "Delete account error:",
+                                error
+                            );
+                            Alert.alert(
+                                "Error",
+                                error?.message ||
+                                "Failed to delete account."
+                            );
                         }
                     },
                 },
@@ -160,82 +240,272 @@ export default function MenuScreen() {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={["left", "right", "bottom"]}>
-
+        <SafeAreaView
+            style={styles.container}
+            edges={[
+                "left",
+                "right",
+                "bottom",
+            ]}
+        >
             <View style={styles.content}>
                 <View style={styles.hero}>
                     <TouchableOpacity
-                        onPress={() => navigation.goBack()}
+                        onPress={() =>
+                            navigation.goBack()
+                        }
                         style={styles.backButton}
                         activeOpacity={0.8}
                     >
-                        <Ionicons name="arrow-back" size={22} color={theme.text} />
+                        <Ionicons
+                            name="arrow-back"
+                            size={22}
+                            color={theme.text}
+                        />
                     </TouchableOpacity>
 
-                    <View style={styles.heroTextWrap}>
-                        <Text style={styles.heroEyebrow}>SCOOLFOOLS</Text>
-                        <Text style={styles.screenTitle}>Menu</Text>
+                    <View
+                        style={
+                            styles.heroTextWrap
+                        }
+                    >
+                        <Text
+                            style={
+                                styles.heroEyebrow
+                            }
+                        >
+                            SCOOLFOOLS
+                        </Text>
+                        <Text
+                            style={
+                                styles.screenTitle
+                            }
+                        >
+                            Menu
+                        </Text>
                     </View>
                 </View>
 
                 <ScrollView
                     style={styles.scrollView}
-                    contentContainerStyle={styles.scrollContent}
-                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={
+                        styles.scrollContent
+                    }
+                    showsVerticalScrollIndicator={
+                        false
+                    }
                 >
                     <View style={styles.card}>
                         <MenuItem
                             icon="person-circle-outline"
                             color={theme.cyan}
                             title="Profile Settings"
-                            onPress={() => navigation.navigate("AccountSettings")}
+                            onPress={() =>
+                                navigation.navigate(
+                                    "AccountSettings"
+                                )
+                            }
                             styles={styles}
                             theme={theme}
                         />
-                        <MenuItem icon="information-circle-outline" color={theme.cyan} title="About ScoolFools" onPress={() => setAboutVisible(true)} styles={styles} theme={theme} />
-                        <MenuItem icon="mail-outline" color={theme.cyan} title="Contact Us" onPress={() => navigation.navigate("ContactUs")} styles={styles} theme={theme} />
-                        <MenuItem icon="notifications-outline" color={theme.cyan} title="Notifications" onPress={() => navigation.navigate("Notifications")} styles={styles} theme={theme} />
-                        <MenuItem icon="calendar-outline" color={theme.cyan} title="Events" onPress={() => navigation.navigate("EventsScreen")} styles={styles} theme={theme} />
-                        <MenuItem icon="game-controller-outline" color={theme.yellow} title="Party Games! 🎉" onPress={() => navigation.navigate("GameHome")} styles={styles} theme={theme} last />
+                        <MenuItem
+                            icon="information-circle-outline"
+                            color={theme.cyan}
+                            title="About ScoolFools"
+                            onPress={() =>
+                                setAboutVisible(
+                                    true
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="mail-outline"
+                            color={theme.cyan}
+                            title="Contact Us"
+                            onPress={() =>
+                                navigation.navigate(
+                                    "ContactUs"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="notifications-outline"
+                            color={theme.cyan}
+                            title="Notifications"
+                            onPress={() =>
+                                navigation.navigate(
+                                    "Notifications"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="calendar-outline"
+                            color={theme.cyan}
+                            title="Events"
+                            onPress={() =>
+                                navigation.navigate(
+                                    "EventsScreen"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="game-controller-outline"
+                            color={theme.yellow}
+                            title="Party Games! 🎉"
+                            onPress={() =>
+                                navigation.navigate(
+                                    "GameHome"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                            last
+                        />
                     </View>
 
-                    <View style={styles.sectionGap} />
+                    <View
+                        style={styles.sectionGap}
+                    />
 
                     <View style={styles.card}>
-                        <MenuItem icon="document-text-outline" color={theme.cyan} title="Privacy Policy" onPress={() => handleOpenLink(PRIVACY_POLICY_URL, "Privacy Policy")} styles={styles} theme={theme} />
-                        <MenuItem icon="shield-checkmark-outline" color={theme.cyan} title="Terms & Conditions" onPress={() => handleOpenLink(TERMS_URL, "Terms & Conditions")} styles={styles} theme={theme} last />
+                        <MenuItem
+                            icon="document-text-outline"
+                            color={theme.cyan}
+                            title="Privacy Policy"
+                            onPress={() =>
+                                handleOpenLink(
+                                    PRIVACY_POLICY_URL,
+                                    "Privacy Policy"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="shield-checkmark-outline"
+                            color={theme.cyan}
+                            title="Terms & Conditions"
+                            onPress={() =>
+                                handleOpenLink(
+                                    TERMS_URL,
+                                    "Terms & Conditions"
+                                )
+                            }
+                            styles={styles}
+                            theme={theme}
+                            last
+                        />
                     </View>
 
-                    <View style={styles.sectionGap} />
+                    <View
+                        style={styles.sectionGap}
+                    />
 
                     <View style={styles.card}>
-                        <MenuItem icon="log-out-outline" color={theme.yellow} title="Logout" onPress={handleLogout} styles={styles} theme={theme} />
-                        <MenuItem icon="trash-outline" color={theme.danger} title="Delete Account" danger last onPress={handleDeleteAccount} styles={styles} theme={theme} />
+                        <MenuItem
+                            icon="log-out-outline"
+                            color={theme.yellow}
+                            title="Logout"
+                            onPress={handleLogout}
+                            styles={styles}
+                            theme={theme}
+                        />
+                        <MenuItem
+                            icon="trash-outline"
+                            color={theme.danger}
+                            title="Delete Account"
+                            danger
+                            last
+                            onPress={
+                                handleDeleteAccount
+                            }
+                            styles={styles}
+                            theme={theme}
+                        />
                     </View>
 
-                    <View style={styles.bottomSpacer} />
+                    <View
+                        style={styles.bottomSpacer}
+                    />
                 </ScrollView>
-
-
             </View>
 
-            <Modal visible={aboutVisible} transparent animationType="fade" onRequestClose={() => setAboutVisible(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalCard}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>About ScoolFools</Text>
+            <Modal
+                visible={aboutVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() =>
+                    setAboutVisible(false)
+                }
+            >
+                <View
+                    style={styles.modalOverlay}
+                >
+                    <View
+                        style={styles.modalCard}
+                    >
+                        <View
+                            style={
+                                styles.modalHeader
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.modalTitle
+                                }
+                            >
+                                About ScoolFools
+                            </Text>
 
-                            <Pressable onPress={() => setAboutVisible(false)} style={styles.closeButton}>
-                                <Ionicons name="close" size={22} color={theme.text} />
+                            <Pressable
+                                onPress={() =>
+                                    setAboutVisible(
+                                        false
+                                    )
+                                }
+                                style={
+                                    styles.closeButton
+                                }
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={22}
+                                    color={
+                                        theme.text
+                                    }
+                                />
                             </Pressable>
                         </View>
 
-                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-                            <Text style={styles.modalBody}>
+                        <ScrollView
+                            showsVerticalScrollIndicator={
+                                false
+                            }
+                            contentContainerStyle={
+                                styles.modalScrollContent
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.modalBody
+                                }
+                            >
                                 ScoolFools is a student community app built for campus news, sports, rankings, TV content, and student culture.
                             </Text>
 
-                            <Text style={styles.modalBody}>
+                            <Text
+                                style={
+                                    styles.modalBody
+                                }
+                            >
                                 The goal is to make school life feel more connected, more fun, and easier to follow.
                             </Text>
                         </ScrollView>
@@ -262,31 +532,59 @@ function MenuItem({
     onPress: () => void;
     danger?: boolean;
     last?: boolean;
-    styles: ReturnType<typeof createStyles>;
-    theme: ReturnType<typeof getMenuTheme>;
+    styles: ReturnType<
+        typeof createStyles
+    >;
+    theme: ReturnType<
+        typeof getMenuTheme
+    >;
 }) {
     return (
         <TouchableOpacity
-            style={[styles.menuItem, last && styles.lastMenuItem]}
+            style={[
+                styles.menuItem,
+                last &&
+                styles.lastMenuItem,
+            ]}
             activeOpacity={0.85}
             onPress={onPress}
         >
             <View style={styles.menuLeft}>
-                <View style={styles.iconBubble}>
-                    <Ionicons name={icon} size={21} color={color} />
+                <View
+                    style={styles.iconBubble}
+                >
+                    <Ionicons
+                        name={icon}
+                        size={21}
+                        color={color}
+                    />
                 </View>
 
-                <Text style={[styles.menuText, danger && styles.deleteText]}>
+                <Text
+                    style={[
+                        styles.menuText,
+                        danger &&
+                        styles.deleteText,
+                    ]}
+                >
                     {title}
                 </Text>
             </View>
 
-            <Ionicons name="chevron-forward" size={20} color={theme.muted} />
+            <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={theme.muted}
+            />
         </TouchableOpacity>
     );
 }
 
-const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
+const createStyles = (
+    theme: ReturnType<
+        typeof getMenuTheme
+    >
+) =>
     StyleSheet.create({
         container: {
             flex: 1,
@@ -316,13 +614,15 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         heroEyebrow: {
             color: theme.cyan,
             fontSize: 13,
-            fontFamily: "Rajdhani_700Bold",
+            fontFamily:
+                "Rajdhani_700Bold",
             letterSpacing: 1.8,
         },
         screenTitle: {
             color: theme.text,
             fontSize: 32,
-            fontFamily: "Rajdhani_700Bold",
+            fontFamily:
+                "Rajdhani_700Bold",
             letterSpacing: 0.6,
             marginTop: -2,
         },
@@ -330,7 +630,10 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             flex: 1,
         },
         scrollContent: {
-            paddingBottom: Platform.OS === "android" ? 210 : 150,
+            paddingBottom:
+                Platform.OS === "android"
+                    ? 210
+                    : 150,
         },
         card: {
             backgroundColor: "transparent",
@@ -343,9 +646,11 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             paddingHorizontal: 2,
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent:
+                "space-between",
             borderBottomWidth: 1,
-            borderBottomColor: theme.divider,
+            borderBottomColor:
+                theme.divider,
         },
         lastMenuItem: {
             borderBottomWidth: 0,
@@ -365,7 +670,8 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         menuText: {
             color: theme.text,
             fontSize: 18,
-            fontFamily: "Rajdhani_700Bold",
+            fontFamily:
+                "Rajdhani_700Bold",
             letterSpacing: 0.35,
             marginLeft: 10,
         },
@@ -375,11 +681,10 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         bottomSpacer: {
             height: 30,
         },
-
-
         modalOverlay: {
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.72)",
+            backgroundColor:
+                "rgba(0,0,0,0.72)",
             justifyContent: "center",
             paddingHorizontal: 20,
         },
@@ -394,16 +699,19 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
         modalHeader: {
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent:
+                "space-between",
             paddingHorizontal: 18,
             paddingVertical: 16,
             borderBottomWidth: 1,
-            borderBottomColor: theme.divider,
+            borderBottomColor:
+                theme.divider,
         },
         modalTitle: {
             color: theme.text,
             fontSize: 24,
-            fontFamily: "Rajdhani_700Bold",
+            fontFamily:
+                "Rajdhani_700Bold",
             letterSpacing: 0.4,
             flex: 1,
             paddingRight: 12,
@@ -414,7 +722,8 @@ const createStyles = (theme: ReturnType<typeof getMenuTheme>) =>
             borderRadius: 17,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: theme.bubble,
+            backgroundColor:
+                theme.bubble,
         },
         modalScrollContent: {
             paddingHorizontal: 18,

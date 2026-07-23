@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import {
     ActivityIndicator,
     StyleSheet,
@@ -11,16 +11,16 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Feather from "@expo/vector-icons/Feather";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
+
 import { useNotifications } from "../context/NotificationsContext";
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
-type TimeTheme = "day" | "night";
-
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
-
-const getNotificationTheme = (mode: TimeTheme) => {
+const getNotificationTheme = (
+    mode: TimeTheme
+) => {
     if (mode === "day") {
         return {
             bg: "#F8FAFC",
@@ -30,7 +30,8 @@ const getNotificationTheme = (mode: TimeTheme) => {
             textSoft: "#475569",
             muted: "#64748B",
             border: "rgba(7,17,31,0.10)",
-            borderStrong: "rgba(6,182,212,0.28)",
+            borderStrong:
+                "rgba(6,182,212,0.28)",
             cyan: "#06B6D4",
             yellow: "#FACC15",
             switchTrackOff: "#CBD5E1",
@@ -47,7 +48,8 @@ const getNotificationTheme = (mode: TimeTheme) => {
         textSoft: "#CBD5E1",
         muted: "#94A3B8",
         border: "rgba(255,255,255,0.10)",
-        borderStrong: "rgba(34,211,238,0.30)",
+        borderStrong:
+            "rgba(34,211,238,0.30)",
         cyan: "#22D3EE",
         yellow: "#FACC15",
         switchTrackOff: "#1B2A4A",
@@ -57,63 +59,110 @@ const getNotificationTheme = (mode: TimeTheme) => {
 };
 
 export default function NotificationsScreen() {
-    const navigation = useNavigation<any>();
-    const { featuredEnabled, alertsEnabled, loading, toggleFeatured, toggleAlerts } =
-        useNotifications();
+    const navigation =
+        useNavigation<any>();
 
-    const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
-    const theme = getNotificationTheme(themeMode);
+    const {
+        featuredEnabled,
+        alertsEnabled,
+        loading,
+        toggleFeatured,
+        toggleAlerts,
+    } = useNotifications();
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60000);
+    const { mode: themeMode } =
+        useTimeTheme();
 
-        return () => clearInterval(interval);
-    }, []);
+    const theme =
+        getNotificationTheme(themeMode);
 
     return (
         <SafeAreaView
             edges={["left", "right"]}
-            style={[styles.safeArea, { backgroundColor: theme.bg }]}
+            style={[
+                styles.safeArea,
+                {
+                    backgroundColor:
+                        theme.bg,
+                },
+            ]}
         >
-
             <View style={styles.container}>
                 <View
                     style={[
                         styles.hero,
                         {
-                            backgroundColor: theme.card,
-                            borderColor: theme.borderStrong,
-                            shadowColor: theme.shadow,
+                            backgroundColor:
+                                theme.card,
+                            borderColor:
+                                theme.borderStrong,
+                            shadowColor:
+                                theme.shadow,
                         },
                     ]}
                 >
                     <TouchableOpacity
-                        onPress={() => navigation.goBack()}
+                        onPress={() =>
+                            navigation.goBack()
+                        }
                         style={[
                             styles.backButton,
                             {
-                                backgroundColor: theme.cardAlt,
-                                borderColor: theme.border,
+                                backgroundColor:
+                                    theme.cardAlt,
+                                borderColor:
+                                    theme.border,
                             },
                         ]}
                         activeOpacity={0.8}
                     >
-                        <Feather name="arrow-left" size={22} color={theme.text} />
+                        <Feather
+                            name="arrow-left"
+                            size={22}
+                            color={theme.text}
+                        />
                     </TouchableOpacity>
 
-                    <View style={styles.heroTextWrap}>
-                        <Text style={[styles.heroEyebrow, { color: theme.cyan }]}>
+                    <View
+                        style={
+                            styles.heroTextWrap
+                        }
+                    >
+                        <Text
+                            style={[
+                                styles.heroEyebrow,
+                                {
+                                    color:
+                                        theme.cyan,
+                                },
+                            ]}
+                        >
                             SCOOLFOOLS
                         </Text>
-                        <Text style={[styles.title, { color: theme.text }]}>
+
+                        <Text
+                            style={[
+                                styles.title,
+                                {
+                                    color:
+                                        theme.text,
+                                },
+                            ]}
+                        >
                             Notifications
                         </Text>
                     </View>
                 </View>
 
-                <Text style={[styles.subtitle, { color: theme.textSoft }]}>
+                <Text
+                    style={[
+                        styles.subtitle,
+                        {
+                            color:
+                                theme.textSoft,
+                        },
+                    ]}
+                >
                     Choose which updates you want pushed to your phone.
                 </Text>
 
@@ -122,9 +171,13 @@ export default function NotificationsScreen() {
                     iconColor={theme.yellow}
                     title="Featured Posts"
                     description="Get notified when a featured article or major story goes live."
-                    enabled={featuredEnabled}
+                    enabled={
+                        featuredEnabled
+                    }
                     loading={loading}
-                    onToggle={toggleFeatured}
+                    onToggle={
+                        toggleFeatured
+                    }
                     theme={theme}
                 />
 
@@ -160,17 +213,26 @@ function NotificationCard({
     enabled: boolean;
     loading: boolean;
     onToggle: () => void;
-    theme: ReturnType<typeof getNotificationTheme>;
+    theme: ReturnType<
+        typeof getNotificationTheme
+    >;
 }) {
     return (
         <View
             style={[
                 styles.card,
                 {
-                    backgroundColor: theme.card,
-                    borderColor: enabled ? theme.borderStrong : theme.border,
-                    shadowColor: enabled ? theme.shadow : "transparent",
-                    shadowOpacity: enabled ? 0.12 : 0,
+                    backgroundColor:
+                        theme.card,
+                    borderColor: enabled
+                        ? theme.borderStrong
+                        : theme.border,
+                    shadowColor: enabled
+                        ? theme.shadow
+                        : "transparent",
+                    shadowOpacity: enabled
+                        ? 0.12
+                        : 0,
                 },
             ]}
         >
@@ -179,48 +241,112 @@ function NotificationCard({
                     style={[
                         styles.iconBubble,
                         {
-                            backgroundColor: theme.iconBg,
-                            borderColor: `${iconColor}55`,
+                            backgroundColor:
+                                theme.iconBg,
+                            borderColor:
+                                `${iconColor}55`,
                         },
                     ]}
                 >
-                    <Ionicons name={icon} size={22} color={iconColor} />
+                    <Ionicons
+                        name={icon}
+                        size={22}
+                        color={iconColor}
+                    />
                 </View>
 
-                <View style={styles.cardTextWrap}>
-                    <Text style={[styles.label, { color: theme.text }]}>{title}</Text>
+                <View
+                    style={
+                        styles.cardTextWrap
+                    }
+                >
+                    <Text
+                        style={[
+                            styles.label,
+                            {
+                                color:
+                                    theme.text,
+                            },
+                        ]}
+                    >
+                        {title}
+                    </Text>
 
-                    <Text style={[styles.helper, { color: theme.textSoft }]}>
+                    <Text
+                        style={[
+                            styles.helper,
+                            {
+                                color:
+                                    theme.textSoft,
+                            },
+                        ]}
+                    >
                         {description}
                     </Text>
                 </View>
 
                 {loading ? (
-                    <ActivityIndicator size="small" color={theme.cyan} />
+                    <ActivityIndicator
+                        size="small"
+                        color={theme.cyan}
+                    />
                 ) : (
                     <Switch
                         value={enabled}
-                        onValueChange={onToggle}
+                        onValueChange={
+                            onToggle
+                        }
                         trackColor={{
-                            false: theme.switchTrackOff,
-                            true: theme.cyan,
+                            false:
+                                theme.switchTrackOff,
+                            true:
+                                theme.cyan,
                         }}
-                        thumbColor={enabled ? "#FFFFFF" : theme.muted}
-                        ios_backgroundColor={theme.switchTrackOff}
+                        thumbColor={
+                            enabled
+                                ? "#FFFFFF"
+                                : theme.muted
+                        }
+                        ios_backgroundColor={
+                            theme.switchTrackOff
+                        }
                     />
                 )}
             </View>
 
-            <View style={[styles.statusRow, { borderTopColor: theme.border }]}>
+            <View
+                style={[
+                    styles.statusRow,
+                    {
+                        borderTopColor:
+                            theme.border,
+                    },
+                ]}
+            >
                 <View
                     style={[
                         styles.statusDot,
-                        { backgroundColor: enabled ? theme.cyan : theme.muted },
+                        {
+                            backgroundColor:
+                                enabled
+                                    ? theme.cyan
+                                    : theme.muted,
+                        },
                     ]}
                 />
 
-                <Text style={[styles.statusText, { color: theme.muted }]}>
-                    {enabled ? "Enabled" : "Disabled"}
+                <Text
+                    style={[
+                        styles.statusText,
+                        {
+                            color:
+                                theme.muted,
+                        },
+                    ]}
+                >
+                    {enabled
+                        ? "Enabled"
+                        : "Disabled"}
                 </Text>
             </View>
         </View>
@@ -250,7 +376,10 @@ const styles = StyleSheet.create({
         marginBottom: 14,
         shadowOpacity: 0.16,
         shadowRadius: 14,
-        shadowOffset: { width: 0, height: 0 },
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
     },
     backButton: {
         width: 42,
@@ -266,12 +395,14 @@ const styles = StyleSheet.create({
     },
     heroEyebrow: {
         fontSize: 13,
-        fontFamily: "Rajdhani_700Bold",
+        fontFamily:
+            "Rajdhani_700Bold",
         letterSpacing: 1.8,
     },
     title: {
         fontSize: 31,
-        fontFamily: "Rajdhani_700Bold",
+        fontFamily:
+            "Rajdhani_700Bold",
         letterSpacing: 0.45,
         marginTop: -2,
     },
@@ -286,7 +417,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         marginBottom: 16,
         shadowRadius: 12,
-        shadowOffset: { width: 0, height: 0 },
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
     },
     cardTopRow: {
         flexDirection: "row",
@@ -307,7 +441,8 @@ const styles = StyleSheet.create({
     },
     label: {
         fontSize: 19,
-        fontFamily: "Rajdhani_700Bold",
+        fontFamily:
+            "Rajdhani_700Bold",
         letterSpacing: 0.35,
         marginBottom: 3,
     },
@@ -330,7 +465,8 @@ const styles = StyleSheet.create({
     },
     statusText: {
         fontSize: 13,
-        fontFamily: "Rajdhani_700Bold",
+        fontFamily:
+            "Rajdhani_700Bold",
         letterSpacing: 0.35,
     },
 });

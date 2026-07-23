@@ -16,11 +16,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+    TimeTheme,
+    useTimeTheme,
+} from "../context/TimeThemeContext";
 
 type StreamType = "Live" | "Podcast" | "Video" | "Highlight";
 type LiveStatus = "upcoming" | "live" | "ended";
 type TVMode = "watch" | "listen";
-type TimeTheme = "day" | "night";
+
 
 type RawTVItem = {
     _id?: string;
@@ -70,10 +74,7 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 const PLAYER_WIDTH = SCREEN_WIDTH - 10;
 const PLAYER_HEIGHT = PLAYER_WIDTH * 0.5625;
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
+
 
 const getTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -220,7 +221,7 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
 };
 
 export default function TVScreen() {
-    const [themeMode] = useState<TimeTheme>(getCurrentThemeMode());
+    const { mode: themeMode } = useTimeTheme();
     const theme = useMemo(() => getTheme(themeMode), [themeMode]);
     const styles = useMemo(() => createStyles(theme), [theme]);
 
