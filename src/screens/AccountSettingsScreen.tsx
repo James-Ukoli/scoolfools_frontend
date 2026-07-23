@@ -516,19 +516,28 @@ export default function AccountSettingsScreen({ navigation }: any) {
     );
 
     const handleSubscribePress = async () => {
-        try {
-            setLoadingSubscription(true);
-            await initializeIAP();
-            await buyBlogsSubscription();
-        } catch (error) {
-            setLoadingSubscription(false);
-            console.log("Account settings subscription request error:", error);
+        setLoadingSubscription(true);
 
-            Alert.alert(
-                "Subscription Failed",
-                "Something went wrong while starting the subscription.",
-            );
-        }
+        await buyBlogsSubscription({
+            onSuccess: verifySubscriptionOnBackend,
+            onError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Subscription purchase error:", error);
+
+                if (
+                    error?.code === "user-cancelled" ||
+                    error?.code === "E_USER_CANCELLED"
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Subscription Failed",
+                    error?.message ||
+                    "Something went wrong while processing your subscription.",
+                );
+            },
+        });
     };
 
     const openSubscriberPaywall = () => {

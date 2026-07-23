@@ -35,8 +35,6 @@ import {
     initializeIAP,
     getBlogsSubscriptionProduct,
     buyBlogsSubscription,
-    setupPurchaseListeners,
-    cleanupIAP,
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
@@ -466,17 +464,45 @@ export default function SetupProfileScreen({ navigation }: any) {
     );
 
     const handleSubscribePress = async () => {
+        setLoadingSubscription(true);
+
         try {
-            setLoadingSubscription(true);
-            await initializeIAP();
-            await buyBlogsSubscription();
-        } catch (error) {
+            await buyBlogsSubscription({
+                onSuccess: verifySubscriptionOnBackend,
+                onError: (error: any) => {
+                    setLoadingSubscription(false);
+
+                    if (
+                        error?.code === "user-cancelled" ||
+                        error?.code === "E_USER_CANCELLED"
+                    ) {
+                        return;
+                    }
+
+                    console.log(
+                        "Setup subscription purchase error:",
+                        error,
+                    );
+
+                    Alert.alert(
+                        "Subscription Failed",
+                        error?.message ||
+                        "Something went wrong while processing your subscription.",
+                    );
+                },
+            });
+        } catch (error: any) {
             setLoadingSubscription(false);
-            console.log("Setup subscription request error:", error);
+
+            console.log(
+                "Unexpected setup subscription error:",
+                error,
+            );
 
             Alert.alert(
                 "Subscription Failed",
-                "Something went wrong while starting the subscription.",
+                error?.message ||
+                "Something went wrong while processing your subscription.",
             );
         }
     };
@@ -486,23 +512,7 @@ export default function SetupProfileScreen({ navigation }: any) {
         void loadSubscriptionProduct();
     };
 
-    useEffect(() => {
-        setupPurchaseListeners({
-            onPurchaseSuccess: async () => { },
-            onGamesPackSuccess: async () => { },
-            onBlogsSubscriptionSuccess: async (purchase: any) => {
-                await verifySubscriptionOnBackend(purchase);
-            },
-            onPurchaseError: (error: any) => {
-                setLoadingSubscription(false);
-                console.log("Setup subscription listener error:", error);
-            },
-        });
 
-        return () => {
-            void cleanupIAP();
-        };
-    }, [verifySubscriptionOnBackend]);
 
     useEffect(() => {
         const loadStoredSubscription = async () => {

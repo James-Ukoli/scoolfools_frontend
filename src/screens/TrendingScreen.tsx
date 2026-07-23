@@ -365,18 +365,28 @@ export default function TrendingScreen({ navigation }: any) {
     };
 
     const handleSubscribePress = async () => {
-        try {
-            setLoadingSubscription(true);
-            await initializeIAP();
-            await buyBlogsSubscription();
-        } catch (error) {
-            setLoadingSubscription(false);
-            console.log("Blog subscription request error:", error);
-            Alert.alert(
-                "Subscription Failed",
-                "Something went wrong while starting the subscription.",
-            );
-        }
+        setLoadingSubscription(true);
+
+        await buyBlogsSubscription({
+            onSuccess: verifyBlogSubscriptionOnBackend,
+            onError: (error: any) => {
+                setLoadingSubscription(false);
+                console.log("Subscription purchase error:", error);
+
+                if (
+                    error?.code === "user-cancelled" ||
+                    error?.code === "E_USER_CANCELLED"
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Subscription Failed",
+                    error?.message ||
+                    "Something went wrong while processing your subscription.",
+                );
+            },
+        });
     };
 
     useEffect(() => {

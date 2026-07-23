@@ -301,33 +301,29 @@ export default function HomeScreen() {
     };
 
     const handleSubscribePress = async () => {
-        try {
-            setLoadingSubscription(true);
+        setLoadingSubscription(true);
 
-            const sessionIsValid = await ensureValidSessionBeforePurchase();
-
-            if (!sessionIsValid) {
+        await buyBlogsSubscription({
+            onSuccess: verifyBlogSubscriptionOnBackend,
+            onError: (error: any) => {
                 setLoadingSubscription(false);
-                return;
-            }
+                console.log("Subscription purchase error:", error);
 
-            await buyBlogsSubscription();
-        } catch (error: any) {
-            setLoadingSubscription(false);
-            console.log("Home blog subscription request error:", error);
+                if (
+                    error?.code === "user-cancelled" ||
+                    error?.code === "E_USER_CANCELLED"
+                ) {
+                    return;
+                }
 
-            if (error?.message === "SESSION_EXPIRED") {
-                await handleExpiredSession();
-                return;
-            }
-
-            Alert.alert(
-                "Subscription Failed",
-                "Something went wrong while starting the subscription."
-            );
-        }
+                Alert.alert(
+                    "Subscription Failed",
+                    error?.message ||
+                    "Something went wrong while processing your subscription.",
+                );
+            },
+        });
     };
-
     const handleRatePress = async () => {
         try {
             const available = await StoreReview.isAvailableAsync();
