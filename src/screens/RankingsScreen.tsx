@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import SportsArticleList from "../components/SportsArticleList";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
     Rajdhani_600SemiBold,
@@ -392,7 +393,7 @@ function RankingRow({
     );
 }
 
-export default function RankingsScreen() {
+export default function RankingsScreen({ navigation }: any) {
     const scrollRef = useRef<ScrollView>(null);
 
     const { isDark } = useTimeTheme();
@@ -859,6 +860,11 @@ export default function RankingsScreen() {
                 </View>
 
                 {renderRankings()}
+                <SportsArticleList
+                    selectedSport={selectedSport}
+                    navigation={navigation}
+                    theme={theme}
+                />
             </ScrollView>
         </SafeAreaView>
     );

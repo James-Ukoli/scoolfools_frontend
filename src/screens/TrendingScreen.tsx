@@ -70,7 +70,6 @@ type CategoryOption = {
 const NEWS_CATEGORIES: CategoryOption[] = [
     { value: "All", label: "All" },
     { value: "Campus News", label: "📰 Campus News" },
-    { value: "Sports", label: "🏆 Sports" },
     { value: "Student Life", label: "🎓 Student Life" },
     { value: "Trending", label: "🔥 Trending" },
 ];
@@ -196,8 +195,6 @@ function getCategoryBadgeStyle(category: string) {
     switch (category) {
         case "Campus News":
             return { backgroundColor: "#174A72", borderColor: "#38BDF8" };
-        case "Sports":
-            return { backgroundColor: "#14532D", borderColor: "#4ADE80" };
         case "Student Life":
             return { backgroundColor: "#5B3A00", borderColor: "#FACC15" };
         case "Trending":
@@ -285,8 +282,16 @@ export default function TrendingScreen({ navigation }: any) {
             const allPosts = (json.data || [])
                 .filter(
                     (post) =>
-                        post.content_type === "news" || post.content_type === "blog",
+                        post.content_type === "news" ||
+                        post.content_type === "blog"
                 )
+                .filter(
+                    (post) => post.content_type !== "sports"
+                )
+                //   (Cleaner?)          const allPosts = (json.data || [])
+                // .filter((post) =>
+                //     ["news", "blog"].includes(post.content_type)
+                // )
                 .sort((a, b) => {
                     const dateA = new Date(a.created_at).getTime();
                     const dateB = new Date(b.created_at).getTime();
