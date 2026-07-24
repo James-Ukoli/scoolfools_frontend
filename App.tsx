@@ -34,6 +34,7 @@ import ImpostorSetupScreen from "./src/screens/games/impostor/ImpostorSetupScree
 import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScreen";
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
+import DeleteAccountScreen from "./src/screens/DeleteAccountScreen";
 import TVScreen from "./src/screens/TVScreen";
 import { NotificationsProvider } from "./src/context/NotificationsContext";
 import {
@@ -179,6 +180,13 @@ function ThemedNavigation({
                         component={
                             AccountSettingsScreen
                         }
+                    />
+                    <Stack.Screen
+                        name="DeleteAccount"
+                        component={DeleteAccountScreen}
+                        options={{
+                            headerShown: false,
+                        }}
                     />
 
                     <Stack.Screen
