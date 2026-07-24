@@ -45,8 +45,6 @@ const API_BASE_URL =
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
-const SUPPORTER_MILESTONES = [100, 1000, 10000, 50000];
-
 const getHomeTheme = (mode: TimeTheme) => {
     if (mode === "day") {
         return {
@@ -113,8 +111,6 @@ export default function HomeScreen() {
     const [isSubscribed, setIsSubscribed] = useState(false);
     const [gamesPackagePurchased, setGamesPackagePurchased] = useState(false);
 
-    const [supporterCount, setSupporterCount] = useState(0);
-
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
@@ -143,21 +139,6 @@ export default function HomeScreen() {
             });
         } catch (error) {
             console.log("Expired session cleanup error:", error);
-        }
-    };
-
-    const fetchSupporterProgress = async () => {
-        try {
-            if (!API_BASE_URL) return;
-
-            const response = await fetch(`${API_BASE_URL}/api/auth/supporter-progress`);
-            const data = await response.json();
-
-            if (data?.success) {
-                setSupporterCount(Number(data.subscribedUsers || 0));
-            }
-        } catch (error) {
-            console.log("Supporter progress error:", error);
         }
     };
 
@@ -285,7 +266,6 @@ export default function HomeScreen() {
             setShowConfetti(true);
 
             await fetchEntitlements();
-            await fetchSupporterProgress();
 
             Alert.alert("Subscribed 🎉");
         } catch (error) {
@@ -383,7 +363,6 @@ export default function HomeScreen() {
     useEffect(() => {
         fetchHomeData();
         fetchEntitlements();
-        fetchSupporterProgress();
 
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
@@ -408,7 +387,6 @@ export default function HomeScreen() {
         try {
             await fetchHomeData();
             await fetchEntitlements();
-            await fetchSupporterProgress();
         } finally {
             setAlertsRefreshKey((prev) => prev + 1);
             setRefreshing(false);
@@ -453,8 +431,7 @@ export default function HomeScreen() {
                         onRequireSubscription={openBlogPaywall}
                     />
 
-                    <SupportGrowthBanner
-                        supporterCount={supporterCount}
+                    <SupporterBenefitsBanner
                         isSubscribed={isSubscribed}
                         onOpenBlogPaywall={openBlogPaywall}
                         theme={theme}
@@ -526,109 +503,184 @@ export default function HomeScreen() {
     );
 }
 
-function SupportGrowthBanner({
-    supporterCount,
+function SupporterBenefitsBanner({
     isSubscribed,
     onOpenBlogPaywall,
     theme,
 }: any) {
-    const progressAnim = useRef(new Animated.Value(0)).current;
-
-    const currentGoal =
-        SUPPORTER_MILESTONES.find((goal) => supporterCount < goal) || 50000;
-
-    const progress = Math.min(supporterCount / currentGoal, 1);
+    const sparkleAnim = useRef(new Animated.Value(0)).current;
+    const glowAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
-        Animated.timing(progressAnim, {
-            toValue: progress,
-            duration: 1500,
-            easing: Easing.out(Easing.exp),
-            useNativeDriver: false,
-        }).start();
-    }, [progress]);
+        if (isSubscribed) return;
 
-    const width = progressAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ["0%", "100%"],
-    });
+        const sparkleLoop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(sparkleAnim, {
+                    toValue: 1,
+                    duration: 1100,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(sparkleAnim, {
+                    toValue: 0,
+                    duration: 1100,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        const glowLoop = Animated.loop(
+            Animated.sequence([
+                Animated.timing(glowAnim, {
+                    toValue: 1,
+                    duration: 1500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+                Animated.timing(glowAnim, {
+                    toValue: 0,
+                    duration: 1500,
+                    easing: Easing.inOut(Easing.ease),
+                    useNativeDriver: true,
+                }),
+            ])
+        );
+
+        sparkleLoop.start();
+        glowLoop.start();
+
+        return () => {
+            sparkleLoop.stop();
+            glowLoop.stop();
+        };
+    }, [glowAnim, isSubscribed, sparkleAnim]);
+
+    if (isSubscribed) return null;
+
+    const sparkleStyle = {
+        opacity: sparkleAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.35, 1],
+        }),
+        transform: [
+            {
+                scale: sparkleAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.75, 1.2],
+                }),
+            },
+            {
+                rotate: sparkleAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", "18deg"],
+                }),
+            },
+        ],
+    };
+
+    const glowStyle = {
+        opacity: glowAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.08, 0.2],
+        }),
+        transform: [
+            {
+                scale: glowAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.98, 1.02],
+                }),
+            },
+        ],
+    };
 
     return (
-        <View
+        <TouchableOpacity
             style={[
-                styles.supportMissionCard,
+                styles.supporterBenefitsCard,
                 {
-                    backgroundColor: theme.cardAlt,
+                    backgroundColor: theme.card,
                     borderColor: theme.borderStrong,
+                    shadowColor: theme.shadow,
                 },
             ]}
+            onPress={onOpenBlogPaywall}
+            activeOpacity={0.9}
         >
-            <View style={styles.supportTopRow}>
-                <Ionicons name="rocket" size={17} color={theme.cyan} />
-
-                <Text style={[styles.supportMissionTitle, { color: theme.text }]}>
-                    ScoolFools Subscribers 🤪🎓
-                </Text>
-            </View>
-
-            <Text style={[styles.supportMissionSubtitle, { color: theme.textSoft }]}>
-                {isSubscribed
-                    ? "Thank you for helping us push chess forward."
-                    : "Help us build the future of chess media."}
-            </Text>
+            <Animated.View
+                style={[
+                    styles.supporterGlow,
+                    {
+                        backgroundColor: theme.cyan,
+                    },
+                    glowStyle,
+                ]}
+            />
 
             <View
                 style={[
-                    styles.progressBarWrap,
-                    {
-                        backgroundColor:
-                            theme.mode === "day" ? "#E2E8F0" : "#0E1625",
-                    },
+                    styles.supporterIconWrap,
+                    { backgroundColor: theme.cyanSoft },
                 ]}
             >
-                <Animated.View
+                <Ionicons name="diamond-outline" size={22} color={theme.cyan} />
+
+                <Animated.Text
                     style={[
-                        styles.progressFill,
-                        {
-                            width,
-                            backgroundColor: theme.cyan,
-                            shadowColor: theme.cyan,
-                        },
+                        styles.supporterSparkle,
+                        { color: theme.yellow },
+                        sparkleStyle,
                     ]}
+                >
+                    ✦
+                </Animated.Text>
+            </View>
+
+            <View style={styles.supporterBenefitsContent}>
+                <Text
+                    style={[
+                        styles.supporterBenefitsEyebrow,
+                        { color: theme.cyan },
+                    ]}
+                >
+                    SCOOLFOOLS SUPPORTERS
+                </Text>
+
+                <Text
+                    style={[
+                        styles.supporterBenefitsTitle,
+                        { color: theme.text },
+                    ]}
+                    numberOfLines={1}
+                >
+                    Subscribe & Unlock Benefits
+                </Text>
+
+                <Text
+                    style={[
+                        styles.supporterBenefitsSubtitle,
+                        { color: theme.textSoft },
+                    ]}
+                    numberOfLines={1}
+                >
+                    5 daily dumps • Blogs • AI narration
+                </Text>
+            </View>
+
+            <View
+                style={[
+                    styles.supporterArrow,
+                    { backgroundColor: theme.cyan },
+                ]}
+            >
+                <Ionicons
+                    name="arrow-forward"
+                    size={18}
+                    color={theme.darkText}
                 />
             </View>
-
-            <View style={styles.progressMetaRow}>
-                <Text style={[styles.progressCount, { color: theme.text }]}>
-                    {supporterCount.toLocaleString()} Supporters
-                </Text>
-
-                <Text style={[styles.progressGoal, { color: theme.muted }]}>
-                    Goal: {currentGoal.toLocaleString()}
-                </Text>
-            </View>
-
-            {!isSubscribed && (
-                <TouchableOpacity
-                    style={[
-                        styles.supportSubscribeButton,
-                        { backgroundColor: theme.cyan },
-                    ]}
-                    onPress={onOpenBlogPaywall}
-                    activeOpacity={0.9}
-                >
-                    <Ionicons name="flash" size={16} color={theme.darkText} />
-                    <Text
-                        style={[
-                            styles.supportSubscribeText,
-                            { color: theme.darkText },
-                        ]}
-                    >
-                        Start Free Month
-                    </Text>
-                </TouchableOpacity>
-            )}
-        </View>
+        </TouchableOpacity>
     );
 }
 
@@ -764,82 +816,78 @@ const styles = StyleSheet.create({
         borderRadius: 999,
     },
 
-    supportMissionCard: {
+    supporterBenefitsCard: {
+        minHeight: 88,
         borderRadius: 20,
-        paddingVertical: 10,
+        paddingVertical: 12,
         paddingHorizontal: 13,
         marginBottom: 16,
         borderWidth: 1,
-    },
-
-    supportTopRow: {
         flexDirection: "row",
         alignItems: "center",
-        gap: 7,
-        marginBottom: 4,
-    },
-
-    supportMissionTitle: {
-        fontSize: 15,
-        fontFamily: "Rajdhani_700Bold",
-        letterSpacing: 0.4,
-        flex: 1,
-    },
-
-    supportMissionSubtitle: {
-        fontSize: 11.5,
-        marginBottom: 9,
-        fontWeight: "700",
-    },
-
-    progressBarWrap: {
-        width: "100%",
-        height: 7,
-        borderRadius: 999,
         overflow: "hidden",
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 4,
     },
 
-    progressFill: {
-        height: "100%",
-        borderRadius: 999,
-        shadowOpacity: 0.9,
-        shadowRadius: 10,
-        shadowOffset: {
-            width: 0,
-            height: 0,
-        },
-        elevation: 10,
+    supporterGlow: {
+        position: "absolute",
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: 20,
     },
 
-    progressMetaRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginTop: 8,
-    },
-
-    progressCount: {
-        fontWeight: "800",
-        fontSize: 11.5,
-    },
-
-    progressGoal: {
-        fontWeight: "700",
-        fontSize: 11.5,
-    },
-
-    supportSubscribeButton: {
-        height: 36,
-        borderRadius: 13,
+    supporterIconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
         alignItems: "center",
         justifyContent: "center",
-        marginTop: 10,
-        flexDirection: "row",
-        gap: 7,
+        marginRight: 11,
     },
 
-    supportSubscribeText: {
-        fontWeight: "900",
-        fontSize: 13,
+    supporterSparkle: {
+        position: "absolute",
+        right: 4,
+        top: 1,
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+    },
+
+    supporterBenefitsContent: {
+        flex: 1,
+        paddingRight: 8,
+    },
+
+    supporterBenefitsEyebrow: {
+        fontSize: 9.5,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+
+    supporterBenefitsTitle: {
+        fontSize: 17,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
+    },
+
+    supporterBenefitsSubtitle: {
+        fontSize: 10.5,
+        fontWeight: "700",
+        marginTop: 3,
+    },
+
+    supporterArrow: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: "center",
+        justifyContent: "center",
     },
 
     partyGamesCard: {

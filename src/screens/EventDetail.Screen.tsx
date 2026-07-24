@@ -1,136 +1,188 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+    Alert,
     Image,
+    Platform,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     View,
-    Platform,
-    Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 
-type Broadcaster = {
-    name: string;
-    platform: string;
-    url: string;
-    broadcast_start_at?: string;
-};
+import {
+    useTimeTheme,
+    type TimeTheme,
+} from "../context/TimeThemeContext";
 
-type GamePlatform = {
-    name: string;
-    url: string;
-    is_official: boolean;
-    notes?: string;
-};
-
-type Round = {
-    round_number: number;
-    label: string;
-    start_at: string;
-    end_at: string | null;
-    broadcast_start_at?: string;
-    is_rest_day: boolean;
-    status: string;
-    notes?: string;
-};
+type EventStatus = "scheduled" | "canceled" | "postponed";
 
 type EventItem = {
     _id: string;
     title: string;
     slug: string;
-    summary?: string;
-    type: string;
-    location: string;
+    summary?: string | null;
+    description: string;
+    location?: string | null;
     start_at: string;
-    end_at: string;
+    end_at: string | null;
+    estimated_duration_minutes?: number | null;
+    end_time_is_estimated?: boolean;
     timezone: string;
-    cover_image_url: string;
-    card_image_url?: string;
-    official_url?: string;
-    standingsUrl?: string;
-    tags: string[];
+    card_image_url?: string | null;
+    cover_image_url?: string | null;
+    broadcaster?: string | null;
+    broadcast_url?: string | null;
+    promo_label?: string | null;
+    promo_url?: string | null;
+    is_sponsored: boolean;
+    sponsor_name?: string | null;
     is_published: boolean;
     is_featured: boolean;
-    featured_priority?: number;
-    sort_boost?: number;
-    status: string;
-    live_mode?: string;
-    current_day?: number | null;
-    current_round?: number | null;
-    round_label?: string | null;
-    status_note?: string | null;
-    last_status_update_at?: string | null;
-    main_broadcaster?: Broadcaster;
-    other_broadcasters?: Broadcaster[];
-    game_platforms?: GamePlatform[];
-    rounds?: Round[];
-    createdAt: string;
-    updatedAt: string;
+    status: EventStatus;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
-function formatDateRange(startAt: string, endAt: string) {
-    const start = new Date(startAt);
-    const end = new Date(endAt);
+type DisplayStatus =
+    | "Scheduled"
+    | "Happening Now"
+    | "Completed"
+    | "Canceled"
+    | "Postponed";
 
-    const startMonth = start.toLocaleString("en-US", { month: "short" });
-    const endMonth = end.toLocaleString("en-US", { month: "short" });
-    const startDay = start.getDate();
-    const endDay = end.getDate();
-    const year = end.getFullYear();
-
-    if (startMonth === endMonth) {
-        return `${startMonth} ${startDay}–${endDay}, ${year}`;
+const getEventTheme = (mode: TimeTheme) => {
+    if (mode === "day") {
+        return {
+            background: "#F8FAFC",
+            card: "#FFFFFF",
+            cardSoft: "#ECFEFF",
+            text: "#07111F",
+            textSoft: "#475569",
+            muted: "#64748B",
+            border: "rgba(7,17,31,0.10)",
+            borderStrong: "rgba(6,182,212,0.28)",
+            cyan: "#06B6D4",
+            yellow: "#CA8A04",
+            red: "#DC2626",
+            green: "#16A34A",
+            amber: "#D97706",
+            completed: "#64748B",
+            imagePlaceholder: "#E2E8F0",
+            primaryButtonText: "#07111F",
+            shadow: "#06B6D4",
+        };
     }
 
-    return `${startMonth} ${startDay} – ${endMonth} ${endDay}, ${year}`;
+    return {
+        background: "#020617",
+        card: "#090D14",
+        cardSoft: "#07111F",
+        text: "#FFFFFF",
+        textSoft: "#CBD5E1",
+        muted: "#94A3B8",
+        border: "rgba(255,255,255,0.10)",
+        borderStrong: "rgba(34,211,238,0.30)",
+        cyan: "#22D3EE",
+        yellow: "#FACC15",
+        red: "#F87171",
+        green: "#4ADE80",
+        amber: "#FBBF24",
+        completed: "#94A3B8",
+        imagePlaceholder: "#111827",
+        primaryButtonText: "#07111F",
+        shadow: "#22D3EE",
+    };
+};
+
+function getDisplayStatus(event: EventItem, now: number): DisplayStatus {
+    if (event.status === "canceled") return "Canceled";
+    if (event.status === "postponed") return "Postponed";
+
+    const start = new Date(event.start_at).getTime();
+    const end = event.end_at
+        ? new Date(event.end_at).getTime()
+        : Number.NaN;
+
+    if (Number.isFinite(start) && now < start) return "Scheduled";
+    if (Number.isFinite(end) && now <= end) return "Happening Now";
+    if (Number.isFinite(end) && now > end) return "Completed";
+
+    return "Scheduled";
 }
 
-function formatDateTime(dateString?: string) {
-    if (!dateString) return null;
+function formatDateTime(value: string | null | undefined, timezone?: string) {
+    if (!value) return "Time TBA";
 
-    const date = new Date(dateString);
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Time TBA";
 
-    return date.toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    });
+    try {
+        return new Intl.DateTimeFormat("en-US", {
+            timeZone: timezone || undefined,
+            weekday: "short",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+            timeZoneName: "short",
+        }).format(date);
+    } catch {
+        return date.toLocaleString("en-US", {
+            weekday: "short",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    }
+}
+
+function formatDuration(minutes?: number | null) {
+    if (!minutes || minutes <= 0) return null;
+
+    const hours = minutes / 60;
+
+    if (Number.isInteger(hours)) {
+        return `${hours} hour${hours === 1 ? "" : "s"}`;
+    }
+
+    return `${hours.toFixed(1)} hours`;
 }
 
 function normalizeUrl(rawUrl: string) {
     const trimmed = rawUrl.trim();
 
     if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
 
-    if (/^https?:\/\//i.test(trimmed)) {
-        return trimmed;
-    }
-
-    if (
-        trimmed.includes("youtube.com/") ||
-        trimmed.includes("youtu.be/") ||
-        trimmed.includes("www.youtube.com/") ||
-        trimmed.includes("m.youtube.com/") ||
-        trimmed.startsWith("www.")
-    ) {
-        return `https://${trimmed}`;
-    }
-
-    return trimmed;
+    return `https://${trimmed}`;
 }
 
 export default function EventDetailScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
-    const event: EventItem = route.params?.event;
+    const { mode: themeMode } = useTimeTheme();
+    const theme = getEventTheme(themeMode);
 
-    const openLink = async (rawUrl?: string) => {
+    const event: EventItem | undefined = route.params?.event;
+    const [now, setNow] = useState(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setNow(Date.now());
+        }, 60_000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const openLink = async (rawUrl?: string | null) => {
         if (!rawUrl) return;
 
         try {
@@ -141,213 +193,533 @@ export default function EventDetailScreen() {
                 return;
             }
 
-            console.log("Opening event URL:", url);
             await WebBrowser.openBrowserAsync(url);
         } catch (error) {
-            console.log("Failed to open URL:", rawUrl, error);
-            Alert.alert("Error", "Could not open link.");
+            console.log("Failed to open event link:", rawUrl, error);
+            Alert.alert("Error", "This link could not be opened.");
         }
     };
 
     if (!event) {
         return (
-            <SafeAreaView style={styles.safeArea}>
+            <SafeAreaView
+                style={[
+                    styles.safeArea,
+                    { backgroundColor: theme.background },
+                ]}
+            >
                 <View style={styles.centered}>
-                    <Text style={styles.errorText}>Event not found.</Text>
+                    <Ionicons
+                        name="calendar-outline"
+                        size={42}
+                        color={theme.cyan}
+                    />
+                    <Text style={[styles.errorTitle, { color: theme.text }]}>
+                        Event not found
+                    </Text>
+                    <Pressable
+                        style={[
+                            styles.errorBackButton,
+                            { backgroundColor: theme.cyan },
+                        ]}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Text
+                            style={[
+                                styles.errorBackText,
+                                { color: theme.primaryButtonText },
+                            ]}
+                        >
+                            Go Back
+                        </Text>
+                    </Pressable>
                 </View>
             </SafeAreaView>
         );
     }
 
-    const topRounds = (event.rounds || []).slice(0, 5);
+    const displayStatus = getDisplayStatus(event, now);
+    const statusColor =
+        displayStatus === "Happening Now"
+            ? theme.green
+            : displayStatus === "Canceled"
+                ? theme.red
+                : displayStatus === "Postponed"
+                    ? theme.amber
+                    : displayStatus === "Completed"
+                        ? theme.completed
+                        : theme.cyan;
+
+    const imageUrl = event.cover_image_url || event.card_image_url || null;
+    const duration = event.end_time_is_estimated
+        ? formatDuration(event.estimated_duration_minutes)
+        : null;
+
+    const showSummary =
+        Boolean(event.summary?.trim()) &&
+        event.summary?.trim() !== event.description?.trim();
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={[styles.safeArea, { backgroundColor: theme.background }]}
+        >
             <ScrollView
-                style={styles.container}
+                style={[
+                    styles.container,
+                    { backgroundColor: theme.background },
+                ]}
                 contentContainerStyle={styles.contentContainer}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={styles.topBar}>
+                <View style={styles.heroWrap}>
+                    {imageUrl ? (
+                        <Image
+                            source={{ uri: imageUrl }}
+                            style={styles.heroImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View
+                            style={[
+                                styles.heroPlaceholder,
+                                { backgroundColor: theme.imagePlaceholder },
+                            ]}
+                        >
+                            <Ionicons
+                                name="calendar-outline"
+                                size={54}
+                                color={theme.muted}
+                            />
+                        </View>
+                    )}
+
+                    <View style={styles.heroShade} />
+
                     <Pressable
-                        style={styles.backButton}
+                        style={[
+                            styles.backButton,
+                            {
+                                backgroundColor:
+                                    themeMode === "day"
+                                        ? "rgba(255,255,255,0.92)"
+                                        : "rgba(2,6,23,0.88)",
+                                borderColor: theme.border,
+                            },
+                        ]}
                         onPress={() => navigation.goBack()}
                     >
-                        <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                        <Ionicons
+                            name="arrow-back"
+                            size={22}
+                            color={theme.text}
+                        />
                     </Pressable>
+
+                    <View style={styles.heroBadges}>
+                        <View
+                            style={[
+                                styles.statusBadge,
+                                {
+                                    borderColor: statusColor,
+                                    backgroundColor:
+                                        themeMode === "day"
+                                            ? "rgba(255,255,255,0.94)"
+                                            : "rgba(2,6,23,0.88)",
+                                },
+                            ]}
+                        >
+                            {displayStatus === "Happening Now" ? (
+                                <View
+                                    style={[
+                                        styles.liveDot,
+                                        { backgroundColor: statusColor },
+                                    ]}
+                                />
+                            ) : null}
+
+                            <Text
+                                style={[
+                                    styles.statusBadgeText,
+                                    { color: statusColor },
+                                ]}
+                            >
+                                {displayStatus}
+                            </Text>
+                        </View>
+
+                        {event.is_sponsored ? (
+                            <View
+                                style={[
+                                    styles.sponsoredBadge,
+                                    {
+                                        backgroundColor:
+                                            themeMode === "day"
+                                                ? "rgba(255,255,255,0.94)"
+                                                : "rgba(2,6,23,0.88)",
+                                        borderColor: theme.border,
+                                    },
+                                ]}
+                            >
+                                <Text
+                                    style={[
+                                        styles.sponsoredBadgeText,
+                                        { color: theme.text },
+                                    ]}
+                                >
+                                    Sponsored
+                                </Text>
+                            </View>
+                        ) : null}
+                    </View>
                 </View>
 
-                <Image
-                    source={{ uri: event.cover_image_url || event.card_image_url }}
-                    style={styles.heroImage}
-                    resizeMode="cover"
-                />
-
-                <View style={styles.headerSection}>
-                    <View style={styles.chipsRow}>
-                        {!!event.type && (
-                            <View style={styles.typeChip}>
-                                <Text style={styles.typeChipText}>{event.type}</Text>
-                            </View>
-                        )}
-
-                        {!!event.status && (
-                            <View style={styles.statusChip}>
-                                <Text style={styles.statusChipText}>{event.status}</Text>
-                            </View>
-                        )}
-                    </View>
-
-                    <Text style={styles.title}>{event.title}</Text>
-
-                    <Text style={styles.dateText}>
-                        {formatDateRange(event.start_at, event.end_at)}
+                <View style={styles.pageContent}>
+                    <Text style={[styles.title, { color: theme.text }]}>
+                        {event.title}
                     </Text>
 
-                    <View style={styles.infoRow}>
-                        <Ionicons name="location-outline" size={16} color="#F4D03F" />
-                        <Text style={styles.locationText}>{event.location}</Text>
-                    </View>
-
-                    {!!event.summary && (
-                        <Text style={styles.summaryText}>{event.summary}</Text>
-                    )}
-
-                    {!!event.status_note && (
-                        <View style={styles.noteCard}>
-                            <Text style={styles.noteTitle}>Event Note</Text>
-                            <Text style={styles.noteText}>{event.status_note}</Text>
-                        </View>
-                    )}
-                </View>
-
-                {!!event.official_url && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Official</Text>
-
-                        <Pressable
-                            style={styles.linkCard}
-                            onPress={() => openLink(event.official_url)}
+                    {event.is_sponsored && event.sponsor_name ? (
+                        <Text
+                            style={[
+                                styles.sponsorLine,
+                                { color: theme.muted },
+                            ]}
                         >
-                            <Ionicons name="globe-outline" size={18} color="#2EE7FF" />
-                            <Text style={styles.linkText}>Official Event Website</Text>
-                        </Pressable>
-                    </View>
-                )}
+                            Presented by {event.sponsor_name}
+                        </Text>
+                    ) : null}
 
-                {!!event.main_broadcaster && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Main Broadcast</Text>
-
-                        <Pressable
-                            style={styles.linkCard}
-                            onPress={() => openLink(event.main_broadcaster?.url)}
+                    {showSummary ? (
+                        <Text
+                            style={[
+                                styles.summaryText,
+                                { color: theme.textSoft },
+                            ]}
                         >
-                            <Ionicons name="play-circle-outline" size={18} color="#2EE7FF" />
-                            <View style={styles.linkContent}>
-                                <Text style={styles.linkTitle}>
-                                    {event.main_broadcaster.name}
-                                </Text>
-                                <Text style={styles.linkSubtext}>
-                                    {event.main_broadcaster.platform}
-                                    {event.main_broadcaster.broadcast_start_at
-                                        ? ` · ${formatDateTime(
-                                            event.main_broadcaster.broadcast_start_at
-                                        )}`
-                                        : ""}
-                                </Text>
-                            </View>
-                        </Pressable>
-                    </View>
-                )}
+                            {event.summary}
+                        </Text>
+                    ) : null}
 
-                {!!event.other_broadcasters?.length && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Other Coverage</Text>
-
-                        {event.other_broadcasters.map((item, index) => (
-                            <Pressable
-                                key={`${item.url}-${index}`}
-                                style={styles.linkCard}
-                                onPress={() => openLink(item.url)}
-                            >
-                                <Ionicons name="tv-outline" size={18} color="#2EE7FF" />
-                                <View style={styles.linkContent}>
-                                    <Text style={styles.linkTitle}>{item.name}</Text>
-                                    <Text style={styles.linkSubtext}>
-                                        {item.platform}
-                                        {item.broadcast_start_at
-                                            ? ` · ${formatDateTime(item.broadcast_start_at)}`
-                                            : ""}
-                                    </Text>
-                                </View>
-                            </Pressable>
-                        ))}
-                    </View>
-                )}
-
-                {!!event.game_platforms?.length && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Watch Live Games</Text>
-
-                        {event.game_platforms.map((platform, index) => (
-                            <Pressable
-                                key={`${platform.url}-${index}`}
-                                style={styles.linkCard}
-                                onPress={() => openLink(platform.url)}
+                    <View
+                        style={[
+                            styles.infoCard,
+                            {
+                                backgroundColor: theme.card,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                    >
+                        <View style={styles.infoItem}>
+                            <View
+                                style={[
+                                    styles.infoIcon,
+                                    { backgroundColor: theme.cardSoft },
+                                ]}
                             >
                                 <Ionicons
-                                    name="game-controller-outline"
-                                    size={18}
-                                    color="#2EE7FF"
+                                    name="calendar-outline"
+                                    size={20}
+                                    color={theme.cyan}
                                 />
-                                <View style={styles.linkContent}>
-                                    <Text style={styles.linkTitle}>{platform.name}</Text>
-                                    {!!platform.notes && (
-                                        <Text style={styles.linkSubtext}>{platform.notes}</Text>
+                            </View>
+
+                            <View style={styles.infoTextWrap}>
+                                <Text
+                                    style={[
+                                        styles.infoLabel,
+                                        { color: theme.muted },
+                                    ]}
+                                >
+                                    Starts
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.infoValue,
+                                        { color: theme.text },
+                                    ]}
+                                >
+                                    {formatDateTime(
+                                        event.start_at,
+                                        event.timezone
                                     )}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View
+                            style={[
+                                styles.divider,
+                                { backgroundColor: theme.border },
+                            ]}
+                        />
+
+                        <View style={styles.infoItem}>
+                            <View
+                                style={[
+                                    styles.infoIcon,
+                                    { backgroundColor: theme.cardSoft },
+                                ]}
+                            >
+                                <Ionicons
+                                    name="time-outline"
+                                    size={20}
+                                    color={theme.yellow}
+                                />
+                            </View>
+
+                            <View style={styles.infoTextWrap}>
+                                <Text
+                                    style={[
+                                        styles.infoLabel,
+                                        { color: theme.muted },
+                                    ]}
+                                >
+                                    {duration
+                                        ? "Estimated Duration"
+                                        : "Ends"}
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.infoValue,
+                                        { color: theme.text },
+                                    ]}
+                                >
+                                    {duration ||
+                                        formatDateTime(
+                                            event.end_at,
+                                            event.timezone
+                                        )}
+                                </Text>
+                            </View>
+                        </View>
+
+                        {event.location ? (
+                            <>
+                                <View
+                                    style={[
+                                        styles.divider,
+                                        { backgroundColor: theme.border },
+                                    ]}
+                                />
+
+                                <View style={styles.infoItem}>
+                                    <View
+                                        style={[
+                                            styles.infoIcon,
+                                            {
+                                                backgroundColor:
+                                                    theme.cardSoft,
+                                            },
+                                        ]}
+                                    >
+                                        <Ionicons
+                                            name="location-outline"
+                                            size={20}
+                                            color={theme.red}
+                                        />
+                                    </View>
+
+                                    <View style={styles.infoTextWrap}>
+                                        <Text
+                                            style={[
+                                                styles.infoLabel,
+                                                { color: theme.muted },
+                                            ]}
+                                        >
+                                            Location
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.infoValue,
+                                                { color: theme.text },
+                                            ]}
+                                        >
+                                            {event.location}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </>
+                        ) : null}
+                    </View>
+
+                    {event.description ? (
+                        <View style={styles.section}>
+                            <Text
+                                style={[
+                                    styles.sectionTitle,
+                                    { color: theme.text },
+                                ]}
+                            >
+                                About This Event
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.descriptionText,
+                                    { color: theme.textSoft },
+                                ]}
+                            >
+                                {event.description}
+                            </Text>
+                        </View>
+                    ) : null}
+
+                    {event.broadcaster ? (
+                        <View style={styles.section}>
+                            <Text
+                                style={[
+                                    styles.sectionTitle,
+                                    { color: theme.text },
+                                ]}
+                            >
+                                Broadcast
+                            </Text>
+
+                            <View
+                                style={[
+                                    styles.actionCard,
+                                    {
+                                        backgroundColor: theme.card,
+                                        borderColor: theme.border,
+                                    },
+                                ]}
+                            >
+                                <View
+                                    style={[
+                                        styles.actionIcon,
+                                        { backgroundColor: theme.cardSoft },
+                                    ]}
+                                >
+                                    <Ionicons
+                                        name="tv-outline"
+                                        size={24}
+                                        color={theme.cyan}
+                                    />
+                                </View>
+
+                                <View style={styles.actionContent}>
+                                    <Text
+                                        style={[
+                                            styles.actionLabel,
+                                            { color: theme.muted },
+                                        ]}
+                                    >
+                                        Watch on
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.actionTitle,
+                                            { color: theme.text },
+                                        ]}
+                                    >
+                                        {event.broadcaster}
+                                    </Text>
+                                </View>
+
+                                {event.broadcast_url ? (
+                                    <Pressable
+                                        style={[
+                                            styles.smallActionButton,
+                                            { backgroundColor: theme.cyan },
+                                        ]}
+                                        onPress={() =>
+                                            openLink(event.broadcast_url)
+                                        }
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.smallActionButtonText,
+                                                {
+                                                    color: theme.primaryButtonText,
+                                                },
+                                            ]}
+                                        >
+                                            Watch
+                                        </Text>
+                                        <Ionicons
+                                            name="open-outline"
+                                            size={15}
+                                            color={theme.primaryButtonText}
+                                        />
+                                    </Pressable>
+                                ) : null}
+                            </View>
+                        </View>
+                    ) : null}
+
+                    {event.promo_url ? (
+                        <View style={styles.section}>
+                            <Text
+                                style={[
+                                    styles.sectionTitle,
+                                    { color: theme.text },
+                                ]}
+                            >
+                                {event.is_sponsored
+                                    ? "Featured Promotion"
+                                    : "Event Link"}
+                            </Text>
+
+                            <Pressable
+                                style={[
+                                    styles.promoCard,
+                                    {
+                                        backgroundColor: theme.cardSoft,
+                                        borderColor: theme.borderStrong,
+                                        shadowColor: theme.shadow,
+                                    },
+                                ]}
+                                onPress={() => openLink(event.promo_url)}
+                            >
+                                <View style={styles.promoContent}>
+                                    {event.is_sponsored ? (
+                                        <Text
+                                            style={[
+                                                styles.promoEyebrow,
+                                                { color: theme.cyan },
+                                            ]}
+                                        >
+                                            SPONSORED
+                                        </Text>
+                                    ) : null}
+
+                                    <Text
+                                        style={[
+                                            styles.promoTitle,
+                                            { color: theme.text },
+                                        ]}
+                                    >
+                                        {event.promo_label || "Learn More"}
+                                    </Text>
+
+                                    {event.sponsor_name ? (
+                                        <Text
+                                            style={[
+                                                styles.promoSponsor,
+                                                { color: theme.textSoft },
+                                            ]}
+                                        >
+                                            From {event.sponsor_name}
+                                        </Text>
+                                    ) : null}
+                                </View>
+
+                                <View
+                                    style={[
+                                        styles.promoButton,
+                                        { backgroundColor: theme.cyan },
+                                    ]}
+                                >
+                                    <Ionicons
+                                        name="arrow-forward"
+                                        size={20}
+                                        color={theme.primaryButtonText}
+                                    />
                                 </View>
                             </Pressable>
-                        ))}
-                    </View>
-                )}
-
-                {!!topRounds.length && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Rounds</Text>
-
-                        {topRounds.map((round) => (
-                            <View key={round.round_number} style={styles.roundCard}>
-                                <Text style={styles.roundTitle}>{round.label}</Text>
-                                <Text style={styles.roundTime}>
-                                    {formatDateTime(round.start_at)}
-                                </Text>
-                                {!!round.notes && (
-                                    <Text style={styles.roundNotes}>{round.notes}</Text>
-                                )}
-                            </View>
-                        ))}
-
-                        {event.rounds && event.rounds.length > 5 && (
-                            <Text style={styles.moreRoundsText}>
-                                + {event.rounds.length - 5} more rounds in this event
-                            </Text>
-                        )}
-                    </View>
-                )}
-
-                {!!event.tags?.length && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Tags</Text>
-                        <View style={styles.tagsWrap}>
-                            {event.tags.map((tag, index) => (
-                                <View key={`${tag}-${index}`} style={styles.tagChip}>
-                                    <Text style={styles.tagText}>{tag}</Text>
-                                </View>
-                            ))}
                         </View>
-                    </View>
-                )}
+                    ) : null}
+                </View>
             </ScrollView>
         </SafeAreaView>
     );
@@ -356,219 +728,255 @@ export default function EventDetailScreen() {
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     container: {
         flex: 1,
-        backgroundColor: "#000000",
     },
     contentContainer: {
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === "android" ? 190 : 90,
     },
     centered: {
         flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    errorText: {
-        color: "#FFFFFF",
-        fontSize: 16,
-        fontWeight: "700",
-    },
-    topBar: {
-        paddingHorizontal: 16,
-        paddingTop: 6,
-        paddingBottom: 10,
-    },
-    backButton: {
-        width: 38,
-        height: 38,
-        borderRadius: 19,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "#121C31",
-        borderWidth: 1,
-        borderColor: "#21385F",
+        paddingHorizontal: 24,
+    },
+    errorTitle: {
+        fontSize: 24,
+        fontFamily: "Rajdhani_700Bold",
+        marginTop: 12,
+    },
+    errorBackButton: {
+        marginTop: 18,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 999,
+    },
+    errorBackText: {
+        fontSize: 15,
+        fontFamily: "Rajdhani_700Bold",
+    },
+    heroWrap: {
+        height: 270,
+        position: "relative",
+        overflow: "hidden",
     },
     heroImage: {
         width: "100%",
-        height: 215,
-        backgroundColor: "#151515",
+        height: "100%",
     },
-    headerSection: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
+    heroPlaceholder: {
+        width: "100%",
+        height: "100%",
+        alignItems: "center",
+        justifyContent: "center",
     },
-    chipsRow: {
-        flexDirection: "row",
-        gap: 8,
-        marginBottom: 12,
+    heroShade: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: "rgba(0,0,0,0.15)",
     },
-    typeChip: {
-        backgroundColor: "#0D1629",
-        borderColor: "#21446E",
+    backButton: {
+        position: "absolute",
+        top: 14,
+        left: 16,
+        width: 42,
+        height: 42,
+        borderRadius: 21,
         borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
+        alignItems: "center",
+        justifyContent: "center",
     },
-    typeChipText: {
-        color: "#8CCBFF",
-        fontSize: 12,
-        fontWeight: "700",
-        textTransform: "capitalize",
-    },
-    statusChip: {
-        backgroundColor: "#201807",
-        borderColor: "#5C4610",
-        borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 999,
-    },
-    statusChipText: {
-        color: "#F4D03F",
-        fontSize: 12,
-        fontWeight: "700",
-        textTransform: "capitalize",
-    },
-    title: {
-        color: "#FFFFFF",
-        fontSize: 28,
-        lineHeight: 34,
-        fontWeight: "900",
-        marginBottom: 10,
-    },
-    dateText: {
-        color: "#F4D03F",
-        fontSize: 15,
-        fontWeight: "800",
-        marginBottom: 12,
-    },
-    infoRow: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        marginBottom: 14,
-    },
-    locationText: {
-        flex: 1,
-        color: "#D8DEEA",
-        fontSize: 14,
-        lineHeight: 20,
-        marginLeft: 8,
-    },
-    summaryText: {
-        color: "#C8D0DF",
-        fontSize: 15,
-        lineHeight: 22,
-        marginBottom: 16,
-    },
-    noteCard: {
-        backgroundColor: "#0A101D",
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: "#182841",
-        padding: 14,
-    },
-    noteTitle: {
-        color: "#2EE7FF",
-        fontSize: 13,
-        fontWeight: "800",
-        marginBottom: 8,
-    },
-    noteText: {
-        color: "#E8EEF8",
-        fontSize: 14,
-        lineHeight: 21,
-    },
-    section: {
-        paddingHorizontal: 16,
-        marginTop: 24,
-    },
-    sectionTitle: {
-        color: "#F4D03F",
-        fontSize: 20,
-        fontWeight: "900",
-        marginBottom: 12,
-    },
-    linkCard: {
-        flexDirection: "row",
-        alignItems: "flex-start",
-        backgroundColor: "#0D1629",
-        borderWidth: 1,
-        borderColor: "#193155",
-        borderRadius: 16,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        marginBottom: 10,
-    },
-    linkContent: {
-        flex: 1,
-        marginLeft: 10,
-    },
-    linkText: {
-        color: "#CFE9FF",
-        fontSize: 14,
-        fontWeight: "700",
-    },
-    linkTitle: {
-        color: "#FFFFFF",
-        fontSize: 14,
-        fontWeight: "800",
-        marginBottom: 3,
-    },
-    linkSubtext: {
-        color: "#AEB8C8",
-        fontSize: 12,
-        lineHeight: 17,
-    },
-    roundCard: {
-        backgroundColor: "#0A101D",
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: "#182841",
-        padding: 14,
-        marginBottom: 10,
-    },
-    roundTitle: {
-        color: "#FFFFFF",
-        fontSize: 15,
-        fontWeight: "800",
-        marginBottom: 4,
-    },
-    roundTime: {
-        color: "#2EE7FF",
-        fontSize: 13,
-        fontWeight: "700",
-        marginBottom: 6,
-    },
-    roundNotes: {
-        color: "#BCC6D6",
-        fontSize: 13,
-        lineHeight: 18,
-    },
-    moreRoundsText: {
-        color: "#8FA2BE",
-        fontSize: 13,
-        fontWeight: "700",
-        marginTop: 4,
-    },
-    tagsWrap: {
+    heroBadges: {
+        position: "absolute",
+        left: 16,
+        right: 16,
+        bottom: 14,
         flexDirection: "row",
         flexWrap: "wrap",
         gap: 8,
     },
-    tagChip: {
-        backgroundColor: "#101827",
+    statusBadge: {
+        minHeight: 30,
+        flexDirection: "row",
+        alignItems: "center",
         borderWidth: 1,
-        borderColor: "#22334E",
         borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+        gap: 6,
     },
-    tagText: {
-        color: "#D4DCE9",
+    liveDot: {
+        width: 7,
+        height: 7,
+        borderRadius: 4,
+    },
+    statusBadgeText: {
         fontSize: 12,
-        fontWeight: "700",
+        fontFamily: "Rajdhani_700Bold",
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+    },
+    sponsoredBadge: {
+        minHeight: 30,
+        justifyContent: "center",
+        borderWidth: 1,
+        borderRadius: 999,
+        paddingHorizontal: 11,
+        paddingVertical: 5,
+    },
+    sponsoredBadgeText: {
+        fontSize: 12,
+        fontFamily: "Rajdhani_700Bold",
+        textTransform: "uppercase",
+        letterSpacing: 0.4,
+    },
+    pageContent: {
+        paddingHorizontal: 16,
+        paddingTop: 20,
+    },
+    title: {
+        fontSize: 31,
+        lineHeight: 36,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.25,
+    },
+    sponsorLine: {
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+        marginTop: 5,
+    },
+    summaryText: {
+        fontSize: 16,
+        lineHeight: 23,
+        marginTop: 12,
+    },
+    infoCard: {
+        borderWidth: 1,
+        borderRadius: 22,
+        paddingHorizontal: 15,
+        paddingVertical: 4,
+        marginTop: 20,
+    },
+    infoItem: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 13,
+    },
+    infoIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 14,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+    infoTextWrap: {
+        flex: 1,
+    },
+    infoLabel: {
+        fontSize: 11,
+        fontFamily: "Rajdhani_700Bold",
+        textTransform: "uppercase",
+        letterSpacing: 0.7,
+        marginBottom: 3,
+    },
+    infoValue: {
+        fontSize: 15,
+        lineHeight: 20,
+        fontFamily: "Rajdhani_700Bold",
+    },
+    divider: {
+        height: StyleSheet.hairlineWidth,
+        marginLeft: 54,
+    },
+    section: {
+        marginTop: 26,
+    },
+    sectionTitle: {
+        fontSize: 23,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 0.3,
+        marginBottom: 11,
+    },
+    descriptionText: {
+        fontSize: 15,
+        lineHeight: 23,
+    },
+    actionCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderRadius: 20,
+        padding: 13,
+    },
+    actionIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        marginRight: 12,
+    },
+    actionContent: {
+        flex: 1,
+    },
+    actionLabel: {
+        fontSize: 11,
+        fontFamily: "Rajdhani_700Bold",
+        textTransform: "uppercase",
+        letterSpacing: 0.6,
+    },
+    actionTitle: {
+        fontSize: 18,
+        fontFamily: "Rajdhani_700Bold",
+        marginTop: 2,
+    },
+    smallActionButton: {
+        minHeight: 38,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+        borderRadius: 999,
+        paddingHorizontal: 13,
+    },
+    smallActionButtonText: {
+        fontSize: 13,
+        fontFamily: "Rajdhani_700Bold",
+    },
+    promoCard: {
+        flexDirection: "row",
+        alignItems: "center",
+        borderWidth: 1,
+        borderRadius: 22,
+        padding: 16,
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 4,
+    },
+    promoContent: {
+        flex: 1,
+    },
+    promoEyebrow: {
+        fontSize: 10,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1,
+        marginBottom: 4,
+    },
+    promoTitle: {
+        fontSize: 20,
+        fontFamily: "Rajdhani_700Bold",
+    },
+    promoSponsor: {
+        fontSize: 12,
+        marginTop: 3,
+    },
+    promoButton: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: "center",
+        justifyContent: "center",
+        marginLeft: 12,
     },
 });

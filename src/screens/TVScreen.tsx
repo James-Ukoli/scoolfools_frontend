@@ -8,8 +8,10 @@ import {
     Platform,
     RefreshControl,
     ScrollView,
+    type StyleProp,
     StyleSheet,
     Text,
+    type TextStyle,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -32,7 +34,8 @@ type RawTVItem = {
     title?: string;
     subtitle?: string | null;
     type?: "live" | "podcast" | "video" | "highlight";
-    source?: string | null;
+    description?: string | null;
+    professor_fools_comment?: string | null;
     youtube_url?: string;
     thumbnail_url?: string | null;
     duration?: string | null;
@@ -56,11 +59,11 @@ type StreamItem = {
     title: string;
     subtitle: string;
     type: StreamType;
-    badge: string;
-    badgeColor: string;
     youtubeUrl: string;
     thumbnail: string;
     createdAt: string;
+    description: string;
+    professorFoolsComment: string;
     liveStatus?: LiveStatus;
     duration?: string;
 };
@@ -74,7 +77,12 @@ const SCREEN_WIDTH = Dimensions.get("window").width;
 const PLAYER_WIDTH = SCREEN_WIDTH - 10;
 const PLAYER_HEIGHT = PLAYER_WIDTH * 0.5625;
 
-
+const professorFoolsAvatar = require("../../assets/images/profileimages/professorFools.png");
+const TYPEWRITER_FONT = Platform.select({
+    ios: "Menlo",
+    android: "monospace",
+    default: "monospace",
+});
 
 const getTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -128,12 +136,6 @@ const getTheme = (mode: TimeTheme) => {
     };
 };
 
-const BROADCAST_COLORS = ["#22D3EE", "#FACC15", "#2563EB", "#A855F7", "#22C55E"];
-
-const getBroadcastColor = (index: number) => {
-    return BROADCAST_COLORS[index % BROADCAST_COLORS.length];
-};
-
 const toDisplayType = (type?: RawTVItem["type"]): StreamType => {
     if (type === "podcast") return "Podcast";
     if (type === "video") return "Video";
@@ -157,25 +159,10 @@ const getYoutubeThumbnail = (url?: string) => {
     return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
 };
 
-const normalizeTitleKey = (title: string) => {
-    return title.trim().toLowerCase().replace(/\s+/g, " ");
-};
-
 const getNewestByCreatedAt = (items: StreamItem[]) => {
     return [...items].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
-};
-
-const getGroupedLatestByTitle = (items: StreamItem[]) => {
-    const grouped = new Map<string, StreamItem>();
-
-    getNewestByCreatedAt(items).forEach((item) => {
-        const key = `${item.type}-${normalizeTitleKey(item.title)}`;
-        if (!grouped.has(key)) grouped.set(key, item);
-    });
-
-    return Array.from(grouped.values());
 };
 
 const getDisplayType = (type: StreamType) => {
@@ -208,17 +195,72 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
     return {
         id: item._id || item.id || `${item.title}-${index}`,
         title: item.title,
-        subtitle: item.subtitle || item.source || "Scoolfools TV",
+        subtitle: item.subtitle || "ScoolFools TV",
         type: displayType,
-        badge: item.source || displayType,
-        badgeColor: getBroadcastColor(index),
         youtubeUrl: item.youtube_url,
         thumbnail: item.thumbnail_url || getYoutubeThumbnail(item.youtube_url),
         createdAt,
+        description: item.description || "",
+        professorFoolsComment: item.professor_fools_comment || "",
         liveStatus: item.live_status || "upcoming",
         duration: item.duration || undefined,
     };
 };
+
+type FastTypewriterTextProps = {
+    text: string;
+    style: StyleProp<TextStyle>;
+    cursorColor: string;
+    delay?: number;
+};
+
+function FastTypewriterText({
+    text,
+    style,
+    cursorColor,
+    delay = 0,
+}: FastTypewriterTextProps) {
+    const [visibleText, setVisibleText] = useState("");
+    const [isTyping, setIsTyping] = useState(Boolean(text));
+
+    useEffect(() => {
+        let intervalId: ReturnType<typeof setInterval> | undefined;
+
+        setVisibleText("");
+        setIsTyping(Boolean(text));
+
+        const timeoutId = setTimeout(() => {
+            if (!text) {
+                setIsTyping(false);
+                return;
+            }
+
+            let characterIndex = 0;
+
+            intervalId = setInterval(() => {
+                characterIndex = Math.min(characterIndex + 3, text.length);
+                setVisibleText(text.slice(0, characterIndex));
+
+                if (characterIndex >= text.length) {
+                    if (intervalId) clearInterval(intervalId);
+                    setIsTyping(false);
+                }
+            }, 10);
+        }, delay);
+
+        return () => {
+            clearTimeout(timeoutId);
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [delay, text]);
+
+    return (
+        <Text style={style}>
+            {visibleText}
+            {isTyping ? <Text style={{ color: cursorColor }}>▌</Text> : null}
+        </Text>
+    );
+}
 
 export default function TVScreen() {
     const { mode: themeMode } = useTimeTheme();
@@ -325,29 +367,19 @@ export default function TVScreen() {
         outputRange: [0.14, 0.28],
     });
 
-    const modeStreams = useMemo(() => {
-        const filtered = streams.filter((item) =>
-            selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
-        );
-
-        return getGroupedLatestByTitle(filtered);
-    }, [streams, selectedMode]);
+    const modeStreams = useMemo(
+        () =>
+            getNewestByCreatedAt(
+                streams.filter((item) =>
+                    selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
+                )
+            ),
+        [streams, selectedMode]
+    );
 
     const limitedModeStreams = modeStreams.slice(0, 10);
     const renderedStreams = limitedModeStreams.slice(0, visibleCount);
     const hasMoreStreams = visibleCount < limitedModeStreams.length;
-
-    const broadcastOptions = useMemo(() => {
-        if (!selectedStream) return [];
-
-        return getNewestByCreatedAt(
-            streams.filter(
-                (item) =>
-                    item.type === selectedStream.type &&
-                    normalizeTitleKey(item.title) === normalizeTitleKey(selectedStream.title)
-            )
-        );
-    }, [streams, selectedStream]);
 
     const animateSwitch = (nextMode: TVMode) => {
         const nextValue = nextMode === "watch" ? 0 : 1;
@@ -366,7 +398,7 @@ export default function TVScreen() {
             nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
         );
 
-        const newestForMode = getGroupedLatestByTitle(nextItems)[0];
+        const newestForMode = getNewestByCreatedAt(nextItems)[0];
         if (newestForMode) setSelectedStream(newestForMode);
     };
 
@@ -510,51 +542,6 @@ export default function TVScreen() {
                             </TouchableOpacity>
                         </View>
 
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.channelScroller}
-                        >
-                            {broadcastOptions.length > 0 ? (
-                                broadcastOptions.map((stream, index) => {
-                                    const active = stream.id === selectedStream.id;
-                                    const color = index === 0 ? theme.cyan : theme.yellow;
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={stream.id}
-                                            activeOpacity={0.85}
-                                            onPress={() => setSelectedStream(stream)}
-                                            style={[
-                                                styles.channelPill,
-                                                {
-                                                    borderColor: color,
-                                                    backgroundColor: active
-                                                        ? color
-                                                        : "transparent",
-                                                },
-                                            ]}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.channelPillText,
-                                                    {
-                                                        color: active
-                                                            ? "#07111F"
-                                                            : color,
-                                                    },
-                                                ]}
-                                            >
-                                                {stream.badge}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })
-                            ) : (
-                                <View />
-                            )}
-                        </ScrollView>
-
                         <Animated.View
                             style={[
                                 styles.heroCard,
@@ -605,6 +592,57 @@ export default function TVScreen() {
                             </View>
                         </Animated.View>
 
+                        <View style={styles.contextCard}>
+                            <View style={styles.descriptionHeadingRow}>
+                                <Text style={styles.descriptionEmoji}>📝</Text>
+                                <Text style={styles.contextHeading}>Description</Text>
+                            </View>
+
+                            <FastTypewriterText
+                                key={`description-${selectedStream.id}`}
+                                text={
+                                    selectedStream.description ||
+                                    "No description has been added for this content yet."
+                                }
+                                style={styles.descriptionText}
+                                cursorColor={theme.cyan}
+                            />
+
+                            <View style={styles.contextDivider} />
+
+                            <View style={styles.professorHeader}>
+                                <View style={styles.professorAvatarWrap}>
+                                    <Image
+                                        source={professorFoolsAvatar}
+                                        style={styles.professorAvatar}
+                                        resizeMode="contain"
+                                    />
+                                </View>
+
+                                <View style={styles.professorIdentity}>
+                                    <Text style={styles.professorName}>
+                                        Professor Fools
+                                    </Text>
+                                    <Text style={styles.professorLabel}>
+                                        PROFESSOR&apos;S COMMENT
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.professorCommentBox}>
+                                <FastTypewriterText
+                                    key={`professor-comment-${selectedStream.id}`}
+                                    text={
+                                        selectedStream.professorFoolsComment ||
+                                        "Professor Fools has not commented on this one yet."
+                                    }
+                                    style={styles.professorComment}
+                                    cursorColor={theme.cyan}
+                                    delay={140}
+                                />
+                            </View>
+                        </View>
+
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>
                                 {selectedMode === "watch" ? "LATEST WATCH" : "LATEST PODCASTS"}
@@ -625,11 +663,7 @@ export default function TVScreen() {
                         </View>
 
                         {renderedStreams.map((item) => {
-                            const active =
-                                item.id === selectedStream.id ||
-                                (item.type === selectedStream.type &&
-                                    normalizeTitleKey(item.title) ===
-                                    normalizeTitleKey(selectedStream.title));
+                            const active = item.id === selectedStream.id;
 
                             const typeBadge = getTypeBadgeStyle(item.type);
 
@@ -822,34 +856,13 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             textShadowOffset: { width: 0, height: 0 },
         },
 
-        channelScroller: {
-            paddingRight: 14,
-            paddingBottom: 18,
-            gap: 10,
-        },
-        channelPill: {
-            borderWidth: 1.4,
-            borderRadius: 999,
-            paddingHorizontal: 16,
-            paddingVertical: 9,
-            minWidth: 96,
-            alignItems: "center",
-            justifyContent: "center",
-        },
-        channelPillText: {
-            fontSize: 12,
-            fontFamily: "Rajdhani_700Bold",
-            textTransform: "uppercase",
-            letterSpacing: 0.55,
-        },
-
         heroCard: {
             borderRadius: 24,
             backgroundColor: theme.card,
             borderWidth: 1.2,
             borderColor: theme.border,
             overflow: "hidden",
-            marginBottom: 24,
+            marginBottom: 14,
             shadowColor: theme.cyan,
             shadowRadius: 22,
             shadowOffset: { width: 0, height: 12 },
@@ -949,6 +962,108 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
         heroAccentYellow: {
             flex: 1,
             backgroundColor: theme.yellow,
+        },
+
+        contextCard: {
+            backgroundColor: theme.card,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: theme.border,
+            paddingHorizontal: 16,
+            paddingTop: 15,
+            paddingBottom: 16,
+            marginBottom: 24,
+            shadowColor: "#000000",
+            shadowOpacity: theme.mode === "day" ? 0.06 : 0.14,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 5 },
+            elevation: 3,
+        },
+        descriptionHeadingRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+        },
+        descriptionEmoji: {
+            fontSize: 19,
+        },
+        contextHeading: {
+            color: theme.text,
+            fontSize: 20,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.2,
+        },
+        descriptionText: {
+            color: theme.subtext,
+            fontSize: 12.5,
+            lineHeight: 18.5,
+            fontFamily: TYPEWRITER_FONT,
+            letterSpacing: 0.05,
+        },
+        contextDivider: {
+            height: 1,
+            backgroundColor: theme.border,
+            marginVertical: 16,
+        },
+        professorHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 10,
+        },
+        professorAvatarWrap: {
+            width: 58,
+            height: 58,
+            borderRadius: 29,
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            backgroundColor:
+                theme.mode === "day"
+                    ? "rgba(6,182,212,0.10)"
+                    : "rgba(34,211,238,0.09)",
+            borderWidth: 1.5,
+            borderColor: theme.cyan,
+            marginRight: 11,
+        },
+        professorAvatar: {
+            width: 54,
+            height: 54,
+        },
+        professorIdentity: {
+            flex: 1,
+        },
+        professorName: {
+            color: theme.text,
+            fontSize: 19,
+            lineHeight: 22,
+            fontFamily: "Rajdhani_700Bold",
+        },
+        professorLabel: {
+            color: theme.cyan,
+            fontSize: 10,
+            lineHeight: 14,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.9,
+        },
+        professorCommentBox: {
+            backgroundColor:
+                theme.mode === "day"
+                    ? "rgba(6,182,212,0.07)"
+                    : "rgba(34,211,238,0.07)",
+            borderLeftWidth: 3,
+            borderLeftColor: theme.cyan,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 11,
+            overflow: "hidden",
+        },
+        professorComment: {
+            color: theme.text,
+            fontSize: 12.5,
+            lineHeight: 18.5,
+            fontFamily: TYPEWRITER_FONT,
+            letterSpacing: 0.05,
         },
 
         sectionHeader: {
