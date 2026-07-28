@@ -21,6 +21,7 @@ import HomeScreen from "../screens/HomeScreen";
 import TrendingScreen from "../screens/TrendingScreen";
 import TVScreen from "../screens/TVScreen";
 import RankingsScreen from "../screens/RankingsScreen";
+import DumpScreen from "../screens/DumpScreen";
 
 const Tab = createBottomTabNavigator();
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -238,7 +239,7 @@ export default function BottomTabs() {
 
             <Tab.Screen
                 name="Dump"
-                component={HomeScreen}
+                component={DumpScreen}
             />
 
             <Tab.Screen

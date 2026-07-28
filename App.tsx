@@ -35,6 +35,8 @@ import ImpostorRevealScreen from "./src/screens/games/impostor/ImpostorRevealScr
 import JustMoveClockScreen from "./src/screens/games/clock/JustMoveClockScreen";
 import GamesPaywallScreen from "./src/screens/games/GamesPaywallScreen";
 import DeleteAccountScreen from "./src/screens/DeleteAccountScreen";
+import CreateDumpScreen from "./src/screens/CreateDumpScreen";
+import MyDumpsScreen from "./src/screens/MyDumpsScreen";
 import TVScreen from "./src/screens/TVScreen";
 import { NotificationsProvider } from "./src/context/NotificationsContext";
 import {
@@ -274,6 +276,20 @@ function ThemedNavigation({
                     <Stack.Screen
                         name="TVScreen"
                         component={TVScreen}
+                    />
+                    <Stack.Screen
+                        name="CreateDump"
+                        component={CreateDumpScreen}
+                        options={{
+                            headerShown: false,
+                        }}
+                    />
+                    <Stack.Screen
+                        name="MyDumps"
+                        component={MyDumpsScreen}
+                        options={{
+                            headerShown: false,
+                        }}
                     />
                 </Stack.Navigator>
             </NavigationContainer>
