@@ -188,6 +188,61 @@ const getClassificationLabel = (
     );
 };
 
+const getSportEmoji = (
+    sport?: string | null
+) => {
+    switch (sport?.toLowerCase()) {
+        case "football":
+            return "🏈";
+
+        case "basketball":
+            return "🏀";
+
+        case "baseball":
+            return "⚾";
+
+        case "softball":
+            return "🥎";
+
+        case "soccer":
+            return "⚽";
+
+        case "volleyball":
+            return "🏐";
+
+        case "tennis":
+            return "🎾";
+
+        case "track":
+        case "track & field":
+            return "🏃";
+
+        case "cross country":
+            return "🏃";
+
+        case "swimming":
+            return "🏊";
+
+        case "golf":
+            return "⛳";
+
+        case "wrestling":
+            return "🤼";
+
+        case "lacrosse":
+            return "🥍";
+
+        case "cheer":
+        case "cheerleading":
+            return "📣";
+
+        case "chess":
+            return "♟️";
+
+        default:
+            return "🏅";
+    }
+};
 const getSocialIcon = (
     platform?: string | null
 ):
@@ -451,6 +506,11 @@ export default function DumpCard({
             "college"
             ? "🎓"
             : "🎒";
+
+    const athleteEmoji =
+        author?.isStudentAthlete
+            ? getSportEmoji(author?.sport)
+            : null;
 
     const showSocialMedia =
         !isAnonymous &&
@@ -734,6 +794,16 @@ export default function DumpCard({
                         >
                             {studentIdentity}
                         </Text>
+                        {athleteEmoji && (
+                            <Text
+                                style={{
+                                    marginLeft: s(5),
+                                    fontSize: ms(10),
+                                }}
+                            >
+                                {athleteEmoji}
+                            </Text>
+                        )}
                     </View>
                 </View>
 

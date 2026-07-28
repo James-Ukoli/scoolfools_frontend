@@ -41,15 +41,17 @@ export type ReportReason =
   | "other";
 
 export type UserPreview = {
-    _id: string;
-    username?: string | null;
-    display_name?: string | null;
-    providerAvatar?: string | null;
-    avatar?: string | null;
-    selectedAvatar?: string | null;
-    isSubscribed?: boolean;
-    socialMediaPlatform?: string | null;
-    socialMediaUrl?: string | null;
+  _id: string;
+  username?: string | null;
+  display_name?: string | null;
+  providerAvatar?: string | null;
+  avatar?: string | null;
+  selectedAvatar?: string | null;
+  isSubscribed?: boolean;
+  isStudentAthlete?: boolean;
+  sport?: string | null;
+  socialMediaPlatform?: string | null;
+  socialMediaUrl?: string | null;
 };
 
 export type ReactionCollection = {

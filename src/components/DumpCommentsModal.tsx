@@ -53,6 +53,12 @@ import {
     useTimeTheme,
 } from "../context/TimeThemeContext";
 
+/*
+|--------------------------------------------------------------------------
+| Avatar Helpers
+|--------------------------------------------------------------------------
+*/
+
 type ProfileAvatarId =
     keyof typeof PROFILE_AVATAR_IMAGES;
 
@@ -71,6 +77,126 @@ const getProfileAvatarSource = (
     return PROFILE_AVATAR_IMAGES.basicBlue;
 };
 
+const getLocalAvatarId = (
+    user?: UserPreview | null
+): string | null => {
+    if (
+        user?.selectedAvatar &&
+        user.selectedAvatar in
+        PROFILE_AVATAR_IMAGES
+    ) {
+        return user.selectedAvatar;
+    }
+
+    if (
+        user?.avatar &&
+        !user.avatar.startsWith("http") &&
+        user.avatar in
+        PROFILE_AVATAR_IMAGES
+    ) {
+        return user.avatar;
+    }
+
+    return null;
+};
+
+const getRemoteAvatarUrl = (
+    user?: UserPreview | null,
+    localAvatarId?: string | null
+): string | null => {
+    if (localAvatarId) {
+        return null;
+    }
+
+    if (
+        user?.providerAvatar &&
+        user.providerAvatar.startsWith("http")
+    ) {
+        return user.providerAvatar;
+    }
+
+    if (
+        user?.avatar &&
+        user.avatar.startsWith("http")
+    ) {
+        return user.avatar;
+    }
+
+    return null;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Student Athlete Helpers
+|--------------------------------------------------------------------------
+*/
+
+const getSportEmoji = (
+    sport?: string | null
+) => {
+    switch (
+    sport
+        ?.trim()
+        .toLowerCase()
+    ) {
+        case "football":
+            return "🏈";
+
+        case "basketball":
+            return "🏀";
+
+        case "baseball":
+            return "⚾";
+
+        case "softball":
+            return "🥎";
+
+        case "soccer":
+            return "⚽";
+
+        case "volleyball":
+            return "🏐";
+
+        case "tennis":
+            return "🎾";
+
+        case "track":
+        case "track and field":
+        case "track & field":
+        case "cross country":
+            return "🏃";
+
+        case "swimming":
+        case "swim":
+            return "🏊";
+
+        case "golf":
+            return "⛳";
+
+        case "wrestling":
+            return "🤼";
+
+        case "lacrosse":
+            return "🥍";
+
+        case "cheer":
+        case "cheerleading":
+            return "📣";
+
+        case "chess":
+            return "♟️";
+
+        default:
+            return "🏅";
+    }
+};
+
+/*
+|--------------------------------------------------------------------------
+| Types
+|--------------------------------------------------------------------------
+*/
+
 type DumpCommentsModalProps = {
     visible: boolean;
     dump: Dump | null;
@@ -82,19 +208,30 @@ type DumpCommentsModalProps = {
 
 type StoredUser = UserPreview & {
     id?: string;
-    providerAvatar?: string | null;
+
     schoolLevel?:
     | "college"
     | "highSchool";
-    collegeName?: string | null;
+
+    collegeName?:
+    | string
+    | null;
+
     highSchoolClassification?:
     | string
     | null;
 };
 
-type FlatCommentItem = Comment & {
-    isReply: boolean;
-};
+type FlatCommentItem =
+    Comment & {
+        isReply: boolean;
+    };
+
+/*
+|--------------------------------------------------------------------------
+| Theme
+|--------------------------------------------------------------------------
+*/
 
 const getCommentsTheme = (
     mode: TimeTheme
@@ -106,7 +243,8 @@ const getCommentsTheme = (
             text: "#07111F",
             textSoft: "#475569",
             muted: "#64748B",
-            border: "rgba(7,17,31,0.09)",
+            border:
+                "rgba(7,17,31,0.09)",
             input: "#F1F5F9",
             cyan: "#06B6D4",
             blueCheck: "#1D9BF0",
@@ -131,6 +269,12 @@ const getCommentsTheme = (
     };
 };
 
+/*
+|--------------------------------------------------------------------------
+| General Helpers
+|--------------------------------------------------------------------------
+*/
+
 const getAuthor = (
     author: Comment["author"]
 ): UserPreview | null => {
@@ -152,7 +296,9 @@ const getTimeAgo = (
     }
 
     const created =
-        new Date(dateValue).getTime();
+        new Date(
+            dateValue
+        ).getTime();
 
     const difference =
         Date.now() - created;
@@ -179,16 +325,36 @@ const getTimeAgo = (
     }
 
     const hours =
-        Math.floor(minutes / 60);
+        Math.floor(
+            minutes / 60
+        );
 
     if (hours < 24) {
         return `${hours}h`;
     }
 
-    return `${Math.floor(
-        hours / 24
-    )}d`;
+    const days =
+        Math.floor(
+            hours / 24
+        );
+
+    if (days < 7) {
+        return `${days}d`;
+    }
+
+    const weeks =
+        Math.floor(
+            days / 7
+        );
+
+    return `${weeks}w`;
 };
+
+/*
+|--------------------------------------------------------------------------
+| Component
+|--------------------------------------------------------------------------
+*/
 
 export default function DumpCommentsModal({
     visible,
@@ -200,7 +366,9 @@ export default function DumpCommentsModal({
         useTimeTheme();
 
     const theme =
-        getCommentsTheme(mode);
+        getCommentsTheme(
+            mode
+        );
 
     const [
         comments,
@@ -251,43 +419,84 @@ export default function DumpCommentsModal({
             null
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Load Logged-In User
+    |--------------------------------------------------------------------------
+    */
+
     const loadCurrentUser =
-        useCallback(async () => {
-            try {
-                const storedUser =
-                    await AsyncStorage.getItem(
-                        "user"
+        useCallback(
+            async () => {
+                try {
+                    const storedUser =
+                        await AsyncStorage.getItem(
+                            "user"
+                        );
+
+                    if (
+                        !storedUser
+                    ) {
+                        setCurrentUser(
+                            null
+                        );
+
+                        return;
+                    }
+
+                    const parsedUser =
+                        JSON.parse(
+                            storedUser
+                        );
+
+                    setCurrentUser(
+                        parsedUser
+                    );
+                } catch (
+                error
+                ) {
+                    console.log(
+                        "Comment current user error:",
+                        error
                     );
 
-                if (!storedUser) {
-                    setCurrentUser(null);
-                    return;
+                    setCurrentUser(
+                        null
+                    );
                 }
+            },
+            []
+        );
 
-                setCurrentUser(
-                    JSON.parse(storedUser)
-                );
-            } catch (error) {
-                console.log(
-                    "Comment current user error:",
-                    error
-                );
-            }
-        }, []);
+    /*
+    |--------------------------------------------------------------------------
+    | Load Comments
+    |--------------------------------------------------------------------------
+    */
 
     const loadComments =
         useCallback(
             async (
-                showLoading = true
+                showLoading =
+                    true
             ) => {
-                if (!dump?._id) {
-                    setComments([]);
+                if (
+                    !dump?._id
+                ) {
+                    setComments(
+                        []
+                    );
+
                     return;
                 }
 
                 try {
-                    if (showLoading) {
-                        setLoading(true);
+                    if (
+                        showLoading
+                    ) {
+                        setLoading(
+                            true
+                        );
                     }
 
                     const response =
@@ -298,22 +507,35 @@ export default function DumpCommentsModal({
                         );
 
                     setComments(
-                        response.comments || []
+                        response.comments ||
+                        []
                     );
-                } catch (error: any) {
+                } catch (
+                error: any
+                ) {
                     Alert.alert(
                         "Comments Failed",
                         error?.message ||
                         "Comments could not be loaded."
                     );
                 } finally {
-                    if (showLoading) {
-                        setLoading(false);
+                    if (
+                        showLoading
+                    ) {
+                        setLoading(
+                            false
+                        );
                     }
                 }
             },
             [dump?._id]
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Open Modal
+    |--------------------------------------------------------------------------
+    */
 
     useEffect(() => {
         if (!visible) {
@@ -321,7 +543,9 @@ export default function DumpCommentsModal({
         }
 
         setCommentText("");
-        setReplyingTo(null);
+        setReplyingTo(
+            null
+        );
 
         loadCurrentUser();
         loadComments();
@@ -331,18 +555,26 @@ export default function DumpCommentsModal({
         visible,
     ]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Flatten Comments and Replies
+    |--------------------------------------------------------------------------
+    */
+
     const flattenedComments =
         useMemo<
             FlatCommentItem[]
         >(() => {
             const result:
-                FlatCommentItem[] = [];
+                FlatCommentItem[] =
+                [];
 
             comments.forEach(
                 (comment) => {
                     result.push({
                         ...comment,
-                        isReply: false,
+                        isReply:
+                            false,
                     });
 
                     (
@@ -350,11 +582,13 @@ export default function DumpCommentsModal({
                         []
                     ).forEach(
                         (reply) => {
-                            result.push({
-                                ...reply,
-                                isReply:
-                                    true,
-                            });
+                            result.push(
+                                {
+                                    ...reply,
+                                    isReply:
+                                        true,
+                                }
+                            );
                         }
                     );
                 }
@@ -363,18 +597,57 @@ export default function DumpCommentsModal({
             return result;
         }, [comments]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Current User Avatar
+    |--------------------------------------------------------------------------
+    */
+
+    const currentLocalAvatarId =
+        getLocalAvatarId(
+            currentUser
+        );
+
+    const currentRemoteAvatarUrl =
+        getRemoteAvatarUrl(
+            currentUser,
+            currentLocalAvatarId
+        );
+
+    const currentAvatarSource =
+        getProfileAvatarSource(
+            currentLocalAvatarId ??
+            "basicBlue"
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh
+    |--------------------------------------------------------------------------
+    */
+
     const handleRefresh =
         async () => {
-            setRefreshing(true);
+            setRefreshing(
+                true
+            );
 
             try {
                 await loadComments(
                     false
                 );
             } finally {
-                setRefreshing(false);
+                setRefreshing(
+                    false
+                );
             }
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reply
+    |--------------------------------------------------------------------------
+    */
 
     const handleReplyPress = (
         comment: Comment
@@ -384,16 +657,28 @@ export default function DumpCommentsModal({
                 comment.author
             );
 
-        setReplyingTo(comment);
+        setReplyingTo(
+            comment
+        );
 
-        if (author?.username) {
+        if (
+            author?.username
+        ) {
             setCommentText(
                 `@${author.username} `
             );
         } else {
-            setCommentText("");
+            setCommentText(
+                ""
+            );
         }
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Create Comment or Reply
+    |--------------------------------------------------------------------------
+    */
 
     const handlePostComment =
         async () => {
@@ -409,21 +694,29 @@ export default function DumpCommentsModal({
             }
 
             try {
-                setPosting(true);
+                setPosting(
+                    true
+                );
 
                 await createComment(
                     dump._id,
                     {
                         content:
                             trimmed,
+
                         parentComment:
                             replyingTo?._id ||
                             null,
                     }
                 );
 
-                setCommentText("");
-                setReplyingTo(null);
+                setCommentText(
+                    ""
+                );
+
+                setReplyingTo(
+                    null
+                );
 
                 onCommentAdded(
                     dump._id
@@ -432,16 +725,26 @@ export default function DumpCommentsModal({
                 await loadComments(
                     false
                 );
-            } catch (error: any) {
+            } catch (
+            error: any
+            ) {
                 Alert.alert(
                     "Comment Blocked",
                     error?.message ||
                     "Your comment could not be posted."
                 );
             } finally {
-                setPosting(false);
+                setPosting(
+                    false
+                );
             }
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Heart Comment
+    |--------------------------------------------------------------------------
+    */
 
     const handleHeartComment =
         async (
@@ -466,7 +769,9 @@ export default function DumpCommentsModal({
                 await loadComments(
                     false
                 );
-            } catch (error: any) {
+            } catch (
+            error: any
+            ) {
                 Alert.alert(
                     "Reaction Failed",
                     error?.message ||
@@ -479,29 +784,11 @@ export default function DumpCommentsModal({
             }
         };
 
-    const currentAvatarId =
-        currentUser
-            ?.selectedAvatar ||
-        (
-            currentUser?.avatar &&
-                !currentUser.avatar.startsWith(
-                    "http"
-                )
-                ? currentUser.avatar
-                : null
-        ) ||
-        "basicBlue";
-
-    const currentRemoteAvatar =
-        (
-            currentUser
-                ?.providerAvatar ||
-            currentUser?.avatar
-        )?.startsWith("http")
-            ? currentUser
-                ?.providerAvatar ||
-            currentUser?.avatar
-            : null;
+    /*
+    |--------------------------------------------------------------------------
+    | Render Comment
+    |--------------------------------------------------------------------------
+    */
 
     const renderComment = ({
         item,
@@ -513,31 +800,35 @@ export default function DumpCommentsModal({
                 item.author
             );
 
-        const avatarId =
-            author?.selectedAvatar ||
-            (
-                author?.avatar &&
-                    !author.avatar.startsWith(
-                        "http"
-                    )
-                    ? author.avatar
-                    : null
-            ) ||
-            "basicBlue";
+        const localAvatarId =
+            getLocalAvatarId(
+                author
+            );
 
-        const remoteAvatar =
-            (
-                author?.providerAvatar ||
-                author?.avatar
-            )?.startsWith("http")
-                ? author
-                    ?.providerAvatar ||
-                author?.avatar
+        const remoteAvatarUrl =
+            getRemoteAvatarUrl(
+                author,
+                localAvatarId
+            );
+
+        const avatarSource =
+            getProfileAvatarSource(
+                localAvatarId ??
+                "basicBlue"
+            );
+
+        const athleteEmoji =
+            author
+                ?.isStudentAthlete
+                ? getSportEmoji(
+                    author?.sport
+                )
                 : null;
 
         const heartCount =
-            item.reactions?.heart
-                ?.length || 0;
+            item.reactions
+                ?.heart?.length ||
+            0;
 
         const currentUserId =
             currentUser?._id ||
@@ -546,15 +837,18 @@ export default function DumpCommentsModal({
         const hasHearted =
             Boolean(
                 currentUserId &&
-                item.reactions?.heart?.some(
-                    (userId) =>
-                        String(
+                item.reactions
+                    ?.heart?.some(
+                        (
                             userId
-                        ) ===
-                        String(
-                            currentUserId
-                        )
-                )
+                        ) =>
+                            String(
+                                userId
+                            ) ===
+                            String(
+                                currentUserId
+                            )
+                    )
             );
 
         return (
@@ -564,6 +858,7 @@ export default function DumpCommentsModal({
                     {
                         borderBottomColor:
                             theme.border,
+
                         marginLeft:
                             item.isReply
                                 ? s(35)
@@ -573,16 +868,15 @@ export default function DumpCommentsModal({
             >
                 <Image
                     source={
-                        remoteAvatar
+                        remoteAvatarUrl
                             ? {
-                                uri: remoteAvatar,
+                                uri: remoteAvatarUrl,
                             }
-                            : getProfileAvatarSource(
-                                avatarId
-                            )
+                            : avatarSource
                     }
                     style={[
                         styles.commentAvatar,
+
                         item.isReply &&
                         styles.replyAvatar,
                     ]}
@@ -605,7 +899,9 @@ export default function DumpCommentsModal({
                             }
                         >
                             <Text
-                                numberOfLines={1}
+                                numberOfLines={
+                                    1
+                                }
                                 style={[
                                     styles.commentUsername,
                                     {
@@ -615,19 +911,35 @@ export default function DumpCommentsModal({
                                 ]}
                             >
                                 @
-                                {author?.username ||
-                                    author?.display_name ||
+                                {author
+                                    ?.username ||
+                                    author
+                                        ?.display_name ||
                                     "student"}
                             </Text>
 
                             {author?.isSubscribed && (
                                 <Ionicons
                                     name="checkmark-circle"
-                                    size={13}
+                                    size={
+                                        13
+                                    }
                                     color={
                                         theme.blueCheck
                                     }
                                 />
+                            )}
+
+                            {athleteEmoji && (
+                                <Text
+                                    style={
+                                        styles.athleteEmoji
+                                    }
+                                >
+                                    {
+                                        athleteEmoji
+                                    }
+                                </Text>
                             )}
                         </View>
 
@@ -683,7 +995,9 @@ export default function DumpCommentsModal({
                                         ? "heart"
                                         : "heart-outline"
                                 }
-                                size={14}
+                                size={
+                                    14
+                                }
                                 color={
                                     hasHearted
                                         ? "#EF4444"
@@ -700,7 +1014,9 @@ export default function DumpCommentsModal({
                                     },
                                 ]}
                             >
-                                {heartCount}
+                                {
+                                    heartCount
+                                }
                             </Text>
                         </Pressable>
 
@@ -717,7 +1033,9 @@ export default function DumpCommentsModal({
                             >
                                 <Ionicons
                                     name="return-down-forward-outline"
-                                    size={14}
+                                    size={
+                                        14
+                                    }
                                     color={
                                         theme.muted
                                     }
@@ -741,6 +1059,12 @@ export default function DumpCommentsModal({
             </View>
         );
     };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render
+    |--------------------------------------------------------------------------
+    */
 
     return (
         <Modal
@@ -860,7 +1184,9 @@ export default function DumpCommentsModal({
                             >
                                 <Ionicons
                                     name="close"
-                                    size={20}
+                                    size={
+                                        20
+                                    }
                                     color={
                                         theme.text
                                     }
@@ -875,13 +1201,16 @@ export default function DumpCommentsModal({
                                     {
                                         backgroundColor:
                                             theme.surface,
+
                                         borderBottomColor:
                                             theme.border,
                                     },
                                 ]}
                             >
                                 <Text
-                                    numberOfLines={2}
+                                    numberOfLines={
+                                        2
+                                    }
                                     style={[
                                         styles.originalDumpText,
                                         {
@@ -890,7 +1219,9 @@ export default function DumpCommentsModal({
                                         },
                                     ]}
                                 >
-                                    {dump.content}
+                                    {
+                                        dump.content
+                                    }
                                 </Text>
                             </View>
                         )}
@@ -901,7 +1232,9 @@ export default function DumpCommentsModal({
                             }
                             keyExtractor={(
                                 item
-                            ) => item._id}
+                            ) =>
+                                item._id
+                            }
                             renderItem={
                                 renderComment
                             }
@@ -943,7 +1276,9 @@ export default function DumpCommentsModal({
                                     >
                                         <Ionicons
                                             name="chatbubbles-outline"
-                                            size={30}
+                                            size={
+                                                30
+                                            }
                                             color={
                                                 theme.cyan
                                             }
@@ -984,13 +1319,16 @@ export default function DumpCommentsModal({
                                     {
                                         backgroundColor:
                                             theme.surface,
+
                                         borderTopColor:
                                             theme.border,
                                     },
                                 ]}
                             >
                                 <Text
-                                    numberOfLines={1}
+                                    numberOfLines={
+                                        1
+                                    }
                                     style={[
                                         styles.replyingText,
                                         {
@@ -1002,7 +1340,8 @@ export default function DumpCommentsModal({
                                     Replying to @
                                     {getAuthor(
                                         replyingTo.author
-                                    )?.username ||
+                                    )
+                                        ?.username ||
                                         "student"}
                                 </Text>
 
@@ -1011,6 +1350,7 @@ export default function DumpCommentsModal({
                                         setReplyingTo(
                                             null
                                         );
+
                                         setCommentText(
                                             ""
                                         );
@@ -1018,7 +1358,9 @@ export default function DumpCommentsModal({
                                 >
                                     <Ionicons
                                         name="close-circle"
-                                        size={18}
+                                        size={
+                                            18
+                                        }
                                         color={
                                             theme.muted
                                         }
@@ -1033,6 +1375,7 @@ export default function DumpCommentsModal({
                                 {
                                     backgroundColor:
                                         theme.bg,
+
                                     borderTopColor:
                                         theme.border,
                                 },
@@ -1040,13 +1383,11 @@ export default function DumpCommentsModal({
                         >
                             <Image
                                 source={
-                                    currentRemoteAvatar
+                                    currentRemoteAvatarUrl
                                         ? {
-                                            uri: currentRemoteAvatar,
+                                            uri: currentRemoteAvatarUrl,
                                         }
-                                        : getProfileAvatarSource(
-                                            currentAvatarId
-                                        )
+                                        : currentAvatarSource
                                 }
                                 style={
                                     styles.currentUserAvatar
@@ -1066,7 +1407,9 @@ export default function DumpCommentsModal({
                                     theme.muted
                                 }
                                 multiline
-                                maxLength={250}
+                                maxLength={
+                                    250
+                                }
                                 editable={
                                     !posting
                                 }
@@ -1075,6 +1418,7 @@ export default function DumpCommentsModal({
                                     {
                                         color:
                                             theme.text,
+
                                         backgroundColor:
                                             theme.input,
                                     },
@@ -1082,7 +1426,9 @@ export default function DumpCommentsModal({
                             />
 
                             <TouchableOpacity
-                                activeOpacity={0.8}
+                                activeOpacity={
+                                    0.8
+                                }
                                 disabled={
                                     !commentText.trim() ||
                                     posting
@@ -1095,6 +1441,7 @@ export default function DumpCommentsModal({
                                     {
                                         backgroundColor:
                                             theme.cyan,
+
                                         opacity:
                                             commentText.trim() &&
                                                 !posting
@@ -1109,7 +1456,9 @@ export default function DumpCommentsModal({
                                             ? "hourglass-outline"
                                             : "arrow-up"
                                     }
-                                    size={17}
+                                    size={
+                                        17
+                                    }
                                     color="#07111F"
                                 />
                             </TouchableOpacity>
@@ -1120,6 +1469,12 @@ export default function DumpCommentsModal({
         </Modal>
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Styles
+|--------------------------------------------------------------------------
+*/
 
 const styles =
     StyleSheet.create({
@@ -1246,6 +1601,7 @@ const styles =
             flexDirection: "row",
             alignItems: "center",
             flexShrink: 1,
+            minWidth: 0,
             gap: s(3),
         },
 
@@ -1254,6 +1610,12 @@ const styles =
             fontSize: ms(11.5),
             fontFamily:
                 "Rajdhani_700Bold",
+        },
+
+        athleteEmoji: {
+            marginLeft: s(1),
+            fontSize: ms(10),
+            lineHeight: ms(13),
         },
 
         commentTime: {
