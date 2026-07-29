@@ -4,20 +4,38 @@ import React, {
     useMemo,
     useState,
 } from "react";
+
 import {
     Image,
     ImageSourcePropType,
     StyleSheet,
+    Text,
     TouchableOpacity,
     View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
+import {
+    SafeAreaView,
+} from "react-native-safe-area-context";
+
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
-import { useNavigation } from "@react-navigation/native";
+
+import {
+    useFocusEffect,
+    useNavigation,
+} from "@react-navigation/native";
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { useNotifications } from "../context/NotificationsContext";
+import {
+    useNotifications,
+} from "../context/NotificationsContext";
+
+import {
+    useNotificationFeed,
+} from "../context/NotificationFeedContext";
+
 import {
     useTimeTheme,
     type TimeTheme,
@@ -46,9 +64,11 @@ const AVATAR_IMAGES: Record<
 };
 
 /*
- * Only the solid background surrounding the header card
- * changes based on the selected avatar.
- */
+|--------------------------------------------------------------------------
+| Avatar Background Colors
+|--------------------------------------------------------------------------
+*/
+
 const AVATAR_BACKGROUND_COLORS: Record<
     string,
     string
@@ -62,6 +82,12 @@ const AVATAR_BACKGROUND_COLORS: Record<
     diamondBoy: "#0891B2",
     diamondGirl: "#DB2777",
 };
+
+/*
+|--------------------------------------------------------------------------
+| Header Theme
+|--------------------------------------------------------------------------
+*/
 
 const getHeaderTheme = (
     mode: TimeTheme,
@@ -106,14 +132,28 @@ const getHeaderTheme = (
     };
 };
 
+/*
+|--------------------------------------------------------------------------
+| Header
+|--------------------------------------------------------------------------
+*/
+
 export default function AppHeader() {
     const navigation = useNavigation<any>();
-    const { mode: themeMode } = useTimeTheme();
+
+    const {
+        mode: themeMode,
+    } = useTimeTheme();
 
     const {
         featuredEnabled,
         alertsEnabled,
     } = useNotifications();
+
+    const {
+        unreadCount,
+        refreshUnreadCount,
+    } = useNotificationFeed();
 
     const [user, setUser] =
         useState<StoredUser | null>(null);
@@ -122,9 +162,11 @@ export default function AppHeader() {
         useState(false);
 
     /*
-     * Use selectedAvatar first. If the server stored the
-     * avatar ID inside avatar, that value also works.
-     */
+    |--------------------------------------------------------------------------
+    | Selected Avatar
+    |--------------------------------------------------------------------------
+    */
+
     const selectedAvatarId = useMemo(() => {
         if (user?.selectedAvatar) {
             return user.selectedAvatar;
@@ -140,19 +182,34 @@ export default function AppHeader() {
         return null;
     }, [user]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Theme
+    |--------------------------------------------------------------------------
+    */
+
     const theme = useMemo(
         () =>
             getHeaderTheme(
                 themeMode,
                 selectedAvatarId
             ),
-        [themeMode, selectedAvatarId]
+        [
+            themeMode,
+            selectedAvatarId,
+        ]
     );
 
     const styles = useMemo(
         () => createStyles(theme),
         [theme]
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Stored User
+    |--------------------------------------------------------------------------
+    */
 
     const loadStoredUser = useCallback(
         async () => {
@@ -186,17 +243,21 @@ export default function AppHeader() {
     );
 
     /*
-     * Load the saved user when the header mounts.
-     * Theme updates now come from TimeThemeProvider.
-     */
+    |--------------------------------------------------------------------------
+    | Initial Load
+    |--------------------------------------------------------------------------
+    */
+
     useEffect(() => {
         loadStoredUser();
     }, [loadStoredUser]);
 
     /*
-     * Reload the saved user after navigation changes.
-     * This helps the header update after Account Settings.
-     */
+    |--------------------------------------------------------------------------
+    | Reload User After Navigation Changes
+    |--------------------------------------------------------------------------
+    */
+
     useEffect(() => {
         const unsubscribe =
             navigation.addListener(
@@ -212,28 +273,80 @@ export default function AppHeader() {
         loadStoredUser,
     ]);
 
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh Badge Whenever Header Becomes Focused
+    |--------------------------------------------------------------------------
+    */
+
+    useFocusEffect(
+        useCallback(() => {
+            refreshUnreadCount();
+        }, [refreshUnreadCount])
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Avatar Source
+    |--------------------------------------------------------------------------
+    */
+
     const selectedAvatarSource =
         selectedAvatarId
-            ? AVATAR_IMAGES[
-            selectedAvatarId
-            ]
+            ? AVATAR_IMAGES[selectedAvatarId]
             : null;
 
     const remoteAvatarUrl =
         user?.providerAvatar ||
-        (user?.avatar?.startsWith("http")
-            ? user.avatar
-            : null);
+        (
+            user?.avatar?.startsWith("http")
+                ? user.avatar
+                : null
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Bell State
+    |--------------------------------------------------------------------------
+    */
 
     const isOneEnabled =
-        featuredEnabled || alertsEnabled;
+        featuredEnabled ||
+        alertsEnabled;
 
     const isBothEnabled =
-        featuredEnabled && alertsEnabled;
+        featuredEnabled &&
+        alertsEnabled;
 
-    const bellColor = isBothEnabled
-        ? theme.icon
-        : theme.cyan;
+    const bellColor =
+        isBothEnabled
+            ? theme.icon
+            : theme.cyan;
+
+    const hasUnreadNotifications =
+        unreadCount > 0;
+
+    const unreadBadgeText =
+        unreadCount > 99
+            ? "99+"
+            : String(unreadCount);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Open Notifications
+    |--------------------------------------------------------------------------
+    */
+
+    const handleOpenNotifications =
+        useCallback(() => {
+            navigation.navigate(
+                "MainTabs",
+                {
+                    screen:
+                        "Notifications",
+                }
+            );
+        }, [navigation]);
 
     return (
         <SafeAreaView
@@ -317,6 +430,7 @@ export default function AppHeader() {
                                     {
                                         screen:
                                             "MainTabs",
+
                                         params: {
                                             screen:
                                                 "Home",
@@ -340,39 +454,70 @@ export default function AppHeader() {
                     <View
                         style={styles.sideRight}
                     >
-                        <TouchableOpacity
-                            style={[
-                                styles.iconButton,
-
-                                isOneEnabled &&
-                                styles.iconButtonActive,
-
-                                isBothEnabled &&
-                                styles.iconButtonFullyActive,
-                            ]}
-                            activeOpacity={0.8}
-                            onPress={() =>
-                                navigation.navigate(
-                                    "MainTabs",
-                                    {
-                                        screen:
-                                            "Notifications",
-                                    }
-                                )
+                        <View
+                            style={
+                                styles.bellWrapper
                             }
                         >
-                            <FontAwesome6
-                                name="bell"
-                                size={20}
-                                color={bellColor}
-                            />
-                        </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.iconButton,
+
+                                    isOneEnabled &&
+                                    styles.iconButtonActive,
+
+                                    isBothEnabled &&
+                                    styles.iconButtonFullyActive,
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={
+                                    handleOpenNotifications
+                                }
+                            >
+                                <FontAwesome6
+                                    name="bell"
+                                    size={20}
+                                    color={
+                                        bellColor
+                                    }
+                                />
+                            </TouchableOpacity>
+
+                            {hasUnreadNotifications && (
+                                <View
+                                    pointerEvents="none"
+                                    style={[
+                                        styles.unreadBadge,
+
+                                        unreadCount > 99 &&
+                                        styles.unreadBadgeWide,
+                                    ]}
+                                >
+                                    <Text
+                                        style={
+                                            styles.unreadBadgeText
+                                        }
+                                        numberOfLines={1}
+                                    >
+                                        {
+                                            unreadBadgeText
+                                        }
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </View>
                 </View>
             </View>
         </SafeAreaView>
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Styles
+|--------------------------------------------------------------------------
+*/
 
 const createStyles = (
     theme: ReturnType<
@@ -397,7 +542,8 @@ const createStyles = (
         card: {
             height: 68,
 
-            backgroundColor: theme.card,
+            backgroundColor:
+                theme.card,
 
             borderRadius: 20,
 
@@ -411,17 +557,21 @@ const createStyles = (
             position: "relative",
 
             borderWidth: 1,
-            borderColor: theme.border,
+            borderColor:
+                theme.border,
 
             shadowColor: "#000",
+
             shadowOffset: {
                 width: 0,
                 height: 8,
             },
+
             shadowOpacity:
                 theme.mode === "day"
                     ? 0.12
                     : 0.14,
+
             shadowRadius: 9,
 
             elevation: 6,
@@ -459,16 +609,20 @@ const createStyles = (
                 theme.surface,
 
             borderWidth: 1.5,
+
             borderColor:
                 theme.buttonBorder,
 
             overflow: "hidden",
 
-            shadowColor: theme.cyan,
+            shadowColor:
+                theme.cyan,
+
             shadowOffset: {
                 width: 0,
                 height: 3,
             },
+
             shadowOpacity: 0.14,
             shadowRadius: 7,
 
@@ -525,6 +679,10 @@ const createStyles = (
             ],
         },
 
+        bellWrapper: {
+            position: "relative",
+        },
+
         iconButton: {
             width: 44,
             height: 44,
@@ -537,14 +695,18 @@ const createStyles = (
                 theme.surface,
 
             borderWidth: 1,
+
             borderColor:
                 theme.buttonBorder,
 
-            shadowColor: theme.cyan,
+            shadowColor:
+                theme.cyan,
+
             shadowOffset: {
                 width: 0,
                 height: 3,
             },
+
             shadowOpacity: 0.14,
             shadowRadius: 7,
 
@@ -565,5 +727,49 @@ const createStyles = (
 
             borderColor:
                 theme.yellow,
+        },
+
+        unreadBadge: {
+            position: "absolute",
+
+            top: -7,
+            right: -7,
+
+            minWidth: 20,
+            height: 20,
+
+            paddingHorizontal: 5,
+
+            borderRadius: 10,
+
+            alignItems: "center",
+            justifyContent: "center",
+
+            backgroundColor: "#EF4444",
+
+            borderWidth: 2,
+            borderColor:
+                theme.card,
+
+            zIndex: 20,
+
+            elevation: 10,
+        },
+
+        unreadBadgeWide: {
+            minWidth: 30,
+        },
+
+        unreadBadgeText: {
+            color: "#FFFFFF",
+
+            fontSize: 10,
+            lineHeight: 12,
+
+            fontWeight: "800",
+
+            textAlign: "center",
+
+            includeFontPadding: false,
         },
     });
