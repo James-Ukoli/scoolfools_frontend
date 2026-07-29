@@ -39,6 +39,8 @@ import CreateDumpScreen from "./src/screens/CreateDumpScreen";
 import MyDumpsScreen from "./src/screens/MyDumpsScreen";
 import TVScreen from "./src/screens/TVScreen";
 import { NotificationsProvider } from "./src/context/NotificationsContext";
+import { NotificationFeedProvider } from "./src/context/NotificationFeedContext";
+
 import {
     TimeThemeProvider,
     useTimeTheme,
@@ -102,197 +104,218 @@ function ThemedNavigation({
 
     return (
         <NotificationsProvider>
-            <NavigationContainer>
-                <StatusBar
-                    style={
-                        isDark
-                            ? "light"
-                            : "dark"
-                    }
-                    backgroundColor={
-                        isDark
-                            ? "#020617"
-                            : "#06B6D4"
-                    }
-                />
-
-                <Stack.Navigator
-                    initialRouteName={
-                        initialRoute
-                    }
-                    screenOptions={{
-                        headerShown: false,
-                        animation: "none",
-                        contentStyle: {
-                            backgroundColor:
-                                rootBackground,
-                        },
-                    }}
-                >
-                    <Stack.Screen
-                        name="GoogleSignIn"
-                        component={
-                            GoogleSignInScreen
+            <NotificationFeedProvider>
+                <NavigationContainer>
+                    <StatusBar
+                        style={
+                            isDark
+                                ? "light"
+                                : "dark"
+                        }
+                        backgroundColor={
+                            isDark
+                                ? "#020617"
+                                : "#06B6D4"
                         }
                     />
 
-                    <Stack.Screen
-                        name="SetupProfile"
-                        component={
-                            SetupProfileScreen
+                    <Stack.Navigator
+                        initialRouteName={
+                            initialRoute
                         }
-                    />
-
-                    <Stack.Screen
-                        name="IntroVideo"
-                        component={
-                            IntroVideoScreen
-                        }
-                    />
-
-                    <Stack.Screen
-                        name="MainTabs"
-                        component={AppShell}
-                    />
-
-                    <Stack.Screen
-                        name="ArticleScreen"
-                        component={ArticleScreen}
-                    />
-
-                    <Stack.Screen
-                        name="EventDetailScreen"
-                        component={
-                            EventDetailScreen
-                        }
-                    />
-
-                    <Stack.Screen
-                        name="Search"
-                        component={SearchScreen}
-                    />
-
-                    <Stack.Screen
-                        name="Menu"
-                        component={MenuScreen}
-                    />
-
-                    <Stack.Screen
-                        name="AccountSettings"
-                        component={
-                            AccountSettingsScreen
-                        }
-                    />
-                    <Stack.Screen
-                        name="DeleteAccount"
-                        component={DeleteAccountScreen}
-                        options={{
+                        screenOptions={{
                             headerShown: false,
+                            animation: "none",
+                            contentStyle: {
+                                backgroundColor:
+                                    rootBackground,
+                            },
                         }}
-                    />
+                    >
+                        <Stack.Screen
+                            name="GoogleSignIn"
+                            component={
+                                GoogleSignInScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="ReviewerLogin"
-                        component={
-                            ReviewerLoginScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="SetupProfile"
+                            component={
+                                SetupProfileScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="Notifications"
-                        component={
-                            NotificationsScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="IntroVideo"
+                            component={
+                                IntroVideoScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="ContactUs"
-                        component={
-                            ContactUsScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="MainTabs"
+                            component={AppShell}
+                        />
 
-                    <Stack.Screen
-                        name="EventsScreen"
-                        component={EventsScreen}
-                    />
+                        <Stack.Screen
+                            name="ArticleScreen"
+                            component={
+                                ArticleScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="GameHome"
-                        component={
-                            GameHomeScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="EventDetailScreen"
+                            component={
+                                EventDetailScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="CharadesSetup"
-                        component={
-                            CharadesSetupScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="Search"
+                            component={
+                                SearchScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="CharadesPlay"
-                        component={
-                            CharadesPlayScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="Menu"
+                            component={
+                                MenuScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="MostLikely"
-                        component={
-                            MostLikelyScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="AccountSettings"
+                            component={
+                                AccountSettingsScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="ImpostorSetup"
-                        component={
-                            ImpostorSetupScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="DeleteAccount"
+                            component={
+                                DeleteAccountScreen
+                            }
+                            options={{
+                                headerShown: false,
+                            }}
+                        />
 
-                    <Stack.Screen
-                        name="ImpostorReveal"
-                        component={
-                            ImpostorRevealScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="ReviewerLogin"
+                            component={
+                                ReviewerLoginScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="JustMoveClock"
-                        component={
-                            JustMoveClockScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="Notifications"
+                            component={
+                                NotificationsScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="GamesPaywall"
-                        component={
-                            GamesPaywallScreen
-                        }
-                    />
+                        <Stack.Screen
+                            name="ContactUs"
+                            component={
+                                ContactUsScreen
+                            }
+                        />
 
-                    <Stack.Screen
-                        name="TVScreen"
-                        component={TVScreen}
-                    />
-                    <Stack.Screen
-                        name="CreateDump"
-                        component={CreateDumpScreen}
-                        options={{
-                            headerShown: false,
-                        }}
-                    />
-                    <Stack.Screen
-                        name="MyDumps"
-                        component={MyDumpsScreen}
-                        options={{
-                            headerShown: false,
-                        }}
-                    />
-                </Stack.Navigator>
-            </NavigationContainer>
+                        <Stack.Screen
+                            name="EventsScreen"
+                            component={
+                                EventsScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="GameHome"
+                            component={
+                                GameHomeScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="CharadesSetup"
+                            component={
+                                CharadesSetupScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="CharadesPlay"
+                            component={
+                                CharadesPlayScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="MostLikely"
+                            component={
+                                MostLikelyScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="ImpostorSetup"
+                            component={
+                                ImpostorSetupScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="ImpostorReveal"
+                            component={
+                                ImpostorRevealScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="JustMoveClock"
+                            component={
+                                JustMoveClockScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="GamesPaywall"
+                            component={
+                                GamesPaywallScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="TVScreen"
+                            component={
+                                TVScreen
+                            }
+                        />
+
+                        <Stack.Screen
+                            name="CreateDump"
+                            component={
+                                CreateDumpScreen
+                            }
+                            options={{
+                                headerShown: false,
+                            }}
+                        />
+
+                        <Stack.Screen
+                            name="MyDumps"
+                            component={
+                                MyDumpsScreen
+                            }
+                            options={{
+                                headerShown: false,
+                            }}
+                        />
+                    </Stack.Navigator>
+                </NavigationContainer>
+            </NotificationFeedProvider>
         </NotificationsProvider>
     );
 }

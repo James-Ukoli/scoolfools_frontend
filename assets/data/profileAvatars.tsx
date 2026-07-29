@@ -7,4 +7,5 @@ export const PROFILE_AVATAR_IMAGES = {
     basicYellow: require("../images/profileimages/basicYellow.png"),
     diamondBoy: require("../images/profileimages/diamondBoy.png"),
     diamondGirl: require("../images/profileimages/diamondGirl.png"),
+    anonymousAvatar: require("../images/profileimages/anonymousAvatar.png"),
 };

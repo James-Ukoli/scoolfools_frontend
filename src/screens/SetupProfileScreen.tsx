@@ -38,6 +38,7 @@ import {
 } from "../services/iap";
 import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
+import { registerCurrentDevice } from "../services/pushRegistration";
 
 const API_BASE_URL =
     Platform.OS === "android"
@@ -875,7 +876,11 @@ export default function SetupProfileScreen({ navigation }: any) {
             };
 
             await AsyncStorage.setItem("user", JSON.stringify(userToStore));
-
+            try {
+                await registerCurrentDevice();
+            } catch (error) {
+                console.log("Push registration after profile setup failed:", error);
+            }
             await waitForMinimumLoadingDuration(loadingStartedAt);
 
             navigation.reset({

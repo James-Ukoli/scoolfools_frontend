@@ -38,6 +38,7 @@ import {
 import {
     Comment,
     createComment,
+    deleteComment,
     Dump,
     getComments,
     toggleCommentReaction,
@@ -201,26 +202,37 @@ type DumpCommentsModalProps = {
     visible: boolean;
     dump: Dump | null;
     onClose: () => void;
+
     onCommentAdded: (
+        dumpId: string
+    ) => void;
+
+    /*
+     * Optional so existing screens do not break.
+     * Later, the feed screen can use this to
+     * decrease its displayed comment count.
+     */
+    onCommentDeleted?: (
         dumpId: string
     ) => void;
 };
 
-type StoredUser = UserPreview & {
-    id?: string;
+type StoredUser =
+    UserPreview & {
+        id?: string;
 
-    schoolLevel?:
-    | "college"
-    | "highSchool";
+        schoolLevel?:
+        | "college"
+        | "highSchool";
 
-    collegeName?:
-    | string
-    | null;
+        collegeName?:
+        | string
+        | null;
 
-    highSchoolClassification?:
-    | string
-    | null;
-};
+        highSchoolClassification?:
+        | string
+        | null;
+    };
 
 type FlatCommentItem =
     Comment & {
@@ -248,6 +260,7 @@ const getCommentsTheme = (
             input: "#F1F5F9",
             cyan: "#06B6D4",
             blueCheck: "#1D9BF0",
+            danger: "#DC2626",
             backdrop:
                 "rgba(2,6,23,0.45)",
         };
@@ -264,6 +277,7 @@ const getCommentsTheme = (
         input: "#111827",
         cyan: "#22D3EE",
         blueCheck: "#1D9BF0",
+        danger: "#F87171",
         backdrop:
             "rgba(0,0,0,0.72)",
     };
@@ -286,6 +300,26 @@ const getAuthor = (
     }
 
     return author;
+};
+
+const getAuthorId = (
+    author: Comment["author"]
+): string | null => {
+    if (!author) {
+        return null;
+    }
+
+    if (
+        typeof author === "string"
+    ) {
+        return String(author);
+    }
+
+    if (author._id) {
+        return String(author._id);
+    }
+
+    return null;
 };
 
 const getTimeAgo = (
@@ -361,6 +395,7 @@ export default function DumpCommentsModal({
     dump,
     onClose,
     onCommentAdded,
+    onCommentDeleted,
 }: DumpCommentsModalProps) {
     const { mode } =
         useTimeTheme();
@@ -373,7 +408,10 @@ export default function DumpCommentsModal({
     const [
         comments,
         setComments,
-    ] = useState<Comment[]>([]);
+    ] =
+        useState<Comment[]>(
+            []
+        );
 
     const [
         currentUser,
@@ -384,9 +422,16 @@ export default function DumpCommentsModal({
         );
 
     const [
+        localCommentCount,
+        setLocalCommentCount,
+    ] =
+        useState(0);
+
+    const [
         commentText,
         setCommentText,
-    ] = useState("");
+    ] =
+        useState("");
 
     const [
         replyingTo,
@@ -399,17 +444,20 @@ export default function DumpCommentsModal({
     const [
         loading,
         setLoading,
-    ] = useState(false);
+    ] =
+        useState(false);
 
     const [
         refreshing,
         setRefreshing,
-    ] = useState(false);
+    ] =
+        useState(false);
 
     const [
         posting,
         setPosting,
-    ] = useState(false);
+    ] =
+        useState(false);
 
     const [
         reactingCommentId,
@@ -418,6 +466,25 @@ export default function DumpCommentsModal({
         useState<string | null>(
             null
         );
+
+    const [
+        deletingCommentId,
+        setDeletingCommentId,
+    ] =
+        useState<string | null>(
+            null
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Current User ID
+    |--------------------------------------------------------------------------
+    */
+
+    const currentUserId =
+        currentUser?._id ||
+        currentUser?.id ||
+        null;
 
     /*
     |--------------------------------------------------------------------------
@@ -434,9 +501,7 @@ export default function DumpCommentsModal({
                             "user"
                         );
 
-                    if (
-                        !storedUser
-                    ) {
+                    if (!storedUser) {
                         setCurrentUser(
                             null
                         );
@@ -444,17 +509,29 @@ export default function DumpCommentsModal({
                         return;
                     }
 
-                    const parsedUser =
+                    const parsedValue =
                         JSON.parse(
                             storedUser
                         );
 
+                    /*
+                     * Supports both:
+                     *
+                     * { _id: "..." }
+                     *
+                     * and:
+                     *
+                     * { user: { _id: "..." } }
+                     */
+                    const parsedUser =
+                        parsedValue?.user ||
+                        parsedValue?.data?.user ||
+                        parsedValue;
+
                     setCurrentUser(
                         parsedUser
                     );
-                } catch (
-                error
-                ) {
+                } catch (error) {
                     console.log(
                         "Comment current user error:",
                         error
@@ -477,12 +554,9 @@ export default function DumpCommentsModal({
     const loadComments =
         useCallback(
             async (
-                showLoading =
-                    true
+                showLoading = true
             ) => {
-                if (
-                    !dump?._id
-                ) {
+                if (!dump?._id) {
                     setComments(
                         []
                     );
@@ -547,9 +621,24 @@ export default function DumpCommentsModal({
             null
         );
 
+        setDeletingCommentId(
+            null
+        );
+
+        setLocalCommentCount(
+            Math.max(
+                0,
+                Number(
+                    dump?.commentsCount ||
+                    0
+                )
+            )
+        );
+
         loadCurrentUser();
         loadComments();
     }, [
+        dump?.commentsCount,
         loadComments,
         loadCurrentUser,
         visible,
@@ -582,13 +671,11 @@ export default function DumpCommentsModal({
                         []
                     ).forEach(
                         (reply) => {
-                            result.push(
-                                {
-                                    ...reply,
-                                    isReply:
-                                        true,
-                                }
-                            );
+                            result.push({
+                                ...reply,
+                                isReply:
+                                    true,
+                            });
                         }
                     );
                 }
@@ -718,6 +805,11 @@ export default function DumpCommentsModal({
                     null
                 );
 
+                setLocalCommentCount(
+                    (current) =>
+                        current + 1
+                );
+
                 onCommentAdded(
                     dump._id
                 );
@@ -751,7 +843,8 @@ export default function DumpCommentsModal({
             comment: Comment
         ) => {
             if (
-                reactingCommentId
+                reactingCommentId ||
+                deletingCommentId
             ) {
                 return;
             }
@@ -786,6 +879,198 @@ export default function DumpCommentsModal({
 
     /*
     |--------------------------------------------------------------------------
+    | Remove Deleted Comment From Local State
+    |--------------------------------------------------------------------------
+    |
+    | Top-level comment:
+    | Removes the full comment row from the list.
+    |
+    | Reply:
+    | Removes the reply from its parent's replies array.
+    |
+    */
+
+    const removeCommentFromState =
+        useCallback(
+            (
+                commentId: string
+            ) => {
+                setComments(
+                    (
+                        currentComments
+                    ) =>
+                        currentComments
+                            .filter(
+                                (
+                                    comment
+                                ) =>
+                                    String(
+                                        comment._id
+                                    ) !==
+                                    String(
+                                        commentId
+                                    )
+                            )
+                            .map(
+                                (
+                                    comment
+                                ) => ({
+                                    ...comment,
+
+                                    replies:
+                                        (
+                                            comment.replies ||
+                                            []
+                                        ).filter(
+                                            (
+                                                reply
+                                            ) =>
+                                                String(
+                                                    reply._id
+                                                ) !==
+                                                String(
+                                                    commentId
+                                                )
+                                        ),
+                                })
+                            )
+                );
+            },
+            []
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Comment
+    |--------------------------------------------------------------------------
+    */
+
+    const performDeleteComment =
+        useCallback(
+            async (
+                comment: Comment
+            ) => {
+                if (
+                    deletingCommentId
+                ) {
+                    return;
+                }
+
+                const commentId =
+                    String(
+                        comment._id
+                    );
+
+                try {
+                    setDeletingCommentId(
+                        commentId
+                    );
+
+                    await deleteComment(
+                        commentId
+                    );
+
+                    removeCommentFromState(
+                        commentId
+                    );
+
+                    setLocalCommentCount(
+                        (current) =>
+                            Math.max(
+                                0,
+                                current - 1
+                            )
+                    );
+
+                    if (
+                        replyingTo?._id &&
+                        String(
+                            replyingTo._id
+                        ) ===
+                        commentId
+                    ) {
+                        setReplyingTo(
+                            null
+                        );
+
+                        setCommentText(
+                            ""
+                        );
+                    }
+
+                    if (dump?._id) {
+                        onCommentDeleted?.(
+                            dump._id
+                        );
+                    }
+                } catch (
+                error: any
+                ) {
+                    console.error(
+                        "DELETE COMMENT ERROR:",
+                        error
+                    );
+
+                    Alert.alert(
+                        "Unable to Delete",
+                        error?.message ||
+                        "Your comment could not be deleted."
+                    );
+                } finally {
+                    setDeletingCommentId(
+                        null
+                    );
+                }
+            },
+            [
+                deletingCommentId,
+                dump?._id,
+                onCommentDeleted,
+                removeCommentFromState,
+                replyingTo?._id,
+            ]
+        );
+
+    const handleDeleteComment =
+        useCallback(
+            (
+                comment: Comment
+            ) => {
+                if (
+                    deletingCommentId
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Delete Comment?",
+                    "This comment will be permanently removed.",
+                    [
+                        {
+                            text: "Cancel",
+                            style: "cancel",
+                        },
+                        {
+                            text: "Delete",
+                            style:
+                                "destructive",
+
+                            onPress: () =>
+                                performDeleteComment(
+                                    comment
+                                ),
+                        },
+                    ]
+                );
+            },
+            [
+                deletingCommentId,
+                performDeleteComment,
+            ]
+        );
+
+    /*
+    |--------------------------------------------------------------------------
     | Render Comment
     |--------------------------------------------------------------------------
     */
@@ -797,6 +1082,11 @@ export default function DumpCommentsModal({
     }) => {
         const author =
             getAuthor(
+                item.author
+            );
+
+        const authorId =
+            getAuthorId(
                 item.author
             );
 
@@ -830,10 +1120,6 @@ export default function DumpCommentsModal({
                 ?.heart?.length ||
             0;
 
-        const currentUserId =
-            currentUser?._id ||
-            currentUser?.id;
-
         const hasHearted =
             Boolean(
                 currentUserId &&
@@ -851,6 +1137,22 @@ export default function DumpCommentsModal({
                     )
             );
 
+        const isOwner =
+            Boolean(
+                currentUserId &&
+                authorId &&
+                String(
+                    currentUserId
+                ) ===
+                String(
+                    authorId
+                )
+            );
+
+        const isDeleting =
+            deletingCommentId ===
+            String(item._id);
+
         return (
             <View
                 style={[
@@ -863,6 +1165,11 @@ export default function DumpCommentsModal({
                             item.isReply
                                 ? s(35)
                                 : 0,
+
+                        opacity:
+                            isDeleting
+                                ? 0.45
+                                : 1,
                     },
                 ]}
             >
@@ -943,19 +1250,63 @@ export default function DumpCommentsModal({
                             )}
                         </View>
 
-                        <Text
-                            style={[
-                                styles.commentTime,
-                                {
-                                    color:
-                                        theme.muted,
-                                },
-                            ]}
+                        <View
+                            style={
+                                styles.commentTopRight
+                            }
                         >
-                            {getTimeAgo(
-                                item.created_at
+                            <Text
+                                style={[
+                                    styles.commentTime,
+                                    {
+                                        color:
+                                            theme.muted,
+                                    },
+                                ]}
+                            >
+                                {getTimeAgo(
+                                    item.created_at
+                                )}
+                            </Text>
+
+                            {isOwner && (
+                                <TouchableOpacity
+                                    activeOpacity={
+                                        0.65
+                                    }
+                                    disabled={
+                                        Boolean(
+                                            deletingCommentId
+                                        )
+                                    }
+                                    onPress={() =>
+                                        handleDeleteComment(
+                                            item
+                                        )
+                                    }
+                                    hitSlop={
+                                        8
+                                    }
+                                    style={
+                                        styles.deleteCommentButton
+                                    }
+                                >
+                                    <Ionicons
+                                        name={
+                                            isDeleting
+                                                ? "hourglass-outline"
+                                                : "trash-outline"
+                                        }
+                                        size={
+                                            13
+                                        }
+                                        color={
+                                            theme.danger
+                                        }
+                                    />
+                                </TouchableOpacity>
                             )}
-                        </Text>
+                        </View>
                     </View>
 
                     <Text
@@ -978,7 +1329,10 @@ export default function DumpCommentsModal({
                         <Pressable
                             disabled={
                                 reactingCommentId ===
-                                item._id
+                                item._id ||
+                                Boolean(
+                                    deletingCommentId
+                                )
                             }
                             onPress={() =>
                                 handleHeartComment(
@@ -1022,6 +1376,11 @@ export default function DumpCommentsModal({
 
                         {!item.isReply && (
                             <Pressable
+                                disabled={
+                                    Boolean(
+                                        deletingCommentId
+                                    )
+                                }
                                 onPress={() =>
                                     handleReplyPress(
                                         item
@@ -1160,9 +1519,9 @@ export default function DumpCommentsModal({
                                         },
                                     ]}
                                 >
-                                    {dump
-                                        ?.commentsCount ||
-                                        0}{" "}
+                                    {
+                                        localCommentCount
+                                    }{" "}
                                     total
                                 </Text>
                             </View>
@@ -1233,7 +1592,9 @@ export default function DumpCommentsModal({
                             keyExtractor={(
                                 item
                             ) =>
-                                item._id
+                                String(
+                                    item._id
+                                )
                             }
                             renderItem={
                                 renderComment
@@ -1411,7 +1772,8 @@ export default function DumpCommentsModal({
                                     250
                                 }
                                 editable={
-                                    !posting
+                                    !posting &&
+                                    !deletingCommentId
                                 }
                                 style={[
                                     styles.commentInput,
@@ -1431,7 +1793,10 @@ export default function DumpCommentsModal({
                                 }
                                 disabled={
                                     !commentText.trim() ||
-                                    posting
+                                    posting ||
+                                    Boolean(
+                                        deletingCommentId
+                                    )
                                 }
                                 onPress={
                                     handlePostComment
@@ -1444,7 +1809,8 @@ export default function DumpCommentsModal({
 
                                         opacity:
                                             commentText.trim() &&
-                                                !posting
+                                                !posting &&
+                                                !deletingCommentId
                                                 ? 1
                                                 : 0.4,
                                     },
@@ -1470,6 +1836,11 @@ export default function DumpCommentsModal({
     );
 }
 
+/*
+|--------------------------------------------------------------------------
+| Styles
+|--------------------------------------------------------------------------
+*/
 /*
 |--------------------------------------------------------------------------
 | Styles
@@ -1595,6 +1966,7 @@ const styles =
             alignItems: "center",
             justifyContent:
                 "space-between",
+            minHeight: 20,
         },
 
         commentUsernameRow: {
@@ -1618,10 +1990,25 @@ const styles =
             lineHeight: ms(13),
         },
 
+        commentTopRight: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginLeft: s(6),
+        },
+
         commentTime: {
-            marginLeft: s(5),
             fontSize: ms(8.5),
             fontWeight: "700",
+        },
+
+        deleteCommentButton: {
+            width: s(24),
+            height: s(24),
+            marginLeft: s(4),
+            borderRadius: s(8),
+            alignItems: "center",
+            justifyContent:
+                "center",
         },
 
         commentContent: {

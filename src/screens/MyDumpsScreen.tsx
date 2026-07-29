@@ -16,6 +16,8 @@ import {
     View,
 } from "react-native";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
     SafeAreaView,
 } from "react-native-safe-area-context";
@@ -25,8 +27,10 @@ import {
 } from "@react-navigation/native";
 
 import DumpCard from "../components/DumpCard";
+import DumpCommentsModal from "../components/DumpCommentsModal";
 
 import {
+    deleteDump,
     Dump,
     getMyDumps,
     getMyInteractions,
@@ -125,6 +129,81 @@ const getInteractionLabel = (
     return labels.join("  ");
 };
 
+const getAuthorId = (
+    author: Dump["author"]
+): string | null => {
+    if (!author) {
+        return null;
+    }
+
+    if (
+        typeof author === "string"
+    ) {
+        return author;
+    }
+
+    return author._id
+        ? String(author._id)
+        : null;
+};
+
+const getStoredCurrentUserId =
+    async (): Promise<
+        string | null
+    > => {
+        const storageKeys = [
+            "user",
+            "currentUser",
+            "userData",
+            "authUser",
+        ];
+
+        for (
+            const key of storageKeys
+        ) {
+            try {
+                const storedValue =
+                    await AsyncStorage.getItem(
+                        key
+                    );
+
+                if (!storedValue) {
+                    continue;
+                }
+
+                const parsed =
+                    JSON.parse(
+                        storedValue
+                    );
+
+                const possibleUser =
+                    parsed?.user ||
+                    parsed?.data?.user ||
+                    parsed;
+
+                const userId =
+                    possibleUser?._id ||
+                    possibleUser?.id ||
+                    parsed?.userId ||
+                    parsed?._id ||
+                    parsed?.id;
+
+                if (userId) {
+                    return String(
+                        userId
+                    );
+                }
+            } catch (error) {
+                console.log(
+                    `Unable to read ${key} from storage:`,
+                    error
+                );
+            }
+        }
+
+        return null;
+    };
+
 export default function MyDumpsScreen() {
     const navigation =
         useNavigation();
@@ -153,9 +232,9 @@ export default function MyDumpsScreen() {
         dumps,
         setDumps,
     ] =
-        useState<ActivityDump[]>(
-            []
-        );
+        useState<
+            ActivityDump[]
+        >([]);
 
     const [
         loading,
@@ -175,18 +254,72 @@ export default function MyDumpsScreen() {
     ] =
         useState("");
 
+    const [
+        currentUserId,
+        setCurrentUserId,
+    ] =
+        useState<
+            string | null
+        >(null);
+
+    const [
+        deletingDumpId,
+        setDeletingDumpId,
+    ] =
+        useState<
+            string | null
+        >(null);
+
+    const [
+        selectedDump,
+        setSelectedDump,
+    ] =
+        useState<Dump | null>(
+            null
+        );
+
+    const [
+        commentsVisible,
+        setCommentsVisible,
+    ] =
+        useState(false);
+
     /*
-     * Replace this with your authenticated
-     * user's MongoDB ID when ready.
-     *
-     * Example:
-     *
-     * const { user } = useAuth();
-     * const currentUserId =
-     *     user?._id ?? null;
-     */
-    const currentUserId:
-        string | null = null;
+    |--------------------------------------------------------------------------
+    | Load Current User ID
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadCurrentUser =
+            async () => {
+                const storedUserId =
+                    await getStoredCurrentUserId();
+
+                if (
+                    isMounted &&
+                    storedUserId
+                ) {
+                    setCurrentUserId(
+                        storedUserId
+                    );
+                }
+            };
+
+        loadCurrentUser();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load My Dumps Or Interactions
+    |--------------------------------------------------------------------------
+    */
 
     const loadContent =
         useCallback(
@@ -211,14 +344,36 @@ export default function MyDumpsScreen() {
                         const response =
                             await getMyDumps();
 
-                        setDumps(
+                        const myDumps =
                             Array.isArray(
-                                response
-                                    ?.dumps
+                                response?.dumps
                             )
                                 ? response.dumps
-                                : []
+                                : [];
+
+                        setDumps(
+                            myDumps
                         );
+
+                        if (
+                            !currentUserId &&
+                            myDumps.length >
+                            0
+                        ) {
+                            const fallbackId =
+                                getAuthorId(
+                                    myDumps[0]
+                                        .author
+                                );
+
+                            if (
+                                fallbackId
+                            ) {
+                                setCurrentUserId(
+                                    fallbackId
+                                );
+                            }
+                        }
 
                         return;
                     }
@@ -288,12 +443,21 @@ export default function MyDumpsScreen() {
                     );
                 }
             },
-            [activeTab]
+            [
+                activeTab,
+                currentUserId,
+            ]
         );
 
     useEffect(() => {
         loadContent();
     }, [loadContent]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh
+    |--------------------------------------------------------------------------
+    */
 
     const handleRefresh =
         useCallback(() => {
@@ -305,6 +469,12 @@ export default function MyDumpsScreen() {
                 false
             );
         }, [loadContent]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Change Tabs
+    |--------------------------------------------------------------------------
+    */
 
     const handleChangeTab =
         useCallback(
@@ -326,26 +496,315 @@ export default function MyDumpsScreen() {
             [activeTab]
         );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Open And Close Comments
+    |--------------------------------------------------------------------------
+    */
+
     const handleOpenComments =
         useCallback(
             (
                 dump: Dump
             ) => {
-                Alert.alert(
-                    "Comments",
-                    dump.content
+                setSelectedDump(
+                    dump
+                );
+
+                setCommentsVisible(
+                    true
                 );
             },
             []
         );
+
+    const handleCloseComments =
+        useCallback(() => {
+            setCommentsVisible(
+                false
+            );
+
+            setSelectedDump(
+                null
+            );
+        }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update Comment Count
+    |--------------------------------------------------------------------------
+    */
+
+    const handleCommentAdded =
+        useCallback(
+            (
+                dumpId: string
+            ) => {
+                setDumps(
+                    (
+                        currentDumps
+                    ) =>
+                        currentDumps.map(
+                            (
+                                currentDump
+                            ) =>
+                                String(
+                                    currentDump._id
+                                ) ===
+                                    String(
+                                        dumpId
+                                    )
+                                    ? {
+                                        ...currentDump,
+                                        commentsCount:
+                                            Math.max(
+                                                0,
+                                                Number(
+                                                    currentDump.commentsCount ||
+                                                    0
+                                                )
+                                            ) +
+                                            1,
+                                    }
+                                    : currentDump
+                        )
+                );
+
+                setSelectedDump(
+                    (
+                        currentDump
+                    ) =>
+                        currentDump &&
+                            String(
+                                currentDump._id
+                            ) ===
+                            String(
+                                dumpId
+                            )
+                            ? {
+                                ...currentDump,
+                                commentsCount:
+                                    Math.max(
+                                        0,
+                                        Number(
+                                            currentDump.commentsCount ||
+                                            0
+                                        )
+                                    ) +
+                                    1,
+                            }
+                            : currentDump
+                );
+            },
+            []
+        );
+
+    const handleCommentDeleted =
+        useCallback(
+            (
+                dumpId: string
+            ) => {
+                setDumps(
+                    (
+                        currentDumps
+                    ) =>
+                        currentDumps.map(
+                            (
+                                currentDump
+                            ) =>
+                                String(
+                                    currentDump._id
+                                ) ===
+                                    String(
+                                        dumpId
+                                    )
+                                    ? {
+                                        ...currentDump,
+                                        commentsCount:
+                                            Math.max(
+                                                0,
+                                                Number(
+                                                    currentDump.commentsCount ||
+                                                    0
+                                                ) -
+                                                1
+                                            ),
+                                    }
+                                    : currentDump
+                        )
+                );
+
+                setSelectedDump(
+                    (
+                        currentDump
+                    ) =>
+                        currentDump &&
+                            String(
+                                currentDump._id
+                            ) ===
+                            String(
+                                dumpId
+                            )
+                            ? {
+                                ...currentDump,
+                                commentsCount:
+                                    Math.max(
+                                        0,
+                                        Number(
+                                            currentDump.commentsCount ||
+                                            0
+                                        ) -
+                                        1
+                                    ),
+                            }
+                            : currentDump
+                );
+            },
+            []
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delete Dump
+    |--------------------------------------------------------------------------
+    */
+
+    const performDeleteDump =
+        useCallback(
+            async (
+                dump: Dump
+            ) => {
+                if (
+                    deletingDumpId
+                ) {
+                    return;
+                }
+
+                const dumpId =
+                    String(
+                        dump._id
+                    );
+
+                try {
+                    setDeletingDumpId(
+                        dumpId
+                    );
+
+                    await deleteDump(
+                        dumpId
+                    );
+
+                    setDumps(
+                        (
+                            currentDumps
+                        ) =>
+                            currentDumps.filter(
+                                (
+                                    currentDump
+                                ) =>
+                                    String(
+                                        currentDump._id
+                                    ) !==
+                                    dumpId
+                            )
+                    );
+
+                    if (
+                        selectedDump &&
+                        String(
+                            selectedDump._id
+                        ) === dumpId
+                    ) {
+                        handleCloseComments();
+                    }
+                } catch (
+                deleteError: any
+                ) {
+                    console.error(
+                        "DELETE DUMP ERROR:",
+                        deleteError
+                    );
+
+                    Alert.alert(
+                        "Unable to Delete",
+                        deleteError
+                            ?.message ||
+                        "Your dump could not be deleted. Please try again."
+                    );
+                } finally {
+                    setDeletingDumpId(
+                        null
+                    );
+                }
+            },
+            [
+                deletingDumpId,
+                handleCloseComments,
+                selectedDump,
+            ]
+        );
+
+    const handleDeleteDump =
+        useCallback(
+            (
+                dump: Dump
+            ) => {
+                if (
+                    deletingDumpId
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Delete Dump?",
+                    "This will permanently delete your dump and its comments.",
+                    [
+                        {
+                            text: "Cancel",
+                            style:
+                                "cancel",
+                        },
+                        {
+                            text: "Delete",
+                            style:
+                                "destructive",
+                            onPress: () =>
+                                performDeleteDump(
+                                    dump
+                                ),
+                        },
+                    ]
+                );
+            },
+            [
+                deletingDumpId,
+                performDeleteDump,
+            ]
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Render Dump
+    |--------------------------------------------------------------------------
+    */
 
     const renderItem = ({
         item,
     }: {
         item: ActivityDump;
     }) => {
+        const isDeleting =
+            deletingDumpId ===
+            String(item._id);
+
         return (
-            <View>
+            <View
+                style={
+                    isDeleting
+                        ? styles.deletingCard
+                        : undefined
+                }
+            >
                 {activeTab ===
                     "interactions" &&
                     item
@@ -386,7 +845,45 @@ export default function MyDumpsScreen() {
                     onOpenComments={
                         handleOpenComments
                     }
+                    onDelete={
+                        activeTab ===
+                            "dumps"
+                            ? handleDeleteDump
+                            : undefined
+                    }
+                    deleteDisabled={
+                        Boolean(
+                            deletingDumpId
+                        )
+                    }
                 />
+
+                {isDeleting && (
+                    <View
+                        style={
+                            styles.deletingOverlay
+                        }
+                    >
+                        <ActivityIndicator
+                            size="small"
+                            color={
+                                theme.cyan
+                            }
+                        />
+
+                        <Text
+                            style={[
+                                styles.deletingText,
+                                {
+                                    color:
+                                        theme.muted,
+                                },
+                            ]}
+                        >
+                            Deleting...
+                        </Text>
+                    </View>
+                )}
             </View>
         );
     };
@@ -681,6 +1178,24 @@ export default function MyDumpsScreen() {
                     }
                 />
             )}
+
+            <DumpCommentsModal
+                visible={
+                    commentsVisible
+                }
+                dump={
+                    selectedDump
+                }
+                onClose={
+                    handleCloseComments
+                }
+                onCommentAdded={
+                    handleCommentAdded
+                }
+                onCommentDeleted={
+                    handleCommentDeleted
+                }
+            />
         </SafeAreaView>
     );
 }
@@ -816,5 +1331,26 @@ const styles =
             fontSize: 14,
             lineHeight: 20,
             textAlign: "center",
+        },
+
+        deletingCard: {
+            position: "relative",
+            opacity: 0.65,
+        },
+
+        deletingOverlay: {
+            ...StyleSheet.absoluteFillObject,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent:
+                "center",
+            gap: 8,
+            backgroundColor:
+                "rgba(0,0,0,0.10)",
+        },
+
+        deletingText: {
+            fontSize: 12,
+            fontWeight: "800",
         },
     });

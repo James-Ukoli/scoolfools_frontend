@@ -65,6 +65,16 @@ type DumpCardProps = {
     dump: Dump;
     currentUserId?: string | null;
     onOpenComments: (dump: Dump) => void;
+
+    /*
+     * The delete button only appears when
+     * this callback is passed by the screen.
+     *
+     * MyDumpsScreen will pass it.
+     * The nationwide feed will not.
+     */
+    onDelete?: (dump: Dump) => void;
+    deleteDisabled?: boolean;
 };
 
 type LocalReaction = {
@@ -83,12 +93,15 @@ const getDumpCardTheme = (
             text: "#07111F",
             textSoft: "#475569",
             muted: "#64748B",
-            border: "rgba(7,17,31,0.08)",
+            border:
+                "rgba(7,17,31,0.08)",
             selectedChip: "#CFFAFE",
-            selectedBorder: "rgba(6,182,212,0.42)",
+            selectedBorder:
+                "rgba(6,182,212,0.42)",
             cyan: "#06B6D4",
             blueCheck: "#1D9BF0",
             imageBackground: "#F1F5F9",
+            delete: "#DC2626",
         };
     }
 
@@ -97,12 +110,16 @@ const getDumpCardTheme = (
         text: "#FFFFFF",
         textSoft: "#CBD5E1",
         muted: "#94A3B8",
-        border: "rgba(255,255,255,0.09)",
-        selectedChip: "rgba(34,211,238,0.15)",
-        selectedBorder: "rgba(34,211,238,0.42)",
+        border:
+            "rgba(255,255,255,0.09)",
+        selectedChip:
+            "rgba(34,211,238,0.15)",
+        selectedBorder:
+            "rgba(34,211,238,0.42)",
         cyan: "#22D3EE",
         blueCheck: "#1D9BF0",
         imageBackground: "#111827",
+        delete: "#FF7A7A",
     };
 };
 
@@ -154,21 +171,27 @@ const getTimeAgo = (
     }
 
     const hours =
-        Math.floor(minutes / 60);
+        Math.floor(
+            minutes / 60
+        );
 
     if (hours < 24) {
         return `${hours}h`;
     }
 
     const days =
-        Math.floor(hours / 24);
+        Math.floor(
+            hours / 24
+        );
 
     if (days < 7) {
         return `${days}d`;
     }
 
     const weeks =
-        Math.floor(days / 7);
+        Math.floor(
+            days / 7
+        );
 
     return `${weeks}w`;
 };
@@ -191,7 +214,9 @@ const getClassificationLabel = (
 const getSportEmoji = (
     sport?: string | null
 ) => {
-    switch (sport?.toLowerCase()) {
+    switch (
+    sport?.toLowerCase()
+    ) {
         case "football":
             return "🏈";
 
@@ -243,6 +268,7 @@ const getSportEmoji = (
             return "🏅";
     }
 };
+
 const getSocialIcon = (
     platform?: string | null
 ):
@@ -287,7 +313,10 @@ const getSocialPlatformLabel = (
 };
 
 const getSocialIconColor = (
-    platform: string | null | undefined,
+    platform:
+        | string
+        | null
+        | undefined,
     isNight: boolean
 ) => {
     switch (platform) {
@@ -312,7 +341,9 @@ const getSocialIconColor = (
 
 const createLocalReactions = (
     dump: Dump,
-    currentUserId?: string | null
+    currentUserId?:
+        | string
+        | null
 ): LocalReaction[] => {
     const hasReaction = (
         reactionType: ReactionType
@@ -328,7 +359,9 @@ const createLocalReactions = (
         ).some(
             (userId) =>
                 String(userId) ===
-                String(currentUserId)
+                String(
+                    currentUserId
+                )
         );
     };
 
@@ -367,6 +400,8 @@ export default function DumpCard({
     dump,
     currentUserId,
     onOpenComments,
+    onDelete,
+    deleteDisabled = false,
 }: DumpCardProps) {
     const { mode } =
         useTimeTheme();
@@ -382,21 +417,23 @@ export default function DumpCard({
     const [
         reactions,
         setReactions,
-    ] = useState<LocalReaction[]>(
-        () =>
+    ] =
+        useState<
+            LocalReaction[]
+        >(() =>
             createLocalReactions(
                 dump,
                 currentUserId
             )
-    );
+        );
 
     const [
         updatingReaction,
         setUpdatingReaction,
     ] =
-        useState<ReactionType | null>(
-            null
-        );
+        useState<
+            ReactionType | null
+        >(null);
 
     const reactionScale =
         useRef(
@@ -416,7 +453,9 @@ export default function DumpCard({
     ]);
 
     const isAnonymous =
-        Boolean(dump.anonymous);
+        Boolean(
+            dump.anonymous
+        );
 
     const username =
         isAnonymous
@@ -430,12 +469,14 @@ export default function DumpCard({
     | Avatar Priority
     |--------------------------------------------------------------------------
     |
+    | Anonymous dump:
+    | anonymousAvatar
+    |
+    | Normal dump:
     | 1. selectedAvatar
     | 2. local avatar key
     | 3. providerAvatar or remote avatar
     | 4. basicBlue
-    |
-    | Anonymous dumps always use basicBlue.
     |
     */
 
@@ -450,7 +491,9 @@ export default function DumpCard({
     const localAvatar =
         !isAnonymous &&
             author?.avatar &&
-            !author.avatar.startsWith("http") &&
+            !author.avatar.startsWith(
+                "http"
+            ) &&
             author.avatar in
             PROFILE_AVATAR_IMAGES
             ? author.avatar
@@ -475,10 +518,13 @@ export default function DumpCard({
             : null;
 
     const avatarSource =
-        getProfileAvatarSource(
-            localAvatarId ??
-            "basicBlue"
-        );
+        isAnonymous
+            ? PROFILE_AVATAR_IMAGES
+                .anonymousAvatar
+            : getProfileAvatarSource(
+                localAvatarId ??
+                "basicBlue"
+            );
 
     const studentIdentity =
         useMemo(() => {
@@ -507,11 +553,22 @@ export default function DumpCard({
             ? "🎓"
             : "🎒";
 
+    /*
+     * Anonymous dumps should never
+     * reveal athlete information.
+     */
     const athleteEmoji =
-        author?.isStudentAthlete
-            ? getSportEmoji(author?.sport)
+        !isAnonymous &&
+            author?.isStudentAthlete
+            ? getSportEmoji(
+                author?.sport
+            )
             : null;
 
+    /*
+     * Anonymous dumps should never
+     * reveal social media links.
+     */
     const showSocialMedia =
         !isAnonymous &&
         Boolean(
@@ -537,7 +594,8 @@ export default function DumpCard({
                         ...reaction,
                         count:
                             counts[
-                            reaction.type
+                            reaction
+                                .type
                             ],
                         selected:
                             userReaction ===
@@ -551,7 +609,9 @@ export default function DumpCard({
         async (
             reactionType: ReactionType
         ) => {
-            if (updatingReaction) {
+            if (
+                updatingReaction
+            ) {
                 return;
             }
 
@@ -584,10 +644,12 @@ export default function DumpCard({
                             if (
                                 reaction.selected
                             ) {
-                                count = Math.max(
-                                    0,
-                                    count - 1
-                                );
+                                count =
+                                    Math.max(
+                                        0,
+                                        count -
+                                        1
+                                    );
                             }
 
                             if (
@@ -640,7 +702,9 @@ export default function DumpCard({
                     response.reactions,
                     response.userReaction
                 );
-            } catch (error: any) {
+            } catch (
+            error: any
+            ) {
                 setReactions(
                     previousReactions
                 );
@@ -697,6 +761,18 @@ export default function DumpCard({
             }
         };
 
+    const handleDeletePress =
+        () => {
+            if (
+                !onDelete ||
+                deleteDisabled
+            ) {
+                return;
+            }
+
+            onDelete(dump);
+        };
+
     return (
         <View
             style={[
@@ -722,7 +798,9 @@ export default function DumpCard({
                             }
                             : avatarSource
                     }
-                    style={styles.avatar}
+                    style={
+                        styles.avatar
+                    }
                     resizeMode="cover"
                 />
 
@@ -744,7 +822,9 @@ export default function DumpCard({
                                         theme.text,
                                 },
                             ]}
-                            numberOfLines={1}
+                            numberOfLines={
+                                1
+                            }
                         >
                             @{username}
                         </Text>
@@ -753,7 +833,9 @@ export default function DumpCard({
                             author?.isSubscribed && (
                                 <Ionicons
                                     name="checkmark-circle"
-                                    size={15}
+                                    size={
+                                        15
+                                    }
                                     color={
                                         theme.blueCheck
                                     }
@@ -779,7 +861,9 @@ export default function DumpCard({
                                 styles.schoolEmoji
                             }
                         >
-                            {studentEmoji}
+                            {
+                                studentEmoji
+                            }
                         </Text>
 
                         <Text
@@ -790,43 +874,88 @@ export default function DumpCard({
                                         theme.muted,
                                 },
                             ]}
-                            numberOfLines={1}
+                            numberOfLines={
+                                1
+                            }
                         >
-                            {studentIdentity}
+                            {
+                                studentIdentity
+                            }
                         </Text>
+
                         {athleteEmoji && (
                             <Text
-                                style={{
-                                    marginLeft: s(5),
-                                    fontSize: ms(10),
-                                }}
+                                style={
+                                    styles.athleteEmoji
+                                }
                             >
-                                {athleteEmoji}
+                                {
+                                    athleteEmoji
+                                }
                             </Text>
                         )}
                     </View>
                 </View>
 
-                <Text
-                    style={[
-                        styles.timeText,
-                        {
-                            color:
-                                theme.muted,
-                        },
-                    ]}
+                <View
+                    style={
+                        styles.headerRight
+                    }
                 >
-                    {getTimeAgo(
-                        dump.created_at
+                    <Text
+                        style={[
+                            styles.timeText,
+                            {
+                                color:
+                                    theme.muted,
+                            },
+                        ]}
+                    >
+                        {getTimeAgo(
+                            dump.created_at
+                        )}
+                    </Text>
+
+                    {onDelete && (
+                        <TouchableOpacity
+                            activeOpacity={
+                                0.65
+                            }
+                            disabled={
+                                deleteDisabled
+                            }
+                            onPress={
+                                handleDeletePress
+                            }
+                            hitSlop={
+                                8
+                            }
+                            style={[
+                                styles.deleteButton,
+                                deleteDisabled &&
+                                styles.deleteButtonDisabled,
+                            ]}
+                        >
+                            <Ionicons
+                                name="trash-outline"
+                                size={
+                                    15
+                                }
+                                color={
+                                    theme.delete
+                                }
+                            />
+                        </TouchableOpacity>
                     )}
-                </Text>
+                </View>
             </View>
 
             <Text
                 style={[
                     styles.dumpContent,
                     {
-                        color: theme.text,
+                        color:
+                            theme.text,
                     },
                 ]}
             >
@@ -928,7 +1057,9 @@ export default function DumpCard({
                     )}
 
                     <TouchableOpacity
-                        activeOpacity={0.7}
+                        activeOpacity={
+                            0.7
+                        }
                         onPress={() =>
                             onOpenComments(
                                 dump
@@ -940,7 +1071,9 @@ export default function DumpCard({
                     >
                         <Ionicons
                             name="chatbubble-outline"
-                            size={15}
+                            size={
+                                15
+                            }
                             color={
                                 theme.muted
                             }
@@ -963,7 +1096,9 @@ export default function DumpCard({
 
                 {showSocialMedia && (
                     <TouchableOpacity
-                        activeOpacity={0.68}
+                        activeOpacity={
+                            0.68
+                        }
                         style={
                             styles.socialMediaButton
                         }
@@ -978,12 +1113,15 @@ export default function DumpCard({
                             size={13}
                             color={getSocialIconColor(
                                 author?.socialMediaPlatform,
-                                mode === "night"
+                                mode ===
+                                "night"
                             )}
                         />
 
                         <Text
-                            numberOfLines={1}
+                            numberOfLines={
+                                1
+                            }
                             style={[
                                 styles.socialUsername,
                                 {
@@ -1023,8 +1161,10 @@ const styles =
         avatar: {
             width: s(35),
             height: s(35),
-            borderRadius: s(11),
-            marginRight: s(8),
+            borderRadius:
+                s(11),
+            marginRight:
+                s(8),
         },
 
         identitySection: {
@@ -1043,7 +1183,8 @@ const styles =
         username: {
             maxWidth: "80%",
             fontSize: ms(13),
-            lineHeight: ms(15),
+            lineHeight:
+                ms(15),
             fontFamily:
                 "Rajdhani_700Bold",
         },
@@ -1064,22 +1205,55 @@ const styles =
         schoolText: {
             flexShrink: 1,
             fontSize: ms(9),
-            lineHeight: ms(11),
+            lineHeight:
+                ms(11),
             fontWeight: "700",
+        },
+
+        athleteEmoji: {
+            marginLeft:
+                s(5),
+            fontSize:
+                ms(10),
+        },
+
+        headerRight: {
+            minWidth: s(26),
+            marginLeft: s(6),
+            alignItems:
+                "flex-end",
         },
 
         timeText: {
             fontSize: ms(9),
-            lineHeight: ms(12),
+            lineHeight:
+                ms(12),
             fontWeight: "700",
-            marginLeft: s(6),
             paddingTop: 1,
+        },
+
+        deleteButton: {
+            width: s(25),
+            height: s(24),
+            marginTop: vs(2),
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
+            borderRadius:
+                s(8),
+        },
+
+        deleteButtonDisabled: {
+            opacity: 0.4,
         },
 
         dumpContent: {
             marginTop: vs(6),
-            fontSize: ms(12.5),
-            lineHeight: ms(16.5),
+            fontSize:
+                ms(12.5),
+            lineHeight:
+                ms(16.5),
             fontWeight: "600",
         },
 
@@ -1107,7 +1281,8 @@ const styles =
         },
 
         compactReaction: {
-            minHeight: vs(23),
+            minHeight:
+                vs(23),
             flexDirection: "row",
             alignItems: "center",
             gap: s(2),
@@ -1115,21 +1290,25 @@ const styles =
             borderWidth: 1,
             borderColor:
                 "transparent",
-            paddingHorizontal: s(4),
+            paddingHorizontal:
+                s(4),
             paddingVertical: 1,
         },
 
         reactionEmoji: {
-            fontSize: ms(11.5),
+            fontSize:
+                ms(11.5),
         },
 
         actionCount: {
-            fontSize: ms(8.5),
+            fontSize:
+                ms(8.5),
             fontWeight: "900",
         },
 
         commentButton: {
-            minHeight: vs(23),
+            minHeight:
+                vs(23),
             flexDirection: "row",
             alignItems: "center",
             gap: s(3),
@@ -1139,19 +1318,22 @@ const styles =
 
         socialMediaButton: {
             maxWidth: "35%",
-            minHeight: vs(23),
+            minHeight:
+                vs(23),
             flexDirection: "row",
             alignItems: "center",
             justifyContent:
                 "flex-end",
             gap: s(4),
             marginLeft: s(9),
-            paddingHorizontal: s(3),
+            paddingHorizontal:
+                s(3),
         },
 
         socialUsername: {
             flexShrink: 1,
-            fontSize: ms(8.5),
+            fontSize:
+                ms(8.5),
             fontWeight: "800",
         },
     });
