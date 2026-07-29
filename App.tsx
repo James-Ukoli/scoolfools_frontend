@@ -1,16 +1,37 @@
-import { NavigationContainer } from "@react-navigation/native";
-import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+    NavigationContainer,
+} from "@react-navigation/native";
+import {
+    createNativeStackNavigator,
+} from "@react-navigation/native-stack";
+import {
+    SafeAreaProvider,
+} from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
-import { GoogleSignin } from "@react-native-google-signin/google-signin";
+import {
+    useEffect,
+    useState,
+} from "react";
+import {
+    ActivityIndicator,
+    View,
+} from "react-native";
+import {
+    GoogleSignin,
+} from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { jwtDecode } from "jwt-decode";
+import {
+    subscribeToPushNotificationEvents,
+    handleInitialNotificationResponse,
+} from "./src/services/pushRegistration";
 
 import {
-    useFonts,
+    handleNotificationResponse,
+} from "./src/services/notificationDeepLinking";
+import {
     Rajdhani_700Bold,
+    useFonts,
 } from "@expo-google-fonts/rajdhani";
 
 import AppShell from "./src/navigation/AppShell";
@@ -38,15 +59,27 @@ import DeleteAccountScreen from "./src/screens/DeleteAccountScreen";
 import CreateDumpScreen from "./src/screens/CreateDumpScreen";
 import MyDumpsScreen from "./src/screens/MyDumpsScreen";
 import TVScreen from "./src/screens/TVScreen";
-import { NotificationsProvider } from "./src/context/NotificationsContext";
-import { NotificationFeedProvider } from "./src/context/NotificationFeedContext";
+
+import {
+    NotificationsProvider,
+} from "./src/context/NotificationsContext";
+import {
+    NotificationFeedProvider,
+} from "./src/context/NotificationFeedContext";
 
 import {
     TimeThemeProvider,
     useTimeTheme,
 } from "./src/context/TimeThemeContext";
 
-const Stack = createNativeStackNavigator();
+import {
+    flushPendingNavigation,
+    navigationRef,
+    type RootStackParamList,
+} from "./src/navigation/AppNavigation";
+
+const Stack =
+    createNativeStackNavigator<RootStackParamList>();
 
 type InitialRoute =
     | "GoogleSignIn"
@@ -63,15 +96,23 @@ type ThemedNavigationProps = {
     initialRoute: InitialRoute;
 };
 
-const isTokenExpired = (token: string) => {
-    try {
-        const decoded: any = jwtDecode(token);
+type DecodedToken = {
+    exp?: number;
+};
 
-        if (!decoded?.exp) {
+const isTokenExpired = (
+    token: string
+): boolean => {
+    try {
+        const decoded =
+            jwtDecode<DecodedToken>(token);
+
+        if (!decoded.exp) {
             return true;
         }
 
-        return decoded.exp < Date.now() / 1000;
+        return decoded.exp <
+            Date.now() / 1000;
     } catch {
         return true;
     }
@@ -102,10 +143,28 @@ function ThemedNavigation({
         ? "#020617"
         : "#F8FAFC";
 
+    const handleNavigationReady = (): void => {
+        /*
+         * A notification may have been tapped while
+         * the app was completely closed.
+         *
+         * In that situation, the notification handler
+         * can queue its destination before React
+         * Navigation is ready. This runs that queued
+         * navigation after the container mounts.
+         */
+        flushPendingNavigation();
+    };
+
     return (
         <NotificationsProvider>
             <NotificationFeedProvider>
-                <NavigationContainer>
+                <NavigationContainer
+                    ref={navigationRef}
+                    onReady={
+                        handleNavigationReady
+                    }
+                >
                     <StatusBar
                         style={
                             isDark
@@ -321,16 +380,22 @@ function ThemedNavigation({
 }
 
 export default function App() {
-    const [initialRoute, setInitialRoute] =
-        useState<InitialRoute | null>(null);
+    const [
+        initialRoute,
+        setInitialRoute,
+    ] = useState<InitialRoute | null>(
+        null
+    );
 
-    const [fontsLoaded, fontError] =
-        useFonts({
-            Rajdhani_700Bold,
-        });
+    const [
+        fontsLoaded,
+        fontError,
+    ] = useFonts({
+        Rajdhani_700Bold,
+    });
 
     useEffect(() => {
-        const setupApp = async () => {
+        const setupApp = async (): Promise<void> => {
             try {
                 const iosClientId =
                     process.env
@@ -352,15 +417,19 @@ export default function App() {
                     );
                 }
 
-                const [token, storedUser] =
-                    await AsyncStorage.multiGet([
-                        "token",
-                        "user",
-                    ]);
+                const [
+                    tokenEntry,
+                    storedUserEntry,
+                ] = await AsyncStorage.multiGet([
+                    "token",
+                    "user",
+                ]);
 
-                const tokenValue = token[1];
+                const tokenValue =
+                    tokenEntry[1];
+
                 const storedUserValue =
-                    storedUser[1];
+                    storedUserEntry[1];
 
                 if (
                     !tokenValue ||
@@ -374,6 +443,7 @@ export default function App() {
                     setInitialRoute(
                         "GoogleSignIn"
                     );
+
                     return;
                 }
 
@@ -386,6 +456,7 @@ export default function App() {
                     setInitialRoute(
                         "GoogleSignIn"
                     );
+
                     return;
                 }
 
@@ -428,7 +499,7 @@ export default function App() {
             }
         };
 
-        setupApp();
+        void setupApp();
     }, []);
 
     useEffect(() => {
@@ -440,9 +511,29 @@ export default function App() {
         }
     }, [fontError]);
 
+    useEffect(() => {
+        if (initialRoute === null) {
+            return;
+        }
+
+        const unsubscribe =
+            subscribeToPushNotificationEvents({
+                onNotificationResponse:
+                    handleNotificationResponse,
+            });
+
+        void handleInitialNotificationResponse(
+            handleNotificationResponse,
+        );
+
+        return () => {
+            unsubscribe();
+        };
+    }, [initialRoute]);
+
     const appReady =
         initialRoute !== null &&
-        (fontsLoaded || !!fontError);
+        (fontsLoaded || Boolean(fontError));
 
     if (!appReady) {
         return (
@@ -475,7 +566,11 @@ export default function App() {
     return (
         <SafeAreaProvider>
             <TimeThemeProvider>
-                {/* <TimeThemeProvider forcedMode="night"> */}
+                {/*
+                <TimeThemeProvider
+                    forcedMode="night"
+                >
+                */}
                 <ThemedNavigation
                     initialRoute={
                         initialRoute

@@ -1,6 +1,7 @@
 import React, {
     useCallback,
     useEffect,
+    useRef,
     useState,
 } from "react";
 
@@ -25,6 +26,7 @@ import {
 import {
     useFocusEffect,
     useNavigation,
+    useRoute,
 } from "@react-navigation/native";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -42,15 +44,19 @@ import {
     Dump,
     getCollegeRecent,
     getCollegeTrending,
+    getDumpById,
     getHighSchoolRecent,
     getHighSchoolTrending,
-
 } from "../api/studentDumpApi";
 
 import {
     TimeTheme,
     useTimeTheme,
 } from "../context/TimeThemeContext";
+
+import {
+    navigate,
+} from "../navigation/AppNavigation";
 
 type FeedTab =
     | "Recent"
@@ -59,13 +65,37 @@ type FeedTab =
 type StoredUser = {
     _id?: string;
     id?: string;
+
     schoolLevel?:
     | "college"
     | "highSchool";
-    collegeName?: string | null;
+
+    collegeName?:
+    | string
+    | null;
+
     highSchoolClassification?:
     | string
     | null;
+};
+
+type DumpScreenRouteParams = {
+    notificationId?: string;
+    type?: string;
+
+    resourceType?: string;
+    resourceId?: string;
+
+    dumpId?: string;
+    commentId?: string;
+    replyId?: string;
+    parentCommentId?: string;
+
+    openComments?:
+    | boolean
+    | string;
+
+    notificationAction?: string;
 };
 
 const PAGE_LIMIT = 20;
@@ -112,15 +142,73 @@ const getDumpScreenTheme = (
     };
 };
 
+const getStringValue = (
+    value: unknown
+): string | null => {
+    if (
+        typeof value !== "string"
+    ) {
+        return null;
+    }
+
+    const trimmedValue =
+        value.trim();
+
+    return trimmedValue.length > 0
+        ? trimmedValue
+        : null;
+};
+
+const getBooleanValue = (
+    value: unknown
+): boolean => {
+    if (
+        typeof value === "boolean"
+    ) {
+        return value;
+    }
+
+    if (
+        typeof value === "string"
+    ) {
+        return (
+            value.toLowerCase() ===
+            "true"
+        );
+    }
+
+    return false;
+};
+
 export default function DumpScreen() {
     const navigation =
         useNavigation<any>();
+
+    const route =
+        useRoute<any>();
+
+    const listRef =
+        useRef<FlatList<Dump> | null>(
+            null
+        );
+
+    const activeDeepLinkRef =
+        useRef<string | null>(
+            null
+        );
+
+    const handledDeepLinkRef =
+        useRef<string | null>(
+            null
+        );
 
     const { mode } =
         useTimeTheme();
 
     const theme =
-        getDumpScreenTheme(mode);
+        getDumpScreenTheme(
+            mode
+        );
 
     const [
         currentUser,
@@ -133,7 +221,10 @@ export default function DumpScreen() {
     const [
         dumps,
         setDumps,
-    ] = useState<Dump[]>([]);
+    ] =
+        useState<Dump[]>(
+            []
+        );
 
     const [
         feedTab,
@@ -146,27 +237,32 @@ export default function DumpScreen() {
     const [
         page,
         setPage,
-    ] = useState(1);
+    ] =
+        useState(1);
 
     const [
         hasMore,
         setHasMore,
-    ] = useState(true);
+    ] =
+        useState(true);
 
     const [
         loading,
         setLoading,
-    ] = useState(true);
+    ] =
+        useState(true);
 
     const [
         loadingMore,
         setLoadingMore,
-    ] = useState(false);
+    ] =
+        useState(false);
 
     const [
         refreshing,
         setRefreshing,
-    ] = useState(false);
+    ] =
+        useState(false);
 
     const [
         errorMessage,
@@ -187,7 +283,38 @@ export default function DumpScreen() {
     const [
         commentsVisible,
         setCommentsVisible,
-    ] = useState(false);
+    ] =
+        useState(false);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Comment Targets
+    |--------------------------------------------------------------------------
+    */
+
+    const [
+        targetCommentId,
+        setTargetCommentId,
+    ] =
+        useState<string | null>(
+            null
+        );
+
+    const [
+        targetReplyId,
+        setTargetReplyId,
+    ] =
+        useState<string | null>(
+            null
+        );
+
+    const [
+        targetParentCommentId,
+        setTargetParentCommentId,
+    ] =
+        useState<string | null>(
+            null
+        );
 
     const schoolLevel =
         currentUser
@@ -205,137 +332,459 @@ export default function DumpScreen() {
             ? "High School Nationwide"
             : "College Nationwide";
 
+    /*
+    |--------------------------------------------------------------------------
+    | Load Stored User
+    |--------------------------------------------------------------------------
+    */
+
     const loadStoredUser =
-        useCallback(async () => {
-            try {
-                const storedUser =
-                    await AsyncStorage.getItem(
-                        "user"
-                    );
-
-                if (!storedUser) {
-                    setCurrentUser(null);
-                    return null;
-                }
-
-                const parsedUser:
-                    StoredUser =
-                    JSON.parse(
-                        storedUser
-                    );
-
-                setCurrentUser(
-                    parsedUser
-                );
-
-                return parsedUser;
-            } catch (error) {
-                console.log(
-                    "Dump user load error:",
-                    error
-                );
-
-                return null;
-            }
-        }, []);
-
-    const fetchFeed = useCallback(
-        async (
-            requestedPage = 1,
-            append = false,
-            user: StoredUser | null = currentUser,
-            selectedTab: FeedTab = feedTab
-        ) => {
-            const level =
-                user?.schoolLevel ||
-                "college";
-
-            const response =
-                level === "highSchool"
-                    ? selectedTab === "Recent"
-                        ? await getHighSchoolRecent(
-                            requestedPage,
-                            PAGE_LIMIT
-                        )
-                        : await getHighSchoolTrending(
-                            requestedPage,
-                            PAGE_LIMIT
-                        )
-                    : selectedTab === "Recent"
-                        ? await getCollegeRecent(
-                            requestedPage,
-                            PAGE_LIMIT
-                        )
-                        : await getCollegeTrending(
-                            requestedPage,
-                            PAGE_LIMIT
+        useCallback(
+            async () => {
+                try {
+                    const storedUser =
+                        await AsyncStorage.getItem(
+                            "user"
                         );
 
-            setDumps((current) =>
-                append
-                    ? [
-                        ...current,
-                        ...response.dumps.filter(
-                            (incoming) =>
-                                !current.some(
-                                    (existing) =>
-                                        existing._id ===
-                                        incoming._id
-                                )
-                        ),
-                    ]
-                    : response.dumps
-            );
+                    if (!storedUser) {
+                        setCurrentUser(
+                            null
+                        );
 
-            setPage(requestedPage);
+                        return null;
+                    }
 
-            const pagination =
-                response?.pagination;
+                    const parsedValue =
+                        JSON.parse(
+                            storedUser
+                        );
 
-            const totalPages =
-                pagination?.pages ?? 1;
+                    const parsedUser =
+                        parsedValue?.user ||
+                        parsedValue?.data
+                            ?.user ||
+                        parsedValue;
 
-            setHasMore(
-                requestedPage < totalPages
-            );
+                    setCurrentUser(
+                        parsedUser
+                    );
 
-            setErrorMessage(null);
-        },
-        [currentUser, feedTab]
-    );
+                    return parsedUser as StoredUser;
+                } catch (error) {
+                    console.log(
+                        "Dump user load error:",
+                        error
+                    );
 
-    const loadInitialFeed =
-        useCallback(async () => {
-            try {
-                setLoading(true);
+                    setCurrentUser(
+                        null
+                    );
 
-                const user =
-                    await loadStoredUser();
+                    return null;
+                }
+            },
+            []
+        );
 
-                await fetchFeed(
-                    1,
-                    false,
+    /*
+    |--------------------------------------------------------------------------
+    | Fetch Feed
+    |--------------------------------------------------------------------------
+    */
+
+    const fetchFeed =
+        useCallback(
+            async (
+                requestedPage = 1,
+                append = false,
+                user:
+                    | StoredUser
+                    | null =
+                    currentUser,
+                selectedTab:
+                    FeedTab =
+                    feedTab
+            ) => {
+                const level =
                     user
+                        ?.schoolLevel ||
+                    "college";
+
+                const response =
+                    level ===
+                        "highSchool"
+                        ? selectedTab ===
+                            "Recent"
+                            ? await getHighSchoolRecent(
+                                requestedPage,
+                                PAGE_LIMIT
+                            )
+                            : await getHighSchoolTrending(
+                                requestedPage,
+                                PAGE_LIMIT
+                            )
+                        : selectedTab ===
+                            "Recent"
+                            ? await getCollegeRecent(
+                                requestedPage,
+                                PAGE_LIMIT
+                            )
+                            : await getCollegeTrending(
+                                requestedPage,
+                                PAGE_LIMIT
+                            );
+
+                setDumps(
+                    (current) =>
+                        append
+                            ? [
+                                ...current,
+                                ...response.dumps.filter(
+                                    (
+                                        incoming
+                                    ) =>
+                                        !current.some(
+                                            (
+                                                existing
+                                            ) =>
+                                                existing._id ===
+                                                incoming._id
+                                        )
+                                ),
+                            ]
+                            : response.dumps
                 );
-            } catch (error: any) {
-                console.log(
-                    "Dump feed load error:",
-                    error
+
+                setPage(
+                    requestedPage
+                );
+
+                const pagination =
+                    response.pagination;
+
+                const totalPages =
+                    pagination?.pages ??
+                    1;
+
+                setHasMore(
+                    requestedPage <
+                    totalPages
                 );
 
                 setErrorMessage(
-                    error?.message ||
-                    "The Student Dump feed could not be loaded."
+                    null
                 );
-            } finally {
-                setLoading(false);
-            }
-        }, [
-            fetchFeed,
-            loadStoredUser,
-        ]);
+            },
+            [
+                currentUser,
+                feedTab,
+            ]
+        );
 
+    /*
+    |--------------------------------------------------------------------------
+    | Initial Feed
+    |--------------------------------------------------------------------------
+    */
 
+    const loadInitialFeed =
+        useCallback(
+            async () => {
+                try {
+                    setLoading(
+                        true
+                    );
+
+                    const user =
+                        await loadStoredUser();
+
+                    await fetchFeed(
+                        1,
+                        false,
+                        user,
+                        feedTab
+                    );
+                } catch (
+                error: any
+                ) {
+                    console.log(
+                        "Dump feed load error:",
+                        error
+                    );
+
+                    setErrorMessage(
+                        error?.message ||
+                        "The Student Dump feed could not be loaded."
+                    );
+                } finally {
+                    setLoading(
+                        false
+                    );
+                }
+            },
+            [
+                feedTab,
+                fetchFeed,
+                loadStoredUser,
+            ]
+        );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Deep Linking
+    |--------------------------------------------------------------------------
+    */
+
+    const handleNotificationDeepLink =
+        useCallback(
+            async () => {
+                const params =
+                    (
+                        route.params ||
+                        {}
+                    ) as DumpScreenRouteParams;
+
+                const resourceType =
+                    getStringValue(
+                        params.resourceType
+                    );
+
+                const directDumpId =
+                    getStringValue(
+                        params.dumpId
+                    );
+
+                const resourceId =
+                    getStringValue(
+                        params.resourceId
+                    );
+
+                const targetDumpId =
+                    directDumpId ||
+                    (
+                        resourceType ===
+                            "dump"
+                            ? resourceId
+                            : null
+                    );
+
+                if (!targetDumpId) {
+                    return;
+                }
+
+                const notificationId =
+                    getStringValue(
+                        params.notificationId
+                    );
+
+                const commentId =
+                    getStringValue(
+                        params.commentId
+                    );
+
+                const replyId =
+                    getStringValue(
+                        params.replyId
+                    );
+
+                const parentCommentId =
+                    getStringValue(
+                        params.parentCommentId
+                    );
+
+                const notificationAction =
+                    getStringValue(
+                        params.notificationAction
+                    );
+
+                const deepLinkKey =
+                    notificationId ||
+                    [
+                        targetDumpId,
+                        commentId || "",
+                        replyId || "",
+                        parentCommentId ||
+                        "",
+                        notificationAction ||
+                        "",
+                    ].join(":");
+
+                if (
+                    handledDeepLinkRef
+                        .current ===
+                    deepLinkKey
+                ) {
+                    return;
+                }
+
+                if (
+                    activeDeepLinkRef
+                        .current ===
+                    deepLinkKey
+                ) {
+                    return;
+                }
+
+                activeDeepLinkRef.current =
+                    deepLinkKey;
+
+                try {
+                    const response =
+                        await getDumpById(
+                            targetDumpId
+                        );
+
+                    const targetDump =
+                        response.dump;
+
+                    setDumps(
+                        (current) => [
+                            targetDump,
+                            ...current.filter(
+                                (dump) =>
+                                    dump._id !==
+                                    targetDump._id
+                            ),
+                        ]
+                    );
+
+                    const shouldOpenComments =
+                        getBooleanValue(
+                            params.openComments
+                        ) ||
+                        Boolean(
+                            commentId ||
+                            replyId ||
+                            parentCommentId
+                        ) ||
+                        notificationAction ===
+                        "open_comments" ||
+                        notificationAction ===
+                        "open_comment" ||
+                        notificationAction ===
+                        "open_reply";
+
+                    if (
+                        shouldOpenComments
+                    ) {
+                        setTargetCommentId(
+                            commentId
+                        );
+
+                        setTargetReplyId(
+                            replyId
+                        );
+
+                        setTargetParentCommentId(
+                            parentCommentId
+                        );
+
+                        setSelectedDump(
+                            targetDump
+                        );
+
+                        setCommentsVisible(
+                            true
+                        );
+                    } else {
+                        setTargetCommentId(
+                            null
+                        );
+
+                        setTargetReplyId(
+                            null
+                        );
+
+                        setTargetParentCommentId(
+                            null
+                        );
+
+                        setTimeout(() => {
+                            listRef.current
+                                ?.scrollToOffset({
+                                    offset: 0,
+                                    animated:
+                                        true,
+                                });
+                        }, 150);
+                    }
+
+                    handledDeepLinkRef.current =
+                        deepLinkKey;
+
+                    navigation.setParams({
+                        notificationId:
+                            undefined,
+
+                        type:
+                            undefined,
+
+                        resourceType:
+                            undefined,
+
+                        resourceId:
+                            undefined,
+
+                        dumpId:
+                            undefined,
+
+                        commentId:
+                            undefined,
+
+                        replyId:
+                            undefined,
+
+                        parentCommentId:
+                            undefined,
+
+                        openComments:
+                            undefined,
+
+                        notificationAction:
+                            undefined,
+                    });
+                } catch (
+                error: any
+                ) {
+                    console.log(
+                        "Dump notification deep-link error:",
+                        error
+                    );
+
+                    Alert.alert(
+                        "Dump unavailable",
+                        error?.message ||
+                        "This dump may have been removed or is no longer available."
+                    );
+                } finally {
+                    if (
+                        activeDeepLinkRef
+                            .current ===
+                        deepLinkKey
+                    ) {
+                        activeDeepLinkRef.current =
+                            null;
+                    }
+                }
+            },
+            [
+                navigation,
+                route.params,
+            ]
+        );
+
+    useEffect(() => {
+        void handleNotificationDeepLink();
+    }, [
+        handleNotificationDeepLink,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh Feed When Focused
+    |--------------------------------------------------------------------------
+    */
 
     useFocusEffect(
         useCallback(() => {
@@ -351,7 +800,9 @@ export default function DumpScreen() {
                             user,
                             feedTab
                         );
-                    } catch (error) {
+                    } catch (
+                    error
+                    ) {
                         console.log(
                             "Dump focus refresh error:",
                             error
@@ -359,13 +810,88 @@ export default function DumpScreen() {
                     }
                 };
 
-            refreshAfterFocus();
-        }, [feedTab])
+            void refreshAfterFocus();
+        }, [
+            feedTab,
+            fetchFeed,
+            loadStoredUser,
+        ])
     );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Initial Mount
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        let mounted =
+            true;
+
+        const startFeed =
+            async () => {
+                try {
+                    setLoading(
+                        true
+                    );
+
+                    const user =
+                        await loadStoredUser();
+
+                    if (!mounted) {
+                        return;
+                    }
+
+                    await fetchFeed(
+                        1,
+                        false,
+                        user,
+                        "Recent"
+                    );
+                } catch (
+                error: any
+                ) {
+                    if (!mounted) {
+                        return;
+                    }
+
+                    console.log(
+                        "Dump feed load error:",
+                        error
+                    );
+
+                    setErrorMessage(
+                        error?.message ||
+                        "The Student Dump feed could not be loaded."
+                    );
+                } finally {
+                    if (mounted) {
+                        setLoading(
+                            false
+                        );
+                    }
+                }
+            };
+
+        void startFeed();
+
+        return () => {
+            mounted =
+                false;
+        };
+    }, []);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refresh
+    |--------------------------------------------------------------------------
+    */
 
     const handleRefresh =
         async () => {
-            setRefreshing(true);
+            setRefreshing(
+                true
+            );
 
             try {
                 const user =
@@ -374,17 +900,28 @@ export default function DumpScreen() {
                 await fetchFeed(
                     1,
                     false,
-                    user
+                    user,
+                    feedTab
                 );
-            } catch (error: any) {
+            } catch (
+            error: any
+            ) {
                 setErrorMessage(
                     error?.message ||
                     "The feed could not be refreshed."
                 );
             } finally {
-                setRefreshing(false);
+                setRefreshing(
+                    false
+                );
             }
         };
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination
+    |--------------------------------------------------------------------------
+    */
 
     const handleLoadMore =
         async () => {
@@ -398,110 +935,137 @@ export default function DumpScreen() {
             }
 
             try {
-                setLoadingMore(true);
+                setLoadingMore(
+                    true
+                );
 
                 await fetchFeed(
                     page + 1,
-                    true
+                    true,
+                    currentUser,
+                    feedTab
                 );
-            } catch (error) {
+            } catch (
+            error
+            ) {
                 console.log(
                     "Dump pagination error:",
                     error
                 );
             } finally {
-                setLoadingMore(false);
+                setLoadingMore(
+                    false
+                );
             }
         };
 
-    const handleChangeTab = async (
-        nextTab: FeedTab
-    ) => {
-        if (
-            nextTab === feedTab ||
-            loading
-        ) {
-            return;
-        }
+    /*
+    |--------------------------------------------------------------------------
+    | Change Feed Tab
+    |--------------------------------------------------------------------------
+    */
 
-        try {
-            setFeedTab(nextTab);
-            setLoading(true);
-            setDumps([]);
-            setPage(1);
-            setHasMore(true);
+    const handleChangeTab =
+        async (
+            nextTab: FeedTab
+        ) => {
+            if (
+                nextTab ===
+                feedTab ||
+                loading
+            ) {
+                return;
+            }
 
-            await fetchFeed(
-                1,
-                false,
-                currentUser,
-                nextTab
-            );
-        } catch (error: any) {
-            setErrorMessage(
-                error?.message ||
-                "The feed could not be loaded."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        let mounted = true;
-
-        const startFeed = async () => {
             try {
-                setLoading(true);
+                setFeedTab(
+                    nextTab
+                );
 
-                const user =
-                    await loadStoredUser();
+                setLoading(
+                    true
+                );
 
-                if (!mounted) return;
+                setDumps(
+                    []
+                );
+
+                setPage(
+                    1
+                );
+
+                setHasMore(
+                    true
+                );
 
                 await fetchFeed(
                     1,
                     false,
-                    user,
-                    "Recent"
+                    currentUser,
+                    nextTab
                 );
-            } catch (error: any) {
-                if (!mounted) return;
-
-                console.log(
-                    "Dump feed load error:",
-                    error
-                );
-
+            } catch (
+            error: any
+            ) {
                 setErrorMessage(
                     error?.message ||
-                    "The Student Dump feed could not be loaded."
+                    "The feed could not be loaded."
                 );
             } finally {
-                if (mounted) {
-                    setLoading(false);
-                }
+                setLoading(
+                    false
+                );
             }
         };
 
-        startFeed();
+    /*
+    |--------------------------------------------------------------------------
+    | Comments Modal
+    |--------------------------------------------------------------------------
+    */
 
-        return () => {
-            mounted = false;
+    const handleOpenComments =
+        (
+            dump: Dump
+        ) => {
+            setTargetCommentId(
+                null
+            );
+
+            setTargetReplyId(
+                null
+            );
+
+            setTargetParentCommentId(
+                null
+            );
+
+            setSelectedDump(
+                dump
+            );
+
+            setCommentsVisible(
+                true
+            );
         };
-    }, []);
-
-
-    const handleOpenComments = (
-        dump: Dump
-    ) => {
-        setSelectedDump(dump);
-        setCommentsVisible(true);
-    };
 
     const handleCloseComments =
         () => {
-            setCommentsVisible(false);
+            setCommentsVisible(
+                false
+            );
+
+            setTargetCommentId(
+                null
+            );
+
+            setTargetReplyId(
+                null
+            );
+
+            setTargetParentCommentId(
+                null
+            );
 
             setTimeout(() => {
                 setSelectedDump(
@@ -510,276 +1074,360 @@ export default function DumpScreen() {
             }, 250);
         };
 
-    const handleCommentAdded = (
-        dumpId: string
-    ) => {
-        setDumps(
-            (current) =>
-                current.map(
-                    (dump) =>
-                        dump._id ===
-                            dumpId
-                            ? {
-                                ...dump,
-                                commentsCount:
+    const handleCommentAdded =
+        (
+            dumpId: string
+        ) => {
+            setDumps(
+                (current) =>
+                    current.map(
+                        (dump) =>
+                            dump._id ===
+                                dumpId
+                                ? {
+                                    ...dump,
+
+                                    commentsCount:
+                                        (
+                                            dump.commentsCount ||
+                                            0
+                                        ) + 1,
+                                }
+                                : dump
+                    )
+            );
+
+            setSelectedDump(
+                (current) =>
+                    current &&
+                        current._id ===
+                        dumpId
+                        ? {
+                            ...current,
+
+                            commentsCount:
+                                (
+                                    current.commentsCount ||
+                                    0
+                                ) + 1,
+                        }
+                        : current
+            );
+        };
+
+    const handleCommentDeleted =
+        (
+            dumpId: string
+        ) => {
+            setDumps(
+                (current) =>
+                    current.map(
+                        (dump) =>
+                            dump._id ===
+                                dumpId
+                                ? {
+                                    ...dump,
+
+                                    commentsCount:
+                                        Math.max(
+                                            0,
+                                            (
+                                                dump.commentsCount ||
+                                                0
+                                            ) -
+                                            1
+                                        ),
+                                }
+                                : dump
+                    )
+            );
+
+            setSelectedDump(
+                (current) =>
+                    current &&
+                        current._id ===
+                        dumpId
+                        ? {
+                            ...current,
+
+                            commentsCount:
+                                Math.max(
+                                    0,
                                     (
-                                        dump.commentsCount ||
+                                        current.commentsCount ||
                                         0
-                                    ) + 1,
-                            }
-                            : dump
-                )
-        );
+                                    ) - 1
+                                ),
+                        }
+                        : current
+            );
+        };
 
-        setSelectedDump(
-            (current) =>
-                current &&
-                    current._id ===
-                    dumpId
-                    ? {
-                        ...current,
-                        commentsCount:
-                            (
-                                current.commentsCount ||
-                                0
-                            ) + 1,
-                    }
-                    : current
-        );
-    };
+    /*
+    |--------------------------------------------------------------------------
+    | Header
+    |--------------------------------------------------------------------------
+    */
 
-    const renderHeader = () => (
-        <View>
-            <View
-                style={[
-                    styles.headerSection,
-                    {
-                        backgroundColor:
-                            theme.surface,
-                        borderBottomColor:
-                            theme.border,
-                    },
-                ]}
-            >
+    const renderHeader =
+        () => (
+            <View>
                 <View
-                    style={
-                        styles.headerAccent
-                    }
-                />
+                    style={[
+                        styles.headerSection,
+                        {
+                            backgroundColor:
+                                theme.surface,
 
-                <View
-                    style={
-                        styles.headerTopRow
-                    }
+                            borderBottomColor:
+                                theme.border,
+                        },
+                    ]}
                 >
                     <View
                         style={
-                            styles.titleTextWrap
+                            styles.headerAccent
                         }
-                    >
-                        <Text
-                            style={[
-                                styles.screenTitle,
-                                {
-                                    color:
-                                        theme.text,
-                                },
-                            ]}
-                        >
-                            Student Dump
-                        </Text>
+                    />
 
-                        <Text
-                            style={[
-                                styles.screenSubtitle,
-                                {
-                                    color:
-                                        theme.textSoft,
-                                },
-                            ]}
-                        >
-                            Say it. Dump it. Get it off your chest.
-                        </Text>
-                    </View>
-
-                    <TouchableOpacity
-                        activeOpacity={0.82}
-                        onPress={() =>
-                            navigation.navigate(
-                                "CreateDump"
-                            )
-                        }
-                        style={[
-                            styles.createButton,
-                            {
-                                backgroundColor:
-                                    theme.yellow,
-                            },
-                        ]}
-                    >
-                        <Ionicons
-                            name="add"
-                            size={17}
-                            color={
-                                theme.darkText
-                            }
-                        />
-
-                        <Text
-                            style={[
-                                styles.createButtonText,
-                                {
-                                    color:
-                                        theme.darkText,
-                                },
-                            ]}
-                        >
-                            Dump
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View
-                    style={
-                        styles.headerBottomRow
-                    }
-                >
                     <View
-                        style={[
-                            styles.feedIdentity,
-                            {
-                                backgroundColor:
-                                    theme.cyanSoft,
-                            },
-                        ]}
-                    >
-                        <Ionicons
-                            name={
-                                schoolLevel ===
-                                    "highSchool"
-                                    ? "book"
-                                    : "school"
-                            }
-                            size={14}
-                            color={
-                                theme.cyan
-                            }
-                        />
-
-                        <Text
-                            style={[
-                                styles.feedIdentityText,
-                                {
-                                    color:
-                                        theme.text,
-                                },
-                            ]}
-                        >
-                            {feedTitle}
-                        </Text>
-                    </View>
-
-                    <TouchableOpacity
-                        activeOpacity={0.78}
-                        onPress={() =>
-                            navigation.navigate(
-                                "MyDumps"
-                            )
+                        style={
+                            styles.headerTopRow
                         }
-                        style={[
-                            styles.myDumpsButton,
-                            {
-                                borderColor:
-                                    theme.border,
-                            },
-                        ]}
                     >
-                        <Ionicons
-                            name="person-outline"
-                            size={14}
-                            color={
-                                theme.cyan
-                            }
-                        />
-
-                        <Text
-                            style={[
-                                styles.myDumpsText,
-                                {
-                                    color:
-                                        theme.text,
-                                },
-                            ]}
-                        >
-                            My Dumps
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            <View
-                style={[
-                    styles.feedTabs,
-                    {
-                        backgroundColor:
-                            theme.feed,
-                        borderBottomColor:
-                            theme.border,
-                    },
-                ]}
-            >
-                {(
-                    [
-                        "Recent",
-                        "Trending",
-                    ] as FeedTab[]
-                ).map((tab) => {
-                    const active =
-                        feedTab === tab;
-
-                    return (
-                        <TouchableOpacity
-                            key={tab}
-                            activeOpacity={0.78}
-                            onPress={() =>
-                                handleChangeTab(
-                                    tab
-                                )
-                            }
+                        <View
                             style={
-                                styles.feedTabButton
+                                styles.titleTextWrap
                             }
                         >
                             <Text
                                 style={[
-                                    styles.feedTabText,
+                                    styles.screenTitle,
                                     {
-                                        color: active
-                                            ? theme.cyan
-                                            : theme.muted,
+                                        color:
+                                            theme.text,
                                     },
                                 ]}
                             >
-                                {tab}
+                                Student Dump
                             </Text>
 
-                            <View
+                            <Text
                                 style={[
-                                    styles.feedTabLine,
+                                    styles.screenSubtitle,
                                     {
-                                        backgroundColor:
-                                            active
-                                                ? theme.cyan
-                                                : "transparent",
+                                        color:
+                                            theme.textSoft,
                                     },
                                 ]}
+                            >
+                                Say it. Dump it. Get it off your chest.
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            activeOpacity={
+                                0.82
+                            }
+                            onPress={() =>
+                                navigate(
+                                    "CreateDump"
+                                )
+                            }
+                            style={[
+                                styles.createButton,
+                                {
+                                    backgroundColor:
+                                        theme.yellow,
+                                },
+                            ]}
+                        >
+                            <Ionicons
+                                name="add"
+                                size={
+                                    17
+                                }
+                                color={
+                                    theme.darkText
+                                }
                             />
+
+                            <Text
+                                style={[
+                                    styles.createButtonText,
+                                    {
+                                        color:
+                                            theme.darkText,
+                                    },
+                                ]}
+                            >
+                                Dump
+                            </Text>
                         </TouchableOpacity>
-                    );
-                })}
+                    </View>
+
+                    <View
+                        style={
+                            styles.headerBottomRow
+                        }
+                    >
+                        <View
+                            style={[
+                                styles.feedIdentity,
+                                {
+                                    backgroundColor:
+                                        theme.cyanSoft,
+                                },
+                            ]}
+                        >
+                            <Ionicons
+                                name={
+                                    schoolLevel ===
+                                        "highSchool"
+                                        ? "book"
+                                        : "school"
+                                }
+                                size={
+                                    14
+                                }
+                                color={
+                                    theme.cyan
+                                }
+                            />
+
+                            <Text
+                                style={[
+                                    styles.feedIdentityText,
+                                    {
+                                        color:
+                                            theme.text,
+                                    },
+                                ]}
+                            >
+                                {
+                                    feedTitle
+                                }
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            activeOpacity={
+                                0.78
+                            }
+                            onPress={() =>
+                                navigate(
+                                    "MyDumps"
+                                )
+                            }
+                            style={[
+                                styles.myDumpsButton,
+                                {
+                                    borderColor:
+                                        theme.border,
+                                },
+                            ]}
+                        >
+                            <Ionicons
+                                name="person-outline"
+                                size={
+                                    14
+                                }
+                                color={
+                                    theme.cyan
+                                }
+                            />
+
+                            <Text
+                                style={[
+                                    styles.myDumpsText,
+                                    {
+                                        color:
+                                            theme.text,
+                                    },
+                                ]}
+                            >
+                                My Dumps
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                <View
+                    style={[
+                        styles.feedTabs,
+                        {
+                            backgroundColor:
+                                theme.feed,
+
+                            borderBottomColor:
+                                theme.border,
+                        },
+                    ]}
+                >
+                    {(
+                        [
+                            "Recent",
+                            "Trending",
+                        ] as FeedTab[]
+                    ).map(
+                        (
+                            tab
+                        ) => {
+                            const active =
+                                feedTab ===
+                                tab;
+
+                            return (
+                                <TouchableOpacity
+                                    key={
+                                        tab
+                                    }
+                                    activeOpacity={
+                                        0.78
+                                    }
+                                    onPress={() =>
+                                        handleChangeTab(
+                                            tab
+                                        )
+                                    }
+                                    style={
+                                        styles.feedTabButton
+                                    }
+                                >
+                                    <Text
+                                        style={[
+                                            styles.feedTabText,
+                                            {
+                                                color:
+                                                    active
+                                                        ? theme.cyan
+                                                        : theme.muted,
+                                            },
+                                        ]}
+                                    >
+                                        {
+                                            tab
+                                        }
+                                    </Text>
+
+                                    <View
+                                        style={[
+                                            styles.feedTabLine,
+                                            {
+                                                backgroundColor:
+                                                    active
+                                                        ? theme.cyan
+                                                        : "transparent",
+                                            },
+                                        ]}
+                                    />
+                                </TouchableOpacity>
+                            );
+                        }
+                    )}
+                </View>
             </View>
-        </View>
-    );
+        );
 
     return (
         <SafeAreaView
@@ -796,7 +1444,12 @@ export default function DumpScreen() {
             ]}
         >
             <FlatList
-                data={dumps}
+                ref={
+                    listRef
+                }
+                data={
+                    dumps
+                }
                 keyExtractor={(
                     item
                 ) => item._id}
@@ -804,7 +1457,9 @@ export default function DumpScreen() {
                     item,
                 }) => (
                     <DumpCard
-                        dump={item}
+                        dump={
+                            item
+                        }
                         currentUserId={
                             currentUserId
                         }
@@ -818,7 +1473,9 @@ export default function DumpScreen() {
                 }
                 contentContainerStyle={[
                     styles.listContent,
-                    dumps.length === 0 &&
+
+                    dumps.length ===
+                    0 &&
                     styles.emptyListContent,
                 ]}
                 refreshControl={
@@ -840,9 +1497,7 @@ export default function DumpScreen() {
                         }
                     />
                 }
-                ListHeaderComponent={
-                    renderHeader
-                }
+                ListHeaderComponent={<>{renderHeader()}</>}
                 onEndReached={
                     handleLoadMore
                 }
@@ -899,7 +1554,9 @@ export default function DumpScreen() {
                             <>
                                 <Ionicons
                                     name="alert-circle-outline"
-                                    size={32}
+                                    size={
+                                        32
+                                    }
                                     color={
                                         theme.red
                                     }
@@ -932,7 +1589,9 @@ export default function DumpScreen() {
                                 </Text>
 
                                 <TouchableOpacity
-                                    activeOpacity={0.8}
+                                    activeOpacity={
+                                        0.8
+                                    }
                                     onPress={
                                         loadInitialFeed
                                     }
@@ -957,7 +1616,9 @@ export default function DumpScreen() {
                             <>
                                 <Ionicons
                                     name="trash-bin-outline"
-                                    size={32}
+                                    size={
+                                        32
+                                    }
                                     color={
                                         theme.cyan
                                     }
@@ -988,9 +1649,11 @@ export default function DumpScreen() {
                                 </Text>
 
                                 <TouchableOpacity
-                                    activeOpacity={0.82}
+                                    activeOpacity={
+                                        0.82
+                                    }
                                     onPress={() =>
-                                        navigation.navigate(
+                                        navigate(
                                             "CreateDump"
                                         )
                                     }
@@ -1004,7 +1667,9 @@ export default function DumpScreen() {
                                 >
                                     <Ionicons
                                         name="add"
-                                        size={16}
+                                        size={
+                                            16
+                                        }
                                         color={
                                             theme.darkText
                                         }
@@ -1035,11 +1700,23 @@ export default function DumpScreen() {
                 dump={
                     selectedDump
                 }
+                targetCommentId={
+                    targetCommentId
+                }
+                targetReplyId={
+                    targetReplyId
+                }
+                targetParentCommentId={
+                    targetParentCommentId
+                }
                 onClose={
                     handleCloseComments
                 }
                 onCommentAdded={
                     handleCommentAdded
+                }
+                onCommentDeleted={
+                    handleCommentDeleted
                 }
             />
         </SafeAreaView>
@@ -1067,15 +1744,19 @@ const styles =
         headerSection: {
             paddingHorizontal:
                 s(14),
-            paddingTop: vs(10),
+            paddingTop:
+                vs(10),
             paddingBottom:
                 vs(10),
-            borderBottomWidth: 1,
-            overflow: "hidden",
+            borderBottomWidth:
+                1,
+            overflow:
+                "hidden",
         },
 
         headerAccent: {
-            position: "absolute",
+            position:
+                "absolute",
             left: 0,
             top: 0,
             bottom: 0,
@@ -1085,8 +1766,10 @@ const styles =
         },
 
         headerTopRow: {
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             justifyContent:
                 "space-between",
         },
@@ -1094,115 +1777,157 @@ const styles =
         titleTextWrap: {
             flex: 1,
             minWidth: 0,
-            marginRight: s(9),
+            marginRight:
+                s(9),
         },
 
         screenTitle: {
-            fontSize: ms(21),
-            lineHeight: ms(23),
+            fontSize:
+                ms(21),
+            lineHeight:
+                ms(23),
             fontFamily:
                 "Rajdhani_700Bold",
-            letterSpacing: 0.2,
+            letterSpacing:
+                0.2,
         },
 
         screenSubtitle: {
             marginTop: 1,
-            fontSize: ms(9),
-            lineHeight: ms(11),
-            fontWeight: "700",
+            fontSize:
+                ms(9),
+            lineHeight:
+                ms(11),
+            fontWeight:
+                "700",
         },
 
         createButton: {
-            height: vs(34),
-            borderRadius: 13,
+            height:
+                vs(34),
+            borderRadius:
+                13,
             paddingHorizontal:
                 s(11),
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             justifyContent:
                 "center",
-            gap: s(3),
+            gap:
+                s(3),
         },
 
         createButtonText: {
-            fontSize: ms(10),
-            fontWeight: "900",
+            fontSize:
+                ms(10),
+            fontWeight:
+                "900",
         },
 
         headerBottomRow: {
-            marginTop: vs(10),
-            flexDirection: "row",
-            alignItems: "center",
+            marginTop:
+                vs(10),
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             justifyContent:
                 "space-between",
-            gap: s(8),
+            gap:
+                s(8),
         },
 
         feedIdentity: {
             flex: 1,
-            minHeight: vs(31),
-            borderRadius: 11,
+            minHeight:
+                vs(31),
+            borderRadius:
+                11,
             paddingHorizontal:
                 s(10),
-            flexDirection: "row",
-            alignItems: "center",
-            gap: s(6),
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            gap:
+                s(6),
         },
 
         feedIdentityText: {
             flexShrink: 1,
-            fontSize: ms(10),
+            fontSize:
+                ms(10),
             fontFamily:
                 "Rajdhani_700Bold",
         },
 
         myDumpsButton: {
-            minHeight: vs(31),
-            borderRadius: 11,
-            borderWidth: 1,
+            minHeight:
+                vs(31),
+            borderRadius:
+                11,
+            borderWidth:
+                1,
             paddingHorizontal:
                 s(9),
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             justifyContent:
                 "center",
-            gap: s(5),
+            gap:
+                s(5),
         },
 
         myDumpsText: {
-            fontSize: ms(9.5),
+            fontSize:
+                ms(9.5),
             fontFamily:
                 "Rajdhani_700Bold",
         },
 
         feedTabs: {
-            flexDirection: "row",
-            borderBottomWidth: 1,
+            flexDirection:
+                "row",
+            borderBottomWidth:
+                1,
         },
 
         feedTabButton: {
             flex: 1,
-            alignItems: "center",
-            paddingTop: vs(8),
+            alignItems:
+                "center",
+            paddingTop:
+                vs(8),
         },
 
         feedTabText: {
-            fontSize: ms(11.5),
+            fontSize:
+                ms(11.5),
             fontFamily:
                 "Rajdhani_700Bold",
         },
 
         feedTabLine: {
-            width: "48%",
-            height: 2.5,
-            borderRadius: 999,
-            marginTop: vs(6),
+            width:
+                "48%",
+            height:
+                2.5,
+            borderRadius:
+                999,
+            marginTop:
+                vs(6),
         },
 
         emptyContainer: {
             flex: 1,
-            minHeight: vs(250),
-            alignItems: "center",
+            minHeight:
+                vs(250),
+            alignItems:
+                "center",
             justifyContent:
                 "center",
             paddingHorizontal:
@@ -1212,63 +1937,88 @@ const styles =
         },
 
         loadingText: {
-            marginTop: vs(10),
-            fontSize: ms(10.5),
-            fontWeight: "700",
+            marginTop:
+                vs(10),
+            fontSize:
+                ms(10.5),
+            fontWeight:
+                "700",
         },
 
         emptyTitle: {
-            marginTop: vs(8),
-            fontSize: ms(16),
+            marginTop:
+                vs(8),
+            fontSize:
+                ms(16),
             fontFamily:
                 "Rajdhani_700Bold",
         },
 
         emptyText: {
-            marginTop: vs(4),
-            fontSize: ms(10.5),
-            lineHeight: ms(14),
-            textAlign: "center",
+            marginTop:
+                vs(4),
+            fontSize:
+                ms(10.5),
+            lineHeight:
+                ms(14),
+            textAlign:
+                "center",
         },
 
         emptyCreateButton: {
-            marginTop: vs(14),
-            minHeight: vs(35),
-            borderRadius: 13,
+            marginTop:
+                vs(14),
+            minHeight:
+                vs(35),
+            borderRadius:
+                13,
             paddingHorizontal:
                 s(13),
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             justifyContent:
                 "center",
-            gap: s(4),
+            gap:
+                s(4),
         },
 
         emptyCreateText: {
-            fontSize: ms(10),
-            fontWeight: "900",
+            fontSize:
+                ms(10),
+            fontWeight:
+                "900",
         },
 
         retryButton: {
-            marginTop: vs(14),
-            minHeight: vs(35),
-            borderRadius: 13,
+            marginTop:
+                vs(14),
+            minHeight:
+                vs(35),
+            borderRadius:
+                13,
             paddingHorizontal:
                 s(18),
-            alignItems: "center",
+            alignItems:
+                "center",
             justifyContent:
                 "center",
         },
 
         retryButtonText: {
-            color: "#07111F",
-            fontSize: ms(10),
-            fontWeight: "900",
+            color:
+                "#07111F",
+            fontSize:
+                ms(10),
+            fontWeight:
+                "900",
         },
 
         footerLoader: {
             paddingVertical:
                 vs(18),
-            alignItems: "center",
+            alignItems:
+                "center",
         },
     });

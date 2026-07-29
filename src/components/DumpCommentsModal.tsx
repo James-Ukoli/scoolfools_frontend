@@ -2,6 +2,7 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -203,15 +204,14 @@ type DumpCommentsModalProps = {
     dump: Dump | null;
     onClose: () => void;
 
+    targetCommentId?: string | null;
+    targetReplyId?: string | null;
+    targetParentCommentId?: string | null;
+
     onCommentAdded: (
         dumpId: string
     ) => void;
 
-    /*
-     * Optional so existing screens do not break.
-     * Later, the feed screen can use this to
-     * decrease its displayed comment count.
-     */
     onCommentDeleted?: (
         dumpId: string
     ) => void;
@@ -259,6 +259,8 @@ const getCommentsTheme = (
                 "rgba(7,17,31,0.09)",
             input: "#F1F5F9",
             cyan: "#06B6D4",
+            highlight:
+                "rgba(6,182,212,0.16)",
             blueCheck: "#1D9BF0",
             danger: "#DC2626",
             backdrop:
@@ -276,6 +278,8 @@ const getCommentsTheme = (
             "rgba(255,255,255,0.09)",
         input: "#111827",
         cyan: "#22D3EE",
+        highlight:
+            "rgba(34,211,238,0.18)",
         blueCheck: "#1D9BF0",
         danger: "#F87171",
         backdrop:
@@ -394,6 +398,9 @@ export default function DumpCommentsModal({
     visible,
     dump,
     onClose,
+    targetCommentId = null,
+    targetReplyId = null,
+    targetParentCommentId = null,
     onCommentAdded,
     onCommentDeleted,
 }: DumpCommentsModalProps) {
@@ -404,6 +411,23 @@ export default function DumpCommentsModal({
         getCommentsTheme(
             mode
         );
+
+    const commentsListRef =
+        useRef<
+            FlatList<FlatCommentItem> | null
+        >(null);
+
+    const handledTargetRef =
+        useRef<string | null>(
+            null
+        );
+
+    const highlightTimerRef =
+        useRef<
+            ReturnType<
+                typeof setTimeout
+            > | null
+        >(null);
 
     const [
         comments,
@@ -475,11 +499,13 @@ export default function DumpCommentsModal({
             null
         );
 
-    /*
-    |--------------------------------------------------------------------------
-    | Current User ID
-    |--------------------------------------------------------------------------
-    */
+    const [
+        highlightedCommentId,
+        setHighlightedCommentId,
+    ] =
+        useState<string | null>(
+            null
+        );
 
     const currentUserId =
         currentUser?._id ||
@@ -514,15 +540,6 @@ export default function DumpCommentsModal({
                             storedUser
                         );
 
-                    /*
-                     * Supports both:
-                     *
-                     * { _id: "..." }
-                     *
-                     * and:
-                     *
-                     * { user: { _id: "..." } }
-                     */
                     const parsedUser =
                         parsedValue?.user ||
                         parsedValue?.data?.user ||
@@ -625,6 +642,13 @@ export default function DumpCommentsModal({
             null
         );
 
+        setHighlightedCommentId(
+            null
+        );
+
+        handledTargetRef.current =
+            null;
+
         setLocalCommentCount(
             Math.max(
                 0,
@@ -635,9 +659,10 @@ export default function DumpCommentsModal({
             )
         );
 
-        loadCurrentUser();
-        loadComments();
+        void loadCurrentUser();
+        void loadComments();
     }, [
+        dump?._id,
         dump?.commentsCount,
         loadComments,
         loadCurrentUser,
@@ -683,6 +708,142 @@ export default function DumpCommentsModal({
 
             return result;
         }, [comments]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification Target
+    |--------------------------------------------------------------------------
+    */
+
+    const targetInteractionId =
+        useMemo(() => {
+            return (
+                targetReplyId ||
+                targetCommentId ||
+                targetParentCommentId ||
+                null
+            );
+        }, [
+            targetCommentId,
+            targetParentCommentId,
+            targetReplyId,
+        ]);
+
+    const scrollToTarget =
+        useCallback(
+            (
+                animated = true
+            ) => {
+                if (
+                    !targetInteractionId ||
+                    flattenedComments.length ===
+                    0
+                ) {
+                    return false;
+                }
+
+                const targetIndex =
+                    flattenedComments.findIndex(
+                        (comment) =>
+                            String(
+                                comment._id
+                            ) ===
+                            String(
+                                targetInteractionId
+                            )
+                    );
+
+                if (targetIndex < 0) {
+                    return false;
+                }
+
+                setHighlightedCommentId(
+                    String(
+                        targetInteractionId
+                    )
+                );
+
+                setTimeout(() => {
+                    commentsListRef.current
+                        ?.scrollToIndex({
+                            index:
+                                targetIndex,
+                            animated,
+                            viewPosition:
+                                0.35,
+                        });
+                }, 250);
+
+                if (
+                    highlightTimerRef.current
+                ) {
+                    clearTimeout(
+                        highlightTimerRef.current
+                    );
+                }
+
+                highlightTimerRef.current =
+                    setTimeout(() => {
+                        setHighlightedCommentId(
+                            null
+                        );
+                    }, 3500);
+
+                return true;
+            },
+            [
+                flattenedComments,
+                targetInteractionId,
+            ]
+        );
+
+    useEffect(() => {
+        if (
+            !visible ||
+            loading ||
+            !targetInteractionId
+        ) {
+            return;
+        }
+
+        const targetKey = [
+            dump?._id || "",
+            targetInteractionId,
+        ].join(":");
+
+        if (
+            handledTargetRef.current ===
+            targetKey
+        ) {
+            return;
+        }
+
+        const didFindTarget =
+            scrollToTarget();
+
+        if (didFindTarget) {
+            handledTargetRef.current =
+                targetKey;
+        }
+    }, [
+        dump?._id,
+        loading,
+        scrollToTarget,
+        targetInteractionId,
+        visible,
+    ]);
+
+    useEffect(() => {
+        return () => {
+            if (
+                highlightTimerRef.current
+            ) {
+                clearTimeout(
+                    highlightTimerRef.current
+                );
+            }
+        };
+    }, []);
 
     /*
     |--------------------------------------------------------------------------
@@ -879,15 +1040,8 @@ export default function DumpCommentsModal({
 
     /*
     |--------------------------------------------------------------------------
-    | Remove Deleted Comment From Local State
+    | Remove Deleted Comment
     |--------------------------------------------------------------------------
-    |
-    | Top-level comment:
-    | Removes the full comment row from the list.
-    |
-    | Reply:
-    | Removes the reply from its parent's replies array.
-    |
     */
 
     const removeCommentFromState =
@@ -1153,6 +1307,10 @@ export default function DumpCommentsModal({
             deletingCommentId ===
             String(item._id);
 
+        const isHighlighted =
+            highlightedCommentId ===
+            String(item._id);
+
         return (
             <View
                 style={[
@@ -1160,6 +1318,11 @@ export default function DumpCommentsModal({
                     {
                         borderBottomColor:
                             theme.border,
+
+                        backgroundColor:
+                            isHighlighted
+                                ? theme.highlight
+                                : "transparent",
 
                         marginLeft:
                             item.isReply
@@ -1419,12 +1582,6 @@ export default function DumpCommentsModal({
         );
     };
 
-    /*
-    |--------------------------------------------------------------------------
-    | Render
-    |--------------------------------------------------------------------------
-    */
-
     return (
         <Modal
             visible={visible}
@@ -1586,6 +1743,9 @@ export default function DumpCommentsModal({
                         )}
 
                         <FlatList
+                            ref={
+                                commentsListRef
+                            }
                             data={
                                 flattenedComments
                             }
@@ -1606,6 +1766,33 @@ export default function DumpCommentsModal({
                                 false
                             }
                             keyboardShouldPersistTaps="handled"
+                            onScrollToIndexFailed={(
+                                info
+                            ) => {
+                                const approximateOffset =
+                                    info.averageItemLength *
+                                    info.index;
+
+                                commentsListRef.current
+                                    ?.scrollToOffset({
+                                        offset:
+                                            approximateOffset,
+                                        animated:
+                                            false,
+                                    });
+
+                                setTimeout(() => {
+                                    commentsListRef.current
+                                        ?.scrollToIndex({
+                                            index:
+                                                info.index,
+                                            animated:
+                                                true,
+                                            viewPosition:
+                                                0.35,
+                                        });
+                                }, 300);
+                            }}
                             refreshControl={
                                 <RefreshControl
                                     refreshing={
@@ -1836,11 +2023,6 @@ export default function DumpCommentsModal({
     );
 }
 
-/*
-|--------------------------------------------------------------------------
-| Styles
-|--------------------------------------------------------------------------
-*/
 /*
 |--------------------------------------------------------------------------
 | Styles

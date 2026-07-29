@@ -109,6 +109,11 @@ export type DumpsResponse = {
   pagination: Pagination;
 };
 
+export type SingleDumpResponse = {
+  success: boolean;
+  dump: Dump;
+};
+
 export type CommentsResponse = {
   success: boolean;
   comments: Comment[];
@@ -224,6 +229,20 @@ export const getMyDumps = async (
 ): Promise<DumpsResponse> => {
   return protectedRequest<DumpsResponse>(
     `/api/dumps/mine?page=${page}&limit=${limit}`
+  );
+};
+
+/*
+|--------------------------------------------------------------------------
+| Get Single Dump
+|--------------------------------------------------------------------------
+*/
+
+export const getDumpById = async (
+  dumpId: string
+): Promise<SingleDumpResponse> => {
+  return protectedRequest<SingleDumpResponse>(
+    `/api/dumps/${dumpId}`
   );
 };
 
