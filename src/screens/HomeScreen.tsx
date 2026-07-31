@@ -26,7 +26,7 @@ import FeaturedCarousel from "../components/FeaturedCarousel";
 import EventCountdownCard from "../components/EventCountdownCard";
 import HorizontalPostsRow from "../components/HorizontalPostsRow";
 import BlogsPaywallModal from "../components/BlogsPaywallModal";
-import { finishTransaction } from "react-native-iap";
+
 
 import { s, vs, ms } from "react-native-size-matters";
 
@@ -37,6 +37,12 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
+import {
+    isOwnershipMismatchError,
+    isPurchaseAlreadyLinkedError,
+    SubscriptionVerificationError,
+    verifyScoolFoolsSubscription,
+} from "../services/subscriptionVerification";
 import {
     TimeTheme,
     useTimeTheme,
@@ -275,67 +281,117 @@ export default function HomeScreen() {
         }
     };
 
-    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
-        try {
-            const token = await getToken();
+    const verifyBlogSubscriptionOnBackend = useCallback(
+        async (purchase: any) => {
+            try {
+                const result =
+                    await verifyScoolFoolsSubscription(
+                        purchase
+                    );
 
-            if (!token || !API_BASE_URL) {
-                await handleExpiredSession();
-                return;
+                const subscribed =
+                    result.isSubscribed === true;
+
+                setIsSubscribed(subscribed);
+                setPaywallVisible(false);
+
+                await fetchEntitlements();
+
+                if (subscribed) {
+                    setShowConfetti(true);
+
+                    Alert.alert(
+                        "Subscribed 🎉",
+                        "Your ScoolFools premium access is now unlocked."
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Subscription Inactive",
+                    "The store verified this subscription, but it is not currently active."
+                );
+            } catch (error: unknown) {
+                console.log(
+                    "Home subscription verification error:",
+                    error
+                );
+
+                if (
+                    isPurchaseAlreadyLinkedError(
+                        error
+                    )
+                ) {
+                    setIsSubscribed(false);
+
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Subscription Already Linked",
+                        "This App Store or Google Play subscription is already connected to another ScoolFools account."
+                    );
+
+                    return;
+                }
+
+                if (
+                    isOwnershipMismatchError(error)
+                ) {
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Different Subscription Detected",
+                        "This ScoolFools account is already connected to a different store subscription."
+                    );
+
+                    return;
+                }
+
+                if (
+                    error instanceof
+                    SubscriptionVerificationError
+                ) {
+                    if (
+                        error.code ===
+                        "UNAUTHORIZED"
+                    ) {
+                        await handleExpiredSession();
+                        return;
+                    }
+
+                    if (
+                        error.code ===
+                        "FINISH_TRANSACTION_FAILED"
+                    ) {
+                        await fetchEntitlements();
+
+                        Alert.alert(
+                            "Subscription Verified",
+                            "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and restore again."
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Verification Failed",
+                        error.message
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Verification Failed",
+                    "Your subscription could not be securely linked to your ScoolFools account."
+                );
+            } finally {
+                setLoadingSubscription(false);
             }
-
-            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    platform: Platform.OS === "ios" ? "ios" : "android",
-                    productId: purchase?.productId,
-                    transactionId:
-                        purchase?.transactionId ||
-                        purchase?.transactionIdIOS ||
-                        purchase?.id ||
-                        null,
-                    purchaseToken: purchase?.purchaseToken || null,
-                }),
-            });
-
-            if (response.status === 401) {
-                await handleExpiredSession();
-                return;
-            }
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to verify subscription");
-            }
-
-            await finishTransaction({
-                purchase,
-                isConsumable: false,
-            });
-
-            setIsSubscribed(!!data.isSubscribed);
-            setPaywallVisible(false);
-            setShowConfetti(true);
-
-            await fetchEntitlements();
-
-            Alert.alert("Subscribed 🎉");
-        } catch (error) {
-            console.log("Verify home blog subscription error:", error);
-
-            Alert.alert(
-                "Purchase Complete",
-                "Purchase worked, but verifying the subscription with your account failed. Please log out, log back in, and restore purchases."
-            );
-        } finally {
-            setLoadingSubscription(false);
-        }
-    };
+        },
+        []
+    );
 
     const handleSubscribePress = async () => {
         setLoadingSubscription(true);
@@ -426,10 +482,16 @@ export default function HomeScreen() {
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
             onBlogsSubscriptionSuccess: async (purchase: any) => {
-                await verifyBlogSubscriptionOnBackend(purchase);
+                await verifyBlogSubscriptionOnBackend(
+                    purchase
+                );
             },
             onPurchaseError: (error: any) => {
-                console.log("Home subscription listener error:", error);
+                console.log(
+                    "Home subscription listener error:",
+                    error
+                );
+
                 setLoadingSubscription(false);
             },
         });
@@ -437,7 +499,11 @@ export default function HomeScreen() {
         return () => {
             cleanupIAP();
         };
-    }, [fetchHomeData, loadSelectedAvatar]);
+    }, [
+        fetchHomeData,
+        loadSelectedAvatar,
+        verifyBlogSubscriptionOnBackend,
+    ]);
 
     useEffect(() => {
         const unsubscribe = navigation.addListener("focus", () => {

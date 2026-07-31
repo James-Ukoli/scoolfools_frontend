@@ -12,7 +12,10 @@ import {
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation } from "@react-navigation/native";
+import {
+    CommonActions,
+    useNavigation,
+} from "@react-navigation/native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -22,16 +25,30 @@ import {
     type TimeTheme,
 } from "../context/TimeThemeContext";
 
-const API_BASE_URL =
-    Platform.OS === "android"
-        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
-        : process.env.EXPO_PUBLIC_API_BASE_URL;
+import { shutdownIAP } from "../../src/services/iap";
 
 const PRIVACY_POLICY_URL =
     "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
 
 const TERMS_URL =
     "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
+
+/*
+|--------------------------------------------------------------------------
+| Login-scoped storage
+|--------------------------------------------------------------------------
+|
+| Do not store App Store or Google Play ownership as trusted local state.
+| The backend user record remains the source of truth.
+|
+| Add any other account-specific cached keys your app currently uses.
+|
+*/
+
+const LOGIN_SCOPED_STORAGE_KEYS = [
+    "token",
+    "user",
+];
 
 const getMenuTheme = (mode: TimeTheme) => {
     const isDay = mode === "day";
@@ -96,11 +113,51 @@ export default function MenuScreen() {
                 `Open ${label} error:`,
                 error
             );
+
             Alert.alert(
                 "Error",
                 `Failed to open ${label}.`
             );
         }
+    };
+
+    const completeLogout = async () => {
+        /*
+         * Stop all purchase listeners and clear pending callbacks before
+         * removing the authenticated user.
+         *
+         * This prevents a purchase initiated by Account A from completing
+         * through a callback after Account B signs in.
+         */
+        await shutdownIAP();
+
+        try {
+            await GoogleSignin.signOut();
+        } catch (error) {
+            console.log(
+                "Google sign out warning:",
+                error
+            );
+        }
+
+        await AsyncStorage.multiRemove(
+            LOGIN_SCOPED_STORAGE_KEYS
+        );
+
+        /*
+         * Reset the full navigation state instead of replacing only the
+         * current screen. This removes authenticated screens from history.
+         */
+        navigation.dispatch(
+            CommonActions.reset({
+                index: 0,
+                routes: [
+                    {
+                        name: "GoogleSignIn",
+                    },
+                ],
+            })
+        );
     };
 
     const handleLogout = () => {
@@ -117,30 +174,13 @@ export default function MenuScreen() {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            try {
-                                await GoogleSignin.signOut();
-                            } catch (error) {
-                                console.log(
-                                    "Google sign out warning:",
-                                    error
-                                );
-                            }
-
-                            await AsyncStorage.removeItem(
-                                "token"
-                            );
-                            await AsyncStorage.removeItem(
-                                "user"
-                            );
-
-                            navigation.replace(
-                                "GoogleSignIn"
-                            );
+                            await completeLogout();
                         } catch (error) {
                             console.log(
                                 "Logout error:",
                                 error
                             );
+
                             Alert.alert(
                                 "Error",
                                 "Failed to log out."
@@ -193,6 +233,7 @@ export default function MenuScreen() {
                         >
                             SCOOLFOOLS
                         </Text>
+
                         <Text
                             style={
                                 styles.screenTitle
@@ -225,6 +266,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="information-circle-outline"
                             color={theme.cyan}
@@ -237,6 +279,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="mail-outline"
                             color={theme.cyan}
@@ -249,6 +292,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="notifications-outline"
                             color={theme.cyan}
@@ -261,6 +305,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="calendar-outline"
                             color={theme.cyan}
@@ -273,6 +318,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="game-controller-outline"
                             color={theme.yellow}
@@ -306,6 +352,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="shield-checkmark-outline"
                             color={theme.cyan}
@@ -335,6 +382,7 @@ export default function MenuScreen() {
                             styles={styles}
                             theme={theme}
                         />
+
                         <MenuItem
                             icon="trash-outline"
                             color={theme.danger}
@@ -507,17 +555,20 @@ const createStyles = (
             flex: 1,
             backgroundColor: theme.bg,
         },
+
         content: {
             flex: 1,
             paddingHorizontal: 20,
             paddingTop: 8,
         },
+
         hero: {
             minHeight: 68,
             flexDirection: "row",
             alignItems: "center",
             marginBottom: 10,
         },
+
         backButton: {
             width: 36,
             height: 36,
@@ -525,9 +576,11 @@ const createStyles = (
             justifyContent: "center",
             marginRight: 10,
         },
+
         heroTextWrap: {
             flex: 1,
         },
+
         heroEyebrow: {
             color: theme.cyan,
             fontSize: 13,
@@ -535,6 +588,7 @@ const createStyles = (
                 "Rajdhani_700Bold",
             letterSpacing: 1.8,
         },
+
         screenTitle: {
             color: theme.text,
             fontSize: 32,
@@ -543,21 +597,26 @@ const createStyles = (
             letterSpacing: 0.6,
             marginTop: -2,
         },
+
         scrollView: {
             flex: 1,
         },
+
         scrollContent: {
             paddingBottom:
                 Platform.OS === "android"
                     ? 210
                     : 150,
         },
+
         card: {
             backgroundColor: "transparent",
         },
+
         sectionGap: {
             height: 18,
         },
+
         menuItem: {
             minHeight: 58,
             paddingHorizontal: 2,
@@ -569,21 +628,25 @@ const createStyles = (
             borderBottomColor:
                 theme.divider,
         },
+
         lastMenuItem: {
             borderBottomWidth: 0,
         },
+
         menuLeft: {
             flexDirection: "row",
             alignItems: "center",
             flex: 1,
             paddingRight: 12,
         },
+
         iconBubble: {
             width: 32,
             height: 36,
             alignItems: "center",
             justifyContent: "center",
         },
+
         menuText: {
             color: theme.text,
             fontSize: 18,
@@ -592,12 +655,15 @@ const createStyles = (
             letterSpacing: 0.35,
             marginLeft: 10,
         },
+
         deleteText: {
             color: theme.danger,
         },
+
         bottomSpacer: {
             height: 30,
         },
+
         modalOverlay: {
             flex: 1,
             backgroundColor:
@@ -605,6 +671,7 @@ const createStyles = (
             justifyContent: "center",
             paddingHorizontal: 20,
         },
+
         modalCard: {
             backgroundColor: theme.card,
             borderRadius: 24,
@@ -613,6 +680,7 @@ const createStyles = (
             maxHeight: "70%",
             overflow: "hidden",
         },
+
         modalHeader: {
             flexDirection: "row",
             alignItems: "center",
@@ -624,6 +692,7 @@ const createStyles = (
             borderBottomColor:
                 theme.divider,
         },
+
         modalTitle: {
             color: theme.text,
             fontSize: 24,
@@ -633,6 +702,7 @@ const createStyles = (
             flex: 1,
             paddingRight: 12,
         },
+
         closeButton: {
             width: 34,
             height: 34,
@@ -642,10 +712,12 @@ const createStyles = (
             backgroundColor:
                 theme.bubble,
         },
+
         modalScrollContent: {
             paddingHorizontal: 18,
             paddingVertical: 18,
         },
+
         modalBody: {
             color: theme.subtext,
             fontSize: 15,

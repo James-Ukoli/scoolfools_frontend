@@ -1,23 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 import {
     ActivityIndicator,
-    Animated,
     Dimensions,
-    Easing,
     Image,
     Platform,
     RefreshControl,
     ScrollView,
-    type StyleProp,
     StyleSheet,
     Text,
-    type TextStyle,
     TouchableOpacity,
     View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import YoutubePlayer from "react-native-youtube-iframe";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+
 import {
     TimeTheme,
     useTimeTheme,
@@ -25,8 +27,6 @@ import {
 
 type StreamType = "Live" | "Podcast" | "Video" | "Highlight";
 type LiveStatus = "upcoming" | "live" | "ended";
-type TVMode = "watch" | "listen";
-
 
 type RawTVItem = {
     _id?: string;
@@ -74,15 +74,12 @@ const API_BASE_URL =
         : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
-const PLAYER_WIDTH = SCREEN_WIDTH - 10;
-const PLAYER_HEIGHT = PLAYER_WIDTH * 0.5625;
+const CONTENT_HORIZONTAL_PADDING = 16;
+const PLAYER_WIDTH =
+    SCREEN_WIDTH - CONTENT_HORIZONTAL_PADDING * 2;
+const PLAYER_HEIGHT = PLAYER_WIDTH * (9 / 16);
 
 const professorFoolsAvatar = require("../../assets/images/profileimages/professorFools.png");
-const TYPEWRITER_FONT = Platform.select({
-    ios: "Menlo",
-    android: "monospace",
-    default: "monospace",
-});
 
 const getTheme = (mode: TimeTheme) => {
     if (mode === "day") {
@@ -97,17 +94,13 @@ const getTheme = (mode: TimeTheme) => {
             muted: "#64748B",
             border: "rgba(7,17,31,0.10)",
             cyan: "#06B6D4",
-            cyanDark: "#0891B2",
+            cyanSoft: "rgba(6,182,212,0.08)",
+            purple: "#8B5CF6",
+            purpleSoft: "rgba(139,92,246,0.08)",
             yellow: "#FACC15",
-            yellowText: "#A16207",
             red: "#E11D48",
-            blue: "#0F172A",
-            shadow: "rgba(6,182,212,0.22)",
-            tabBg: "#FFFFFF",
             selectedCard: "rgba(6,182,212,0.07)",
-            inactive: "#64748B",
-            heroText: "#FFFFFF",
-            heroSubtext: "#E0F2FE",
+            shadow: "rgba(15,23,42,0.12)",
         };
     }
 
@@ -122,21 +115,19 @@ const getTheme = (mode: TimeTheme) => {
         muted: "#94A3B8",
         border: "rgba(255,255,255,0.10)",
         cyan: "#22D3EE",
-        cyanDark: "#06B6D4",
+        cyanSoft: "rgba(34,211,238,0.08)",
+        purple: "#C084FC",
+        purpleSoft: "rgba(192,132,252,0.08)",
         yellow: "#FACC15",
-        yellowText: "#FACC15",
-        red: "#E11D48",
-        blue: "#0F172A",
-        shadow: "rgba(34,211,238,0.18)",
-        tabBg: "#07111F",
+        red: "#FB7185",
         selectedCard: "rgba(34,211,238,0.09)",
-        inactive: "#94A3B8",
-        heroText: "#FFFFFF",
-        heroSubtext: "#E0F2FE",
+        shadow: "rgba(0,0,0,0.35)",
     };
 };
 
-const toDisplayType = (type?: RawTVItem["type"]): StreamType => {
+const toDisplayType = (
+    type?: RawTVItem["type"],
+): StreamType => {
     if (type === "podcast") return "Podcast";
     if (type === "video") return "Video";
     if (type === "highlight") return "Highlight";
@@ -144,10 +135,12 @@ const toDisplayType = (type?: RawTVItem["type"]): StreamType => {
 };
 
 const getYoutubeId = (url?: string) => {
-    if (!url || typeof url !== "string") return "";
+    if (!url || typeof url !== "string") {
+        return "";
+    }
 
     const match = url.match(
-        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/live\/)([^&?]+)/
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/live\/)([^&?]+)/,
     );
 
     return match?.[1] || "";
@@ -155,36 +148,32 @@ const getYoutubeId = (url?: string) => {
 
 const getYoutubeThumbnail = (url?: string) => {
     const youtubeId = getYoutubeId(url);
-    if (!youtubeId) return "";
+
+    if (!youtubeId) {
+        return "";
+    }
+
     return `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
 };
 
 const getNewestByCreatedAt = (items: StreamItem[]) => {
     return [...items].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        (a, b) =>
+            new Date(b.createdAt).getTime() -
+            new Date(a.createdAt).getTime(),
     );
 };
 
-const getDisplayType = (type: StreamType) => {
-    return type === "Live" ? "Broadcast" : type;
-};
-
-const getStatusLabel = (item?: StreamItem | null) => {
-    if (!item) return "";
-
-    if (item.type === "Live") {
-        if (item.liveStatus === "live") return "Live Broadcast";
-        if (item.liveStatus === "ended") return "Ended";
-        return "Upcoming";
+const normalizeTVItem = (
+    item: RawTVItem,
+    index: number,
+): StreamItem | null => {
+    if (!item.youtube_url || !item.title) {
+        return null;
     }
 
-    return item.duration || "Watch";
-};
-
-const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
-    if (!item.youtube_url || !item.title) return null;
-
     const displayType = toDisplayType(item.type);
+
     const createdAt =
         item.created_at ||
         item.createdAt ||
@@ -198,122 +187,158 @@ const normalizeTVItem = (item: RawTVItem, index: number): StreamItem | null => {
         subtitle: item.subtitle || "ScoolFools TV",
         type: displayType,
         youtubeUrl: item.youtube_url,
-        thumbnail: item.thumbnail_url || getYoutubeThumbnail(item.youtube_url),
+        thumbnail:
+            item.thumbnail_url ||
+            getYoutubeThumbnail(item.youtube_url),
         createdAt,
         description: item.description || "",
-        professorFoolsComment: item.professor_fools_comment || "",
+        professorFoolsComment:
+            item.professor_fools_comment || "",
         liveStatus: item.live_status || "upcoming",
         duration: item.duration || undefined,
     };
 };
 
-type FastTypewriterTextProps = {
-    text: string;
-    style: StyleProp<TextStyle>;
-    cursorColor: string;
-    delay?: number;
+const formatPublishedDate = (createdAt: string) => {
+    const createdDate = new Date(createdAt);
+    const now = new Date();
+
+    const differenceMs =
+        now.getTime() - createdDate.getTime();
+
+    const differenceMinutes = Math.floor(
+        differenceMs / 60000,
+    );
+
+    if (differenceMinutes < 1) {
+        return "Just now";
+    }
+
+    if (differenceMinutes < 60) {
+        return `${differenceMinutes}m ago`;
+    }
+
+    const differenceHours = Math.floor(
+        differenceMinutes / 60,
+    );
+
+    if (differenceHours < 24) {
+        return `${differenceHours}h ago`;
+    }
+
+    const differenceDays = Math.floor(
+        differenceHours / 24,
+    );
+
+    if (differenceDays < 7) {
+        return `${differenceDays}d ago`;
+    }
+
+    return createdDate.toLocaleDateString();
 };
 
-function FastTypewriterText({
-    text,
-    style,
-    cursorColor,
-    delay = 0,
-}: FastTypewriterTextProps) {
-    const [visibleText, setVisibleText] = useState("");
-    const [isTyping, setIsTyping] = useState(Boolean(text));
+const getStatusLabel = (item: StreamItem) => {
+    if (item.type === "Live") {
+        if (item.liveStatus === "live") {
+            return "Live now";
+        }
 
-    useEffect(() => {
-        let intervalId: ReturnType<typeof setInterval> | undefined;
+        if (item.liveStatus === "ended") {
+            return "Replay";
+        }
 
-        setVisibleText("");
-        setIsTyping(Boolean(text));
+        return "Upcoming";
+    }
 
-        const timeoutId = setTimeout(() => {
-            if (!text) {
-                setIsTyping(false);
-                return;
-            }
-
-            let characterIndex = 0;
-
-            intervalId = setInterval(() => {
-                characterIndex = Math.min(characterIndex + 3, text.length);
-                setVisibleText(text.slice(0, characterIndex));
-
-                if (characterIndex >= text.length) {
-                    if (intervalId) clearInterval(intervalId);
-                    setIsTyping(false);
-                }
-            }, 10);
-        }, delay);
-
-        return () => {
-            clearTimeout(timeoutId);
-            if (intervalId) clearInterval(intervalId);
-        };
-    }, [delay, text]);
-
-    return (
-        <Text style={style}>
-            {visibleText}
-            {isTyping ? <Text style={{ color: cursorColor }}>▌</Text> : null}
-        </Text>
-    );
-}
+    return item.duration || formatPublishedDate(item.createdAt);
+};
 
 export default function TVScreen() {
     const { mode: themeMode } = useTimeTheme();
-    const theme = useMemo(() => getTheme(themeMode), [themeMode]);
-    const styles = useMemo(() => createStyles(theme), [theme]);
+
+    const theme = useMemo(
+        () => getTheme(themeMode),
+        [themeMode],
+    );
+
+    const styles = useMemo(
+        () => createStyles(theme),
+        [theme],
+    );
 
     const [streams, setStreams] = useState<StreamItem[]>([]);
-    const [selectedMode, setSelectedMode] = useState<TVMode>("watch");
-    const [selectedStream, setSelectedStream] = useState<StreamItem | null>(null);
+    const [selectedStream, setSelectedStream] =
+        useState<StreamItem | null>(null);
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [visibleCount, setVisibleCount] = useState(3);
 
-    const sscAnim = useRef(new Animated.Value(0)).current;
-    const glowAnim = useRef(new Animated.Value(0)).current;
-    const tickerAnim = useRef(new Animated.Value(0)).current;
-
-    const activeAccent = selectedMode === "watch" ? theme.cyan : theme.yellow;
+    const [
+        professorCommentOpen,
+        setProfessorCommentOpen,
+    ] = useState(false);
 
     const fetchTVContent = useCallback(async () => {
         try {
             if (!API_BASE_URL) {
-                console.log("Missing API base URL for TV content.");
+                console.log(
+                    "Missing API base URL for TV content.",
+                );
                 return;
             }
 
-            const response = await fetch(`${API_BASE_URL}/api/tv`);
-            const json: TVApiResponse = await response.json();
+            const response = await fetch(
+                `${API_BASE_URL}/api/tv`,
+            );
+
+            const json: TVApiResponse =
+                await response.json();
 
             let fetchedItems: RawTVItem[] = [];
 
-            if (Array.isArray(json)) fetchedItems = json;
-            else if (Array.isArray(json?.data)) fetchedItems = json.data;
+            if (Array.isArray(json)) {
+                fetchedItems = json;
+            } else if (Array.isArray(json?.data)) {
+                fetchedItems = json.data;
+            }
 
             const normalizedItems = fetchedItems
-                .map((item, index) => normalizeTVItem(item, index))
+                .map((item, index) =>
+                    normalizeTVItem(item, index),
+                )
                 .filter(Boolean) as StreamItem[];
 
-            const sortedItems = getNewestByCreatedAt(normalizedItems);
+            const sortedItems =
+                getNewestByCreatedAt(normalizedItems);
 
             setStreams(sortedItems);
 
             setSelectedStream((current) => {
                 if (current) {
-                    const stillExists = sortedItems.find((item) => item.id === current.id);
-                    if (stillExists) return stillExists;
+                    const stillExists = sortedItems.find(
+                        (item) => item.id === current.id,
+                    );
+
+                    if (stillExists) {
+                        return stillExists;
+                    }
                 }
 
-                const newestWatch = sortedItems.find((item) => item.type !== "Podcast");
-                return newestWatch || sortedItems[0] || null;
+                const newestWatch = sortedItems.find(
+                    (item) => item.type !== "Podcast",
+                );
+
+                return (
+                    newestWatch ||
+                    sortedItems[0] ||
+                    null
+                );
             });
         } catch (error) {
-            console.log("Error fetching TV content:", error);
+            console.log(
+                "Error fetching TV content:",
+                error,
+            );
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -321,252 +346,278 @@ export default function TVScreen() {
     }, []);
 
     useEffect(() => {
-        fetchTVContent();
+        void fetchTVContent();
     }, [fetchTVContent]);
 
     useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(glowAnim, {
-                    toValue: 1,
-                    duration: 1700,
-                    useNativeDriver: false,
-                }),
-                Animated.timing(glowAnim, {
-                    toValue: 0,
-                    duration: 1700,
-                    useNativeDriver: false,
-                }),
-            ])
-        ).start();
-    }, [glowAnim]);
-
-    useEffect(() => {
-        Animated.loop(
-            Animated.timing(tickerAnim, {
-                toValue: 1,
-                duration: 18000,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            })
-        ).start();
-    }, [tickerAnim]);
+        setProfessorCommentOpen(false);
+    }, [selectedStream?.id]);
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);
         await fetchTVContent();
     }, [fetchTVContent]);
 
-    const sscTranslate = sscAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ["0%", "100%"],
-    });
-
-    const animatedGlowOpacity = glowAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0.14, 0.28],
-    });
-
-    const modeStreams = useMemo(
-        () =>
-            getNewestByCreatedAt(
-                streams.filter((item) =>
-                    selectedMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
-                )
+    const latestWatch = useMemo(() => {
+        return getNewestByCreatedAt(
+            streams.filter(
+                (item) => item.type !== "Podcast",
             ),
-        [streams, selectedMode]
-    );
+        ).slice(0, 3);
+    }, [streams]);
 
-    const limitedModeStreams = modeStreams.slice(0, 10);
-    const renderedStreams = limitedModeStreams.slice(0, visibleCount);
-    const hasMoreStreams = visibleCount < limitedModeStreams.length;
+    const latestPodcasts = useMemo(() => {
+        return getNewestByCreatedAt(
+            streams.filter(
+                (item) => item.type === "Podcast",
+            ),
+        ).slice(0, 3);
+    }, [streams]);
 
-    const animateSwitch = (nextMode: TVMode) => {
-        const nextValue = nextMode === "watch" ? 0 : 1;
+    const handleSelectStream = (item: StreamItem) => {
+        setSelectedStream(item);
+        setProfessorCommentOpen(false);
+    };
 
-        Animated.spring(sscAnim, {
-            toValue: nextValue,
-            useNativeDriver: false,
-            tension: 75,
-            friction: 9,
-        }).start();
+    const renderMediaRow = (
+        item: StreamItem,
+        accentColor: string,
+    ) => {
+        const selected =
+            item.id === selectedStream?.id;
 
-        setSelectedMode(nextMode);
-        setVisibleCount(3);
+        return (
+            <TouchableOpacity
+                key={item.id}
+                activeOpacity={0.88}
+                onPress={() =>
+                    handleSelectStream(item)
+                }
+                style={[
+                    styles.mediaRow,
+                    selected && {
+                        borderColor: accentColor,
+                        backgroundColor:
+                            theme.selectedCard,
+                    },
+                ]}
+            >
+                <View style={styles.thumbnailWrap}>
+                    {item.thumbnail ? (
+                        <Image
+                            source={{
+                                uri: item.thumbnail,
+                            }}
+                            style={styles.thumbnail}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <View
+                            style={
+                                styles.thumbnailFallback
+                            }
+                        >
+                            <MaterialCommunityIcons
+                                name={
+                                    item.type ===
+                                        "Podcast"
+                                        ? "headphones"
+                                        : "television-play"
+                                }
+                                size={28}
+                                color={theme.muted}
+                            />
+                        </View>
+                    )}
 
-        const nextItems = streams.filter((item) =>
-            nextMode === "watch" ? item.type !== "Podcast" : item.type === "Podcast"
+                    <View style={styles.thumbnailBadge}>
+                        <Text
+                            style={
+                                styles.thumbnailBadgeText
+                            }
+                        >
+                            {item.type === "Live" &&
+                                item.liveStatus === "live"
+                                ? "LIVE"
+                                : getStatusLabel(item)}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.mediaCopy}>
+                    <View
+                        style={[
+                            styles.typePill,
+                            {
+                                borderColor:
+                                    accentColor,
+                                backgroundColor:
+                                    `${accentColor}14`,
+                            },
+                        ]}
+                    >
+                        <MaterialCommunityIcons
+                            name={
+                                item.type === "Podcast"
+                                    ? "headphones"
+                                    : item.type === "Live"
+                                        ? "access-point"
+                                        : item.type ===
+                                            "Highlight"
+                                            ? "star-four-points"
+                                            : "play-circle-outline"
+                            }
+                            size={13}
+                            color={accentColor}
+                        />
+
+                        <Text
+                            style={[
+                                styles.typePillText,
+                                {
+                                    color: accentColor,
+                                },
+                            ]}
+                        >
+                            {item.type === "Live"
+                                ? "Broadcast"
+                                : item.type}
+                        </Text>
+                    </View>
+
+                    <Text
+                        style={styles.mediaTitle}
+                        numberOfLines={2}
+                    >
+                        {item.title}
+                    </Text>
+
+                    <Text
+                        style={styles.mediaSubtitle}
+                        numberOfLines={1}
+                    >
+                        {item.subtitle}
+                    </Text>
+
+                    <Text style={styles.mediaDate}>
+                        {formatPublishedDate(
+                            item.createdAt,
+                        )}
+                    </Text>
+                </View>
+
+                <MaterialCommunityIcons
+                    name={
+                        selected
+                            ? "check-circle"
+                            : "chevron-right"
+                    }
+                    size={22}
+                    color={
+                        selected
+                            ? accentColor
+                            : theme.muted
+                    }
+                />
+            </TouchableOpacity>
         );
-
-        const newestForMode = getNewestByCreatedAt(nextItems)[0];
-        if (newestForMode) setSelectedStream(newestForMode);
-    };
-
-    const getTypeBadgeStyle = (type: StreamType) => {
-        if (type === "Podcast") {
-            return {
-                backgroundColor: "rgba(6,182,212,0.15)",
-                borderColor: theme.cyan,
-                color: theme.cyan,
-            };
-        }
-
-        if (type === "Highlight") {
-            return {
-                backgroundColor: "rgba(250,204,21,0.22)",
-                borderColor: theme.yellow,
-                color: theme.yellowText,
-            };
-        }
-
-        if (type === "Video") {
-            return {
-                backgroundColor: "rgba(37,99,235,0.14)",
-                borderColor: "#2563EB",
-                color: theme.mode === "day" ? "#2563EB" : "#93C5FD",
-            };
-        }
-
-        return {
-            backgroundColor: "rgba(6,182,212,0.15)",
-            borderColor: theme.cyan,
-            color: theme.cyan,
-        };
-    };
-
-    const getStatusIcon = (item: StreamItem) => {
-        if (item.type === "Podcast") return "headphones";
-        if (item.type === "Live") return "access-point";
-        return "clock-outline";
     };
 
     if (loading) {
         return (
-            <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-                <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color={theme.cyan} />
+            <SafeAreaView
+                edges={["left", "right"]}
+                style={styles.safeArea}
+            >
+                <View
+                    style={styles.loadingContainer}
+                >
+                    <ActivityIndicator
+                        size="small"
+                        color={theme.cyan}
+                    />
                 </View>
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView edges={["left", "right"]} style={styles.safeArea}>
-
+        <SafeAreaView
+            edges={["left", "right"]}
+            style={styles.safeArea}
+        >
             <ScrollView
                 style={styles.container}
-                contentContainerStyle={styles.contentContainer}
+                contentContainerStyle={
+                    styles.contentContainer
+                }
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={activeAccent}
-                        colors={[activeAccent]}
-                        progressBackgroundColor={theme.card}
+                        tintColor={theme.cyan}
+                        colors={[theme.cyan]}
+                        progressBackgroundColor={
+                            theme.card
+                        }
                     />
                 }
             >
-                {streams.length === 0 || !selectedStream ? (
+                {streams.length === 0 ||
+                    !selectedStream ? (
                     <View style={styles.emptyWrap}>
                         <MaterialCommunityIcons
                             name="television-off"
                             size={46}
                             color={theme.muted}
                         />
-                        <Text style={styles.emptyTitle}>No TV content yet</Text>
+
+                        <Text style={styles.emptyTitle}>
+                            No TV content yet
+                        </Text>
+
                         <Text style={styles.emptyText}>
-                            Broadcasts, podcasts, videos, and highlights will show up here.
+                            Videos, broadcasts, highlights,
+                            and podcasts will appear here.
                         </Text>
                     </View>
                 ) : (
                     <>
-                        <View style={styles.segmentWrap}>
-                            <Animated.View
-                                style={[
-                                    styles.segmentSlider,
-                                    {
-                                        transform: [{ translateX: sscTranslate }],
-                                    },
-                                ]}
-                            />
-
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                style={styles.segmentButton}
-                                onPress={() => selectedMode !== "watch" && animateSwitch("watch")}
-                            >
+                        <View style={styles.featuredHeader}>
+                            <View style={styles.simpleTopHeading}>
                                 <MaterialCommunityIcons
-                                    name="play-circle"
-                                    size={18}
-                                    color={
-                                        selectedMode === "watch"
-                                            ? "#FFFFFF"
-                                            : theme.inactive
+                                    name={
+                                        selectedStream.type === "Podcast"
+                                            ? "microphone"
+                                            : "television-play"
                                     }
+                                    size={25}
+                                    color={theme.cyan}
                                 />
-                                <Text
-                                    style={[
-                                        styles.segmentText,
-                                        selectedMode === "watch" && styles.segmentTextActive,
-                                    ]}
-                                >
-                                    Watch
-                                </Text>
-                            </TouchableOpacity>
 
-                            <TouchableOpacity
-                                activeOpacity={0.9}
-                                style={styles.segmentButton}
-                                onPress={() => selectedMode !== "listen" && animateSwitch("listen")}
-                            >
-                                <MaterialCommunityIcons
-                                    name="headphones"
-                                    size={18}
-                                    color={
-                                        selectedMode === "listen"
-                                            ? theme.mode === "night"
-                                                ? "#FFFFFF"
-                                                : "#07111F"
-                                            : theme.inactive
-                                    }
-                                />
-                                <Text
-                                    style={[
-                                        styles.segmentText,
-                                        selectedMode === "listen" && styles.segmentTextActiveListen,
-                                    ]}
-                                >
-                                    Listen
+                                <Text style={styles.simpleTopHeadingText}>
+                                    {selectedStream.type === "Podcast"
+                                        ? "Latest Podcasts"
+                                        : "Latest Watch"}
                                 </Text>
-                            </TouchableOpacity>
+                            </View>
                         </View>
 
-                        <Animated.View
-                            style={[
-                                styles.heroCard,
-                                {
-                                    shadowOpacity: theme.mode === "day" ? 0.14 : 0.22,
-                                },
-                            ]}
-                        >
-                            <Animated.View
-                                style={[
-                                    styles.heroGlow,
-                                    {
-                                        opacity: animatedGlowOpacity,
-                                        backgroundColor: theme.cyan,
-                                    },
-                                ]}
-                            />
-
-                            <View style={styles.playerWrap}>
+                        <View style={styles.heroCard}>
+                            <View
+                                style={styles.playerWrap}
+                            >
                                 <YoutubePlayer
                                     height={PLAYER_HEIGHT}
                                     width={PLAYER_WIDTH}
-                                    videoId={getYoutubeId(selectedStream.youtubeUrl)}
+                                    videoId={getYoutubeId(
+                                        selectedStream.youtubeUrl,
+                                    )}
                                     play={false}
-                                    webViewStyle={styles.youtubeWebView}
+                                    webViewStyle={
+                                        styles.youtubeWebView
+                                    }
                                     initialPlayerParams={{
                                         controls: true,
                                         modestbranding: true,
@@ -577,190 +628,375 @@ export default function TVScreen() {
                             </View>
 
                             <View style={styles.heroInfo}>
-                                <Text style={styles.heroTitle} numberOfLines={2}>
+                                <View
+                                    style={
+                                        styles.heroTypeRow
+                                    }
+                                >
+                                    <View
+                                        style={[
+                                            styles.heroTypePill,
+                                            {
+                                                backgroundColor:
+                                                    selectedStream.type ===
+                                                        "Podcast"
+                                                        ? theme.purpleSoft
+                                                        : theme.cyanSoft,
+                                                borderColor:
+                                                    selectedStream.type ===
+                                                        "Podcast"
+                                                        ? theme.purple
+                                                        : theme.cyan,
+                                            },
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name={
+                                                selectedStream.type ===
+                                                    "Podcast"
+                                                    ? "headphones"
+                                                    : "play-circle-outline"
+                                            }
+                                            size={14}
+                                            color={
+                                                selectedStream.type ===
+                                                    "Podcast"
+                                                    ? theme.purple
+                                                    : theme.cyan
+                                            }
+                                        />
+
+                                        <Text
+                                            style={[
+                                                styles.heroTypeText,
+                                                {
+                                                    color:
+                                                        selectedStream.type ===
+                                                            "Podcast"
+                                                            ? theme.purple
+                                                            : theme.cyan,
+                                                },
+                                            ]}
+                                        >
+                                            {selectedStream.type ===
+                                                "Live"
+                                                ? "Broadcast"
+                                                : selectedStream.type}
+                                        </Text>
+                                    </View>
+
+                                    <Text
+                                        style={
+                                            styles.heroStatusText
+                                        }
+                                    >
+                                        {getStatusLabel(
+                                            selectedStream,
+                                        )}
+                                    </Text>
+                                </View>
+
+                                <Text
+                                    style={styles.heroTitle}
+                                    numberOfLines={2}
+                                >
                                     {selectedStream.title}
                                 </Text>
 
-                                <Text style={styles.heroSubtitle} numberOfLines={1}>
+                                <Text
+                                    style={
+                                        styles.heroSubtitle
+                                    }
+                                    numberOfLines={1}
+                                >
                                     {selectedStream.subtitle}
                                 </Text>
-
-                                <View style={styles.heroAccentBar}>
-                                    <View style={styles.heroAccentCyan} />
-                                    <View style={styles.heroAccentYellow} />
-                                </View>
                             </View>
-                        </Animated.View>
+                        </View>
 
                         <View style={styles.contextCard}>
-                            <View style={styles.descriptionHeadingRow}>
-                                <Text style={styles.descriptionEmoji}>📝</Text>
-                                <Text style={styles.contextHeading}>Description</Text>
+                            <View
+                                style={
+                                    styles.descriptionHeadingRow
+                                }
+                            >
+                                <MaterialCommunityIcons
+                                    name="text-box-outline"
+                                    size={19}
+                                    color={theme.cyan}
+                                />
+
+                                <Text
+                                    style={
+                                        styles.contextHeading
+                                    }
+                                >
+                                    Description
+                                </Text>
                             </View>
 
-                            <FastTypewriterText
-                                key={`description-${selectedStream.id}`}
-                                text={
-                                    selectedStream.description ||
-                                    "No description has been added for this content yet."
+                            <Text
+                                style={
+                                    styles.descriptionText
                                 }
-                                style={styles.descriptionText}
-                                cursorColor={theme.cyan}
+                            >
+                                {selectedStream.description ||
+                                    "No description has been added for this content yet."}
+                            </Text>
+
+                            <View
+                                style={
+                                    styles.contextDivider
+                                }
                             />
 
-                            <View style={styles.contextDivider} />
-
-                            <View style={styles.professorHeader}>
-                                <View style={styles.professorAvatarWrap}>
+                            <TouchableOpacity
+                                style={
+                                    styles.professorToggle
+                                }
+                                activeOpacity={0.85}
+                                onPress={() =>
+                                    setProfessorCommentOpen(
+                                        (current) =>
+                                            !current,
+                                    )
+                                }
+                            >
+                                <View
+                                    style={
+                                        styles.professorAvatarWrap
+                                    }
+                                >
                                     <Image
-                                        source={professorFoolsAvatar}
-                                        style={styles.professorAvatar}
+                                        source={
+                                            professorFoolsAvatar
+                                        }
+                                        style={
+                                            styles.professorAvatar
+                                        }
                                         resizeMode="contain"
                                     />
                                 </View>
 
-                                <View style={styles.professorIdentity}>
-                                    <Text style={styles.professorName}>
+                                <View
+                                    style={
+                                        styles.professorIdentity
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.professorName
+                                        }
+                                    >
                                         Professor Fools
                                     </Text>
-                                    <Text style={styles.professorLabel}>
-                                        PROFESSOR&apos;S COMMENT
+
+                                    <Text
+                                        style={
+                                            styles.professorLabel
+                                        }
+                                    >
+                                        {professorCommentOpen
+                                            ? "TAP TO HIDE HIS TAKE"
+                                            : "TAP TO READ HIS TAKE"}
                                     </Text>
                                 </View>
-                            </View>
 
-                            <View style={styles.professorCommentBox}>
-                                <FastTypewriterText
-                                    key={`professor-comment-${selectedStream.id}`}
-                                    text={
-                                        selectedStream.professorFoolsComment ||
-                                        "Professor Fools has not commented on this one yet."
-                                    }
-                                    style={styles.professorComment}
-                                    cursorColor={theme.cyan}
-                                    delay={140}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>
-                                {selectedMode === "watch" ? "LATEST WATCH" : "LATEST PODCASTS"}
-                            </Text>
-
-                            {hasMoreStreams && (
-                                <TouchableOpacity
-                                    activeOpacity={0.8}
-                                    onPress={() =>
-                                        setVisibleCount((current) =>
-                                            Math.min(current + 3, limitedModeStreams.length)
-                                        )
-                                    }
-                                >
-                                    <Text style={styles.viewAllText}>See more</Text>
-                                </TouchableOpacity>
-                            )}
-                        </View>
-
-                        {renderedStreams.map((item) => {
-                            const active = item.id === selectedStream.id;
-
-                            const typeBadge = getTypeBadgeStyle(item.type);
-
-                            return (
-                                <TouchableOpacity
-                                    key={item.id}
-                                    activeOpacity={0.88}
-                                    onPress={() => setSelectedStream(item)}
-                                    style={[
-                                        styles.videoRow,
-                                        active && {
-                                            borderColor: theme.cyan,
-                                            backgroundColor: theme.selectedCard,
-                                        },
-                                    ]}
-                                >
-                                    {item.thumbnail ? (
-                                        <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
-                                    ) : (
-                                        <View style={styles.thumbnailFallback}>
-                                            <MaterialCommunityIcons
-                                                name={
-                                                    item.type === "Podcast"
-                                                        ? "headphones"
-                                                        : "television-play"
-                                                }
-                                                size={26}
-                                                color={theme.muted}
-                                            />
-                                        </View>
-                                    )}
-
-                                    <View style={styles.videoContent}>
-                                        <View
-                                            style={[
-                                                styles.typeBadge,
-                                                {
-                                                    backgroundColor: typeBadge.backgroundColor,
-                                                    borderColor: typeBadge.borderColor,
-                                                },
-                                            ]}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.typeBadgeText,
-                                                    { color: typeBadge.color },
-                                                ]}
-                                            >
-                                                {getDisplayType(item.type)}
-                                            </Text>
-                                        </View>
-
-                                        <Text style={styles.videoTitle} numberOfLines={2}>
-                                            {item.title}
-                                        </Text>
-
-                                        <Text style={styles.videoSubtitle} numberOfLines={1}>
-                                            {item.subtitle}
-                                        </Text>
-
-                                        <View style={styles.metaRow}>
-                                            <MaterialCommunityIcons
-                                                name={getStatusIcon(item)}
-                                                size={13}
-                                                color={theme.cyan}
-                                            />
-                                            <Text style={styles.metaText}>{getStatusLabel(item)}</Text>
-                                        </View>
-                                    </View>
-
-                                    <MaterialCommunityIcons
-                                        name="dots-vertical"
-                                        size={22}
-                                        color={theme.text}
-                                    />
-                                </TouchableOpacity>
-                            );
-                        })}
-
-                        {hasMoreStreams && (
-                            <TouchableOpacity
-                                activeOpacity={0.85}
-                                onPress={() =>
-                                    setVisibleCount((current) =>
-                                        Math.min(current + 3, limitedModeStreams.length)
-                                    )
-                                }
-                                style={styles.seeMoreButton}
-                            >
-                                <Text style={styles.seeMoreButtonText}>See more</Text>
                                 <MaterialCommunityIcons
-                                    name="chevron-down"
-                                    size={20}
+                                    name={
+                                        professorCommentOpen
+                                            ? "chevron-up"
+                                            : "chevron-down"
+                                    }
+                                    size={24}
                                     color={theme.cyan}
                                 />
                             </TouchableOpacity>
-                        )}
+
+                            {professorCommentOpen && (
+                                <View
+                                    style={
+                                        styles.professorCommentBox
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.professorComment
+                                        }
+                                    >
+                                        {selectedStream.professorFoolsComment ||
+                                            "Professor Fools has not commented on this one yet."}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.sectionBlock}>
+                            <View
+                                style={
+                                    styles.sectionHeader
+                                }
+                            >
+                                <View
+                                    style={
+                                        styles.sectionTitleRow
+                                    }
+                                >
+                                    <View
+                                        style={[
+                                            styles.sectionIcon,
+                                            {
+                                                backgroundColor:
+                                                    theme.cyanSoft,
+                                                borderColor:
+                                                    theme.cyan,
+                                            },
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name="play-circle"
+                                            size={20}
+                                            color={theme.cyan}
+                                        />
+                                    </View>
+
+                                    <View>
+                                        <Text
+                                            style={
+                                                styles.sectionEyebrow
+                                            }
+                                        >
+                                            WATCH
+                                        </Text>
+
+                                        <Text
+                                            style={
+                                                styles.sectionTitle
+                                            }
+                                        >
+                                            Latest Watch
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Text
+                                    style={
+                                        styles.sectionCount
+                                    }
+                                >
+                                    Latest 3
+                                </Text>
+                            </View>
+
+                            {latestWatch.length > 0 ? (
+                                latestWatch.map((item) =>
+                                    renderMediaRow(
+                                        item,
+                                        theme.cyan,
+                                    ),
+                                )
+                            ) : (
+                                <View
+                                    style={
+                                        styles.emptySectionCard
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.emptySectionText
+                                        }
+                                    >
+                                        No watch content yet.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+
+                        <View style={styles.sectionBlock}>
+                            <View
+                                style={
+                                    styles.sectionHeader
+                                }
+                            >
+                                <View
+                                    style={
+                                        styles.sectionTitleRow
+                                    }
+                                >
+                                    <View
+                                        style={[
+                                            styles.sectionIcon,
+                                            {
+                                                backgroundColor:
+                                                    theme.purpleSoft,
+                                                borderColor:
+                                                    theme.purple,
+                                            },
+                                        ]}
+                                    >
+                                        <MaterialCommunityIcons
+                                            name="headphones"
+                                            size={20}
+                                            color={theme.purple}
+                                        />
+                                    </View>
+
+                                    <View>
+                                        <Text
+                                            style={[
+                                                styles.sectionEyebrow,
+                                                {
+                                                    color:
+                                                        theme.purple,
+                                                },
+                                            ]}
+                                        >
+                                            LISTEN
+                                        </Text>
+
+                                        <Text
+                                            style={
+                                                styles.sectionTitle
+                                            }
+                                        >
+                                            Latest Podcasts
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <Text
+                                    style={
+                                        styles.sectionCount
+                                    }
+                                >
+                                    Latest 3
+                                </Text>
+                            </View>
+
+                            {latestPodcasts.length > 0 ? (
+                                latestPodcasts.map(
+                                    (item) =>
+                                        renderMediaRow(
+                                            item,
+                                            theme.purple,
+                                        ),
+                                )
+                            ) : (
+                                <View
+                                    style={
+                                        styles.emptySectionCard
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.emptySectionText
+                                        }
+                                    >
+                                        No podcasts yet.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     </>
                 )}
             </ScrollView>
@@ -768,302 +1004,53 @@ export default function TVScreen() {
     );
 }
 
-const createStyles = (theme: ReturnType<typeof getTheme>) =>
+const createStyles = (
+    theme: ReturnType<typeof getTheme>,
+) =>
     StyleSheet.create({
         safeArea: {
             flex: 1,
             backgroundColor: theme.safeBg,
         },
+
         container: {
             flex: 1,
             backgroundColor: theme.bg,
         },
+
         contentContainer: {
             paddingHorizontal: 16,
-            paddingBottom: 120,
             paddingTop: 14,
+            paddingBottom: 125,
         },
+
         loadingContainer: {
             flex: 1,
-            justifyContent: "center",
             alignItems: "center",
+            justifyContent: "center",
             backgroundColor: theme.bg,
         },
 
-        segmentWrap: {
-            height: 56,
-            borderRadius: 999,
-            backgroundColor: theme.tabBg,
-            borderWidth: 1.4,
-            borderColor: theme.border,
-            padding: 4,
-            marginBottom: 18,
-            flexDirection: "row",
-            position: "relative",
-            overflow: "hidden",
-            shadowColor: "#000",
-            shadowOpacity: theme.mode === "day" ? 0.08 : 0.18,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 6 },
-            elevation: 4,
-        },
-        segmentSlider: {
-            position: "absolute",
-            top: 4,
-            left: 4,
-            width: "50%",
-            height: 48,
-            borderRadius: 999,
-            backgroundColor: theme.mode === "night" ? theme.card2 : theme.cyan,
-            borderWidth: theme.mode === "night" ? 1.2 : 0,
-            borderColor: theme.mode === "night" ? "rgba(255,255,255,0.78)" : "transparent",
-            shadowColor: "#FFFFFF",
-            shadowOpacity: theme.mode === "night" ? 0.42 : 0,
-            shadowRadius: theme.mode === "night" ? 11 : 0,
-            shadowOffset: { width: 0, height: 0 },
-            elevation: theme.mode === "night" ? 5 : 0,
-        },
-        segmentButton: {
-            flex: 1,
-            height: 48,
-            borderRadius: 999,
-            alignItems: "center",
-            justifyContent: "center",
-            flexDirection: "row",
-            gap: 7,
-            zIndex: 2,
-        },
-        segmentText: {
-            color: theme.inactive,
-            fontSize: 17,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.25,
-        },
-        segmentTextActive: {
-            color: "#FFFFFF",
-            textShadowColor: theme.mode === "night"
-                ? "rgba(255,255,255,0.85)"
-                : "transparent",
-            textShadowRadius: theme.mode === "night" ? 8 : 0,
-            textShadowOffset: { width: 0, height: 0 },
-        },
-        segmentTextActiveListen: {
-            color: theme.mode === "night" ? "#FFFFFF" : "#07111F",
-            textShadowColor: theme.mode === "night"
-                ? "rgba(255,255,255,0.85)"
-                : "transparent",
-            textShadowRadius: theme.mode === "night" ? 8 : 0,
-            textShadowOffset: { width: 0, height: 0 },
+        featuredHeader: {
+            marginBottom: 12,
         },
 
-        heroCard: {
-            borderRadius: 24,
-            backgroundColor: theme.card,
-            borderWidth: 1.2,
-            borderColor: theme.border,
-            overflow: "hidden",
-            marginBottom: 14,
-            shadowColor: theme.cyan,
-            shadowRadius: 22,
-            shadowOffset: { width: 0, height: 12 },
-            elevation: 6,
-        },
-        heroGlow: {
-            position: "absolute",
-            left: 18,
-            right: 18,
-            bottom: -14,
-            height: 28,
-            borderRadius: 999,
-        },
-        playerWrap: {
-            width: "100%",
-            height: PLAYER_HEIGHT,
-            backgroundColor: "#000000",
-            overflow: "hidden",
-        },
-        youtubeWebView: {
-            backgroundColor: "#000000",
-        },
-        heroInfo: {
-            paddingHorizontal: 16,
-            paddingTop: 14,
-            paddingBottom: 16,
-        },
-        liveRow: {
+        simpleTopHeading: {
             flexDirection: "row",
             alignItems: "center",
-            gap: 7,
-            marginBottom: 8,
         },
-        liveDot: {
-            width: 9,
-            height: 9,
-            borderRadius: 999,
-        },
-        liveText: {
+
+        simpleTopHeadingText: {
             color: theme.text,
-            fontSize: 12,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.6,
-        },
-        heroTitle: {
-            color: theme.text,
-            fontSize: 25,
-            fontFamily: "Rajdhani_700Bold",
-            lineHeight: 29,
-            letterSpacing: 0.2,
-            marginBottom: 5,
-        },
-        heroSubtitle: {
-            color: theme.subtext,
-            fontSize: 15,
-            fontWeight: "700",
-            marginBottom: 14,
-        },
-        heroBottomRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-        },
-        heroStatus: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
-        },
-        heroStatusText: {
-            color: theme.cyan,
-            fontSize: 13,
+            fontSize: 24,
+            lineHeight: 27,
             fontFamily: "Rajdhani_700Bold",
             letterSpacing: 0.2,
+            marginLeft: 9,
         },
 
-        expandButton: {
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 1,
-            borderColor: theme.border,
-            backgroundColor: theme.card2,
-        },
-        heroAccentBar: {
-            height: 4,
-            borderRadius: 999,
-            overflow: "hidden",
-            flexDirection: "row",
-            marginTop: 15,
-        },
-        heroAccentCyan: {
-            flex: 4,
-            backgroundColor: theme.cyan,
-        },
-        heroAccentYellow: {
-            flex: 1,
-            backgroundColor: theme.yellow,
-        },
-
-        contextCard: {
-            backgroundColor: theme.card,
-            borderRadius: 20,
-            borderWidth: 1,
-            borderColor: theme.border,
-            paddingHorizontal: 16,
-            paddingTop: 15,
-            paddingBottom: 16,
+        sectionBlock: {
             marginBottom: 24,
-            shadowColor: "#000000",
-            shadowOpacity: theme.mode === "day" ? 0.06 : 0.14,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 5 },
-            elevation: 3,
-        },
-        descriptionHeadingRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginBottom: 8,
-        },
-        descriptionEmoji: {
-            fontSize: 19,
-        },
-        contextHeading: {
-            color: theme.text,
-            fontSize: 20,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.2,
-        },
-        descriptionText: {
-            color: theme.subtext,
-            fontSize: 12.5,
-            lineHeight: 18.5,
-            fontFamily: TYPEWRITER_FONT,
-            letterSpacing: 0.05,
-        },
-        contextDivider: {
-            height: 1,
-            backgroundColor: theme.border,
-            marginVertical: 16,
-        },
-        professorHeader: {
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 10,
-        },
-        professorAvatarWrap: {
-            width: 58,
-            height: 58,
-            borderRadius: 29,
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            backgroundColor:
-                theme.mode === "day"
-                    ? "rgba(6,182,212,0.10)"
-                    : "rgba(34,211,238,0.09)",
-            borderWidth: 1.5,
-            borderColor: theme.cyan,
-            marginRight: 11,
-        },
-        professorAvatar: {
-            width: 54,
-            height: 54,
-        },
-        professorIdentity: {
-            flex: 1,
-        },
-        professorName: {
-            color: theme.text,
-            fontSize: 19,
-            lineHeight: 22,
-            fontFamily: "Rajdhani_700Bold",
-        },
-        professorLabel: {
-            color: theme.cyan,
-            fontSize: 10,
-            lineHeight: 14,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.9,
-        },
-        professorCommentBox: {
-            backgroundColor:
-                theme.mode === "day"
-                    ? "rgba(6,182,212,0.07)"
-                    : "rgba(34,211,238,0.07)",
-            borderLeftWidth: 3,
-            borderLeftColor: theme.cyan,
-            borderRadius: 10,
-            paddingHorizontal: 12,
-            paddingVertical: 11,
-            overflow: "hidden",
-        },
-        professorComment: {
-            color: theme.text,
-            fontSize: 12.5,
-            lineHeight: 18.5,
-            fontFamily: TYPEWRITER_FONT,
-            letterSpacing: 0.05,
         },
 
         sectionHeader: {
@@ -1072,109 +1059,343 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             justifyContent: "space-between",
             marginBottom: 12,
         },
-        sectionTitle: {
-            color: theme.text,
-            fontSize: 22,
-            fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.4,
-        },
-        viewAllText: {
-            color: theme.cyan,
-            fontSize: 14,
-            fontWeight: "800",
+
+        sectionTitleRow: {
+            flexDirection: "row",
+            alignItems: "center",
         },
 
-        videoRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: theme.card,
-            borderRadius: 17,
-            padding: 10,
-            marginBottom: 12,
-            borderWidth: 1,
-            borderColor: theme.border,
-            shadowColor: "#000",
-            shadowOpacity: theme.mode === "day" ? 0.06 : 0.12,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 2,
-        },
-        thumbnail: {
-            width: 126,
-            height: 72,
-            borderRadius: 12,
-            backgroundColor: "#111111",
-            marginRight: 12,
-        },
-        thumbnailFallback: {
-            width: 126,
-            height: 72,
-            borderRadius: 12,
-            backgroundColor: theme.card2,
-            marginRight: 12,
+        sectionIcon: {
+            width: 42,
+            height: 42,
+            borderRadius: 14,
             alignItems: "center",
             justifyContent: "center",
-        },
-        videoContent: {
-            flex: 1,
-            paddingRight: 6,
-        },
-        typeBadge: {
-            alignSelf: "flex-start",
-            borderRadius: 999,
             borderWidth: 1,
-            paddingHorizontal: 9,
-            paddingVertical: 3,
-            marginBottom: 6,
+            marginRight: 10,
         },
-        typeBadgeText: {
-            fontSize: 9.5,
+
+        sectionEyebrow: {
+            color: theme.cyan,
+            fontSize: 10,
             fontFamily: "Rajdhani_700Bold",
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
+            letterSpacing: 1.4,
         },
-        videoTitle: {
+
+        sectionTitle: {
             color: theme.text,
-            fontSize: 17,
+            fontSize: 21,
+            lineHeight: 23,
             fontFamily: "Rajdhani_700Bold",
-            lineHeight: 20,
-            marginBottom: 3,
         },
-        videoSubtitle: {
-            color: theme.subtext,
-            fontSize: 12.5,
-            fontWeight: "700",
-            marginBottom: 5,
-        },
-        metaRow: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 5,
-        },
-        metaText: {
+
+        sectionCount: {
             color: theme.muted,
             fontSize: 12,
             fontWeight: "700",
         },
 
-        seeMoreButton: {
-            minHeight: 48,
+        heroCard: {
+            overflow: "hidden",
+            backgroundColor: theme.card,
+            borderRadius: 23,
+            borderWidth: 1,
+            borderColor: theme.border,
+            marginBottom: 14,
+            shadowColor: theme.shadow,
+            shadowOpacity:
+                theme.mode === "day" ? 0.12 : 0.28,
+            shadowRadius: 16,
+            shadowOffset: {
+                width: 0,
+                height: 8,
+            },
+            elevation: 5,
+        },
+
+        playerWrap: {
+            width: PLAYER_WIDTH,
+            height: PLAYER_HEIGHT,
+            backgroundColor: "#000000",
+            overflow: "hidden",
+            alignSelf: "center",
+        },
+
+        youtubeWebView: {
+            backgroundColor: "#000000",
+            margin: 0,
+            padding: 0,
+        },
+
+        heroInfo: {
+            paddingHorizontal: 15,
+            paddingTop: 13,
+            paddingBottom: 15,
+        },
+
+        heroTypeRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 8,
+        },
+
+        heroTypePill: {
+            flexDirection: "row",
+            alignItems: "center",
             borderRadius: 999,
             borderWidth: 1,
-            borderColor: theme.cyan,
+            paddingHorizontal: 9,
+            paddingVertical: 4,
+        },
+
+        heroTypeText: {
+            fontSize: 10,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.6,
+            textTransform: "uppercase",
+            marginLeft: 5,
+        },
+
+        heroStatusText: {
+            color: theme.muted,
+            fontSize: 12,
+            fontWeight: "700",
+        },
+
+        heroTitle: {
+            color: theme.text,
+            fontSize: 24,
+            lineHeight: 28,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.2,
+            marginBottom: 4,
+        },
+
+        heroSubtitle: {
+            color: theme.subtext,
+            fontSize: 14,
+            fontWeight: "700",
+        },
+
+        contextCard: {
             backgroundColor: theme.card,
-            marginTop: 2,
-            marginBottom: 12,
+            borderRadius: 19,
+            borderWidth: 1,
+            borderColor: theme.border,
+            paddingHorizontal: 15,
+            paddingVertical: 14,
+            marginBottom: 24,
+            shadowColor: theme.shadow,
+            shadowOpacity:
+                theme.mode === "day" ? 0.07 : 0.18,
+            shadowRadius: 10,
+            shadowOffset: {
+                width: 0,
+                height: 5,
+            },
+            elevation: 3,
+        },
+
+        descriptionHeadingRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 7,
+        },
+
+        contextHeading: {
+            color: theme.text,
+            fontSize: 17,
+            fontFamily: "Rajdhani_700Bold",
+            marginLeft: 7,
+        },
+
+        descriptionText: {
+            color: theme.subtext,
+            fontSize: 11.5,
+            lineHeight: 17,
+        },
+
+        contextDivider: {
+            height: 1,
+            backgroundColor: theme.border,
+            marginVertical: 14,
+        },
+
+        professorToggle: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+
+        professorAvatarWrap: {
+            width: 44,
+            height: 44,
+            borderRadius: 22,
             alignItems: "center",
             justifyContent: "center",
-            flexDirection: "row",
-            gap: 6,
+            overflow: "hidden",
+            backgroundColor: theme.cyanSoft,
+            borderWidth: 1,
+            borderColor: theme.cyan,
+            marginRight: 10,
         },
-        seeMoreButtonText: {
-            color: theme.cyan,
-            fontSize: 16,
+
+        professorAvatar: {
+            width: 41,
+            height: 41,
+        },
+
+        professorIdentity: {
+            flex: 1,
+        },
+
+        professorName: {
+            color: theme.text,
+            fontSize: 17,
+            lineHeight: 19,
             fontFamily: "Rajdhani_700Bold",
-            letterSpacing: 0.3,
+        },
+
+        professorLabel: {
+            color: theme.cyan,
+            fontSize: 9.5,
+            lineHeight: 13,
+            fontFamily: "Rajdhani_700Bold",
+            letterSpacing: 0.8,
+        },
+
+        professorCommentBox: {
+            backgroundColor: theme.cyanSoft,
+            borderLeftWidth: 3,
+            borderLeftColor: theme.cyan,
+            borderRadius: 10,
+            paddingHorizontal: 11,
+            paddingVertical: 10,
+            marginTop: 12,
+        },
+
+        professorComment: {
+            color: theme.text,
+            fontSize: 11.5,
+            lineHeight: 17,
+        },
+
+        mediaRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: theme.card,
+            borderRadius: 17,
+            borderWidth: 1,
+            borderColor: theme.border,
+            padding: 9,
+            marginBottom: 11,
+            shadowColor: theme.shadow,
+            shadowOpacity:
+                theme.mode === "day" ? 0.06 : 0.14,
+            shadowRadius: 8,
+            shadowOffset: {
+                width: 0,
+                height: 4,
+            },
+            elevation: 2,
+        },
+
+        thumbnailWrap: {
+            width: 124,
+            height: 74,
+            borderRadius: 12,
+            overflow: "hidden",
+            backgroundColor: theme.card2,
+            marginRight: 11,
+            position: "relative",
+        },
+
+        thumbnail: {
+            width: "100%",
+            height: "100%",
+        },
+
+        thumbnailFallback: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.card2,
+        },
+
+        thumbnailBadge: {
+            position: "absolute",
+            right: 5,
+            bottom: 5,
+            backgroundColor: "rgba(0,0,0,0.82)",
+            borderRadius: 6,
+            paddingHorizontal: 6,
+            paddingVertical: 3,
+        },
+
+        thumbnailBadgeText: {
+            color: "#FFFFFF",
+            fontSize: 9.5,
+            fontWeight: "800",
+        },
+
+        mediaCopy: {
+            flex: 1,
+            paddingRight: 5,
+        },
+
+        typePill: {
+            alignSelf: "flex-start",
+            flexDirection: "row",
+            alignItems: "center",
+            borderRadius: 999,
+            borderWidth: 1,
+            paddingHorizontal: 7,
+            paddingVertical: 3,
+            marginBottom: 5,
+        },
+
+        typePillText: {
+            fontSize: 9,
+            fontFamily: "Rajdhani_700Bold",
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            marginLeft: 4,
+        },
+
+        mediaTitle: {
+            color: theme.text,
+            fontSize: 16,
+            lineHeight: 18,
+            fontFamily: "Rajdhani_700Bold",
+            marginBottom: 2,
+        },
+
+        mediaSubtitle: {
+            color: theme.subtext,
+            fontSize: 11.5,
+            fontWeight: "700",
+            marginBottom: 3,
+        },
+
+        mediaDate: {
+            color: theme.muted,
+            fontSize: 10.5,
+            fontWeight: "700",
+        },
+
+        emptySectionCard: {
+            minHeight: 70,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.card,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.border,
+        },
+
+        emptySectionText: {
+            color: theme.muted,
+            fontSize: 13,
         },
 
         emptyWrap: {
@@ -1183,6 +1404,7 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             paddingTop: 90,
             paddingHorizontal: 26,
         },
+
         emptyTitle: {
             color: theme.text,
             fontSize: 22,
@@ -1190,6 +1412,7 @@ const createStyles = (theme: ReturnType<typeof getTheme>) =>
             marginTop: 12,
             marginBottom: 8,
         },
+
         emptyText: {
             color: theme.muted,
             fontSize: 14,

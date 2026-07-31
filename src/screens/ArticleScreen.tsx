@@ -27,7 +27,6 @@ import * as WebBrowser from "expo-web-browser";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import YoutubePlayer from "react-native-youtube-iframe";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { finishTransaction } from "react-native-iap";
 import ConfettiCannon from "react-native-confetti-cannon";
 import BlogsPaywallModal from "../components/BlogsPaywallModal";
 import {
@@ -37,6 +36,12 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
+import {
+    isOwnershipMismatchError,
+    isPurchaseAlreadyLinkedError,
+    SubscriptionVerificationError,
+    verifyScoolFoolsSubscription,
+} from "../services/subscriptionVerification";
 
 type TimeTheme = "day" | "night";
 
@@ -275,89 +280,161 @@ export default function ArticleScreen() {
     const verifySubscriptionOnBackend = useCallback(
         async (purchase: any) => {
             try {
-                const token = await AsyncStorage.getItem("token");
+                const result =
+                    await verifyScoolFoolsSubscription(
+                        purchase
+                    );
 
-                if (!token || !API_BASE_URL) {
-                    throw new Error("Missing token or API base URL");
-                }
+                const subscribed =
+                    result.isSubscribed === true;
 
-                const response = await fetch(
-                    `${API_BASE_URL}/api/subscriptions/verify`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({
-                            platform: Platform.OS === "ios" ? "ios" : "android",
-                            productId:
-                                purchase?.productId || purchase?.productIdIOS || "sfs_399_2y",
-                            transactionId:
-                                purchase?.transactionId ||
-                                purchase?.transactionIdIOS ||
-                                purchase?.id ||
-                                null,
-                            purchaseToken:
-                                purchase?.purchaseToken ||
-                                purchase?.purchaseTokenAndroid ||
-                                null,
-                        }),
-                    },
-                );
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data?.message || "Failed to verify subscription");
-                }
-
-                await finishTransaction({
-                    purchase,
-                    isConsumable: false,
-                });
-
-                const subscribed = !!data?.isSubscribed;
                 setIsSubscribed(subscribed);
                 setPaywallVisible(false);
-                await updateStoredSubscriptionState(subscribed);
+
+                await updateStoredSubscriptionState(
+                    subscribed
+                );
+
                 await fetchEntitlements();
 
                 if (subscribed) {
                     setShowConfetti(true);
+
                     Alert.alert(
                         "Narration Unlocked 🎉",
-                        "AI narration is now available for every article.",
+                        "AI narration is now available for every article."
                     );
+
+                    return;
                 }
-            } catch (error) {
-                console.log("Article subscription verification error:", error);
 
                 Alert.alert(
-                    "Purchase Complete",
-                    "Your purchase was received, but it could not be verified with your account.",
+                    "Subscription Inactive",
+                    "The store verified this subscription, but it is not currently active."
+                );
+            } catch (error: unknown) {
+                console.log(
+                    "Article subscription verification error:",
+                    error
+                );
+
+                if (
+                    isPurchaseAlreadyLinkedError(
+                        error
+                    )
+                ) {
+                    setIsSubscribed(false);
+
+                    await updateStoredSubscriptionState(
+                        false
+                    );
+
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Subscription Already Linked",
+                        "This App Store or Google Play subscription is already connected to another ScoolFools account."
+                    );
+
+                    return;
+                }
+
+                if (
+                    isOwnershipMismatchError(error)
+                ) {
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Different Subscription Detected",
+                        "This ScoolFools account is already connected to a different store subscription."
+                    );
+
+                    return;
+                }
+
+                if (
+                    error instanceof
+                    SubscriptionVerificationError
+                ) {
+                    if (
+                        error.code ===
+                        "UNAUTHORIZED"
+                    ) {
+                        Alert.alert(
+                            "Sign In Required",
+                            error.message
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        error.code ===
+                        "FINISH_TRANSACTION_FAILED"
+                    ) {
+                        await fetchEntitlements();
+
+                        Alert.alert(
+                            "Subscription Verified",
+                            "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and try restoring again."
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Verification Failed",
+                        error.message
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Verification Failed",
+                    "Your subscription could not be securely linked to your ScoolFools account."
                 );
             } finally {
                 setLoadingSubscription(false);
             }
         },
-        [fetchEntitlements, updateStoredSubscriptionState],
+        [
+            fetchEntitlements,
+            updateStoredSubscriptionState,
+        ]
     );
 
     const handleSubscribePress = async () => {
-        try {
-            setLoadingSubscription(true);
-            await initializeIAP();
-            await buyBlogsSubscription();
-        } catch (error) {
-            setLoadingSubscription(false);
-            console.log("Article subscription request error:", error);
+        setLoadingSubscription(true);
 
-            Alert.alert(
-                "Subscription Failed",
-                "Something went wrong while starting the subscription.",
-            );
-        }
+        await buyBlogsSubscription({
+            onSuccess:
+                verifySubscriptionOnBackend,
+
+            onError: (error: any) => {
+                setLoadingSubscription(false);
+
+                console.log(
+                    "Article subscription purchase error:",
+                    error
+                );
+
+                if (
+                    error?.code ===
+                    "user-cancelled" ||
+                    error?.code ===
+                    "E_USER_CANCELLED"
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Subscription Failed",
+                    error?.message ||
+                    "Something went wrong while processing your subscription."
+                );
+            },
+        });
     };
 
     const openNarrationPaywall = () => {

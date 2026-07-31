@@ -8,8 +8,10 @@ import React, {
 
 import {
     Alert,
+    Animated,
     FlatList,
     Image,
+    Keyboard,
     KeyboardAvoidingView,
     Modal,
     Platform,
@@ -54,6 +56,10 @@ import {
     TimeTheme,
     useTimeTheme,
 } from "../context/TimeThemeContext";
+
+const professorFoolsAvatar = require(
+    "../../assets/images/profileimages/professorFools.png"
+);
 
 /*
 |--------------------------------------------------------------------------
@@ -417,6 +423,12 @@ export default function DumpCommentsModal({
             FlatList<FlatCommentItem> | null
         >(null);
 
+
+    const commentInputRef =
+        useRef<TextInput | null>(
+            null
+        );
+
     const handledTargetRef =
         useRef<string | null>(
             null
@@ -506,6 +518,58 @@ export default function DumpCommentsModal({
         useState<string | null>(
             null
         );
+
+    /*
+    |--------------------------------------------------------------------------
+    | Android Keyboard Layout Reset
+    |--------------------------------------------------------------------------
+    |
+    | Android's KeyboardAvoidingView can occasionally retain a slightly
+    | shortened layout after the keyboard closes. We only remount the layout
+    | after keyboardDidHide, preserving the working "height" behavior while
+    | typing and restoring the sheet to its original position afterward.
+    */
+
+    const [
+        androidKeyboardResetKey,
+        setAndroidKeyboardResetKey,
+    ] =
+        useState(0);
+
+    type ModerationStatus =
+        | "idle"
+        | "scanning"
+        | "approved";
+
+    const [
+        moderationStatus,
+        setModerationStatus,
+    ] =
+        useState<ModerationStatus>(
+            "idle"
+        );
+
+    const moderationDotOne =
+        useRef(
+            new Animated.Value(0.35)
+        ).current;
+
+    const moderationDotTwo =
+        useRef(
+            new Animated.Value(0.35)
+        ).current;
+
+    const moderationDotThree =
+        useRef(
+            new Animated.Value(0.35)
+        ).current;
+
+    const moderationResetTimerRef =
+        useRef<
+            ReturnType<
+                typeof setTimeout
+            > | null
+        >(null);
 
     const currentUserId =
         currentUser?._id ||
@@ -845,6 +909,136 @@ export default function DumpCommentsModal({
         };
     }, []);
 
+    useEffect(() => {
+        if (
+            Platform.OS !==
+            "android"
+        ) {
+            return;
+        }
+
+        const hideSubscription =
+            Keyboard.addListener(
+                "keyboardDidHide",
+                () => {
+                    requestAnimationFrame(
+                        () => {
+                            setAndroidKeyboardResetKey(
+                                (current) =>
+                                    current + 1
+                            );
+                        }
+                    );
+                }
+            );
+
+        return () => {
+            hideSubscription.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (
+            moderationStatus !==
+            "scanning"
+        ) {
+            moderationDotOne.stopAnimation();
+            moderationDotTwo.stopAnimation();
+            moderationDotThree.stopAnimation();
+
+            moderationDotOne.setValue(
+                0.35
+            );
+            moderationDotTwo.setValue(
+                0.35
+            );
+            moderationDotThree.setValue(
+                0.35
+            );
+
+            return;
+        }
+
+        const createDotAnimation = (
+            value: Animated.Value,
+            delay: number
+        ) =>
+            Animated.loop(
+                Animated.sequence([
+                    Animated.delay(
+                        delay
+                    ),
+                    Animated.timing(
+                        value,
+                        {
+                            toValue: 1,
+                            duration: 220,
+                            useNativeDriver: true,
+                        }
+                    ),
+                    Animated.timing(
+                        value,
+                        {
+                            toValue: 0.35,
+                            duration: 220,
+                            useNativeDriver: true,
+                        }
+                    ),
+                    Animated.delay(
+                        Math.max(
+                            0,
+                            660 - delay
+                        )
+                    ),
+                ])
+            );
+
+        const dotOneAnimation =
+            createDotAnimation(
+                moderationDotOne,
+                0
+            );
+
+        const dotTwoAnimation =
+            createDotAnimation(
+                moderationDotTwo,
+                140
+            );
+
+        const dotThreeAnimation =
+            createDotAnimation(
+                moderationDotThree,
+                280
+            );
+
+        dotOneAnimation.start();
+        dotTwoAnimation.start();
+        dotThreeAnimation.start();
+
+        return () => {
+            dotOneAnimation.stop();
+            dotTwoAnimation.stop();
+            dotThreeAnimation.stop();
+        };
+    }, [
+        moderationDotOne,
+        moderationDotThree,
+        moderationDotTwo,
+        moderationStatus,
+    ]);
+
+    useEffect(() => {
+        return () => {
+            if (
+                moderationResetTimerRef.current
+            ) {
+                clearTimeout(
+                    moderationResetTimerRef.current
+                );
+            }
+        };
+    }, []);
+
     /*
     |--------------------------------------------------------------------------
     | Current User Avatar
@@ -920,6 +1114,13 @@ export default function DumpCommentsModal({
                 ""
             );
         }
+
+        requestAnimationFrame(
+            () => {
+                commentInputRef.current
+                    ?.focus();
+            }
+        );
     };
 
     /*
@@ -942,8 +1143,23 @@ export default function DumpCommentsModal({
             }
 
             try {
+                if (
+                    moderationResetTimerRef.current
+                ) {
+                    clearTimeout(
+                        moderationResetTimerRef.current
+                    );
+
+                    moderationResetTimerRef.current =
+                        null;
+                }
+
                 setPosting(
                     true
+                );
+
+                setModerationStatus(
+                    "scanning"
                 );
 
                 await createComment(
@@ -978,9 +1194,26 @@ export default function DumpCommentsModal({
                 await loadComments(
                     false
                 );
+
+                setModerationStatus(
+                    "approved"
+                );
+
+                moderationResetTimerRef.current =
+                    setTimeout(() => {
+                        setModerationStatus(
+                            "idle"
+                        );
+
+                        moderationResetTimerRef.current =
+                            null;
+                    }, 1700);
             } catch (
             error: any
             ) {
+                setModerationStatus(
+                    "idle"
+                );
                 Alert.alert(
                     "Comment Blocked",
                     error?.message ||
@@ -1461,7 +1694,7 @@ export default function DumpCommentsModal({
                                                 : "trash-outline"
                                         }
                                         size={
-                                            13
+                                            15
                                         }
                                         color={
                                             theme.danger
@@ -1513,7 +1746,7 @@ export default function DumpCommentsModal({
                                         : "heart-outline"
                                 }
                                 size={
-                                    14
+                                    16
                                 }
                                 color={
                                     hasHearted
@@ -1592,7 +1825,20 @@ export default function DumpCommentsModal({
                 onClose
             }
         >
-            <View
+            <KeyboardAvoidingView
+                key={
+                    Platform.OS === "android"
+                        ? `android-keyboard-${androidKeyboardResetKey}`
+                        : "ios-keyboard"
+                }
+                behavior={
+                    Platform.OS === "ios"
+                        ? "padding"
+                        : "height"
+                }
+                keyboardVerticalOffset={
+                    0
+                }
                 style={[
                     styles.modalBackdrop,
                     {
@@ -1603,422 +1849,560 @@ export default function DumpCommentsModal({
             >
                 <Pressable
                     style={
-                        styles.backdropPressArea
+                        StyleSheet.absoluteFillObject
                     }
                     onPress={
                         onClose
                     }
                 />
 
-                <KeyboardAvoidingView
-                    behavior={
-                        Platform.OS ===
-                            "ios"
-                            ? "padding"
-                            : undefined
-                    }
-                    style={
-                        styles.keyboardContainer
-                    }
+                <SafeAreaView
+                    edges={[
+                        "left",
+                        "right",
+                        "bottom",
+                    ]}
+                    style={[
+                        styles.sheet,
+                        {
+                            backgroundColor:
+                                theme.bg,
+                        },
+                    ]}
                 >
-                    <SafeAreaView
-                        edges={[
-                            "left",
-                            "right",
-                            "bottom",
-                        ]}
+                    <View
                         style={[
-                            styles.sheet,
+                            styles.sheetHandle,
                             {
                                 backgroundColor:
-                                    theme.bg,
+                                    theme.border,
+                            },
+                        ]}
+                    />
+
+                    <View
+                        style={[
+                            styles.modalHeader,
+                            {
+                                borderBottomColor:
+                                    theme.border,
                             },
                         ]}
                     >
-                        <View
+                        <View>
+                            <Text
+                                style={[
+                                    styles.modalTitle,
+                                    {
+                                        color:
+                                            theme.text,
+                                    },
+                                ]}
+                            >
+                                Comments
+                            </Text>
+
+                            <Text
+                                style={[
+                                    styles.modalSubtitle,
+                                    {
+                                        color:
+                                            theme.muted,
+                                    },
+                                ]}
+                            >
+                                {
+                                    localCommentCount
+                                }{" "}
+                                total
+                            </Text>
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={
+                                onClose
+                            }
+                            activeOpacity={
+                                0.75
+                            }
                             style={[
-                                styles.sheetHandle,
+                                styles.closeButton,
                                 {
                                     backgroundColor:
-                                        theme.border,
+                                        theme.surface,
                                 },
                             ]}
-                        />
+                        >
+                            <Ionicons
+                                name="close"
+                                size={
+                                    20
+                                }
+                                color={
+                                    theme.text
+                                }
+                            />
+                        </TouchableOpacity>
+                    </View>
 
+                    {dump && (
                         <View
                             style={[
-                                styles.modalHeader,
+                                styles.originalDumpPreview,
                                 {
+                                    backgroundColor:
+                                        theme.surface,
+
                                     borderBottomColor:
                                         theme.border,
                                 },
                             ]}
                         >
-                            <View>
-                                <Text
-                                    style={[
-                                        styles.modalTitle,
-                                        {
-                                            color:
-                                                theme.text,
-                                        },
-                                    ]}
-                                >
-                                    Comments
-                                </Text>
-
-                                <Text
-                                    style={[
-                                        styles.modalSubtitle,
-                                        {
-                                            color:
-                                                theme.muted,
-                                        },
-                                    ]}
-                                >
-                                    {
-                                        localCommentCount
-                                    }{" "}
-                                    total
-                                </Text>
-                            </View>
-
-                            <TouchableOpacity
-                                onPress={
-                                    onClose
-                                }
-                                activeOpacity={
-                                    0.75
+                            <Text
+                                numberOfLines={
+                                    2
                                 }
                                 style={[
-                                    styles.closeButton,
+                                    styles.originalDumpText,
                                     {
-                                        backgroundColor:
-                                            theme.surface,
+                                        color:
+                                            theme.textSoft,
                                     },
                                 ]}
                             >
-                                <Ionicons
-                                    name="close"
-                                    size={
-                                        20
-                                    }
-                                    color={
-                                        theme.text
-                                    }
-                                />
-                            </TouchableOpacity>
+                                {
+                                    dump.content
+                                }
+                            </Text>
                         </View>
+                    )}
 
-                        {dump && (
-                            <View
-                                style={[
-                                    styles.originalDumpPreview,
-                                    {
-                                        backgroundColor:
-                                            theme.surface,
+                    <FlatList
+                        ref={
+                            commentsListRef
+                        }
+                        data={
+                            flattenedComments
+                        }
+                        keyExtractor={(
+                            item
+                        ) =>
+                            String(
+                                item._id
+                            )
+                        }
+                        renderItem={
+                            renderComment
+                        }
+                        refreshing={
+                            loading
+                        }
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+                        keyboardShouldPersistTaps="handled"
+                        onScrollToIndexFailed={(
+                            info
+                        ) => {
+                            const approximateOffset =
+                                info.averageItemLength *
+                                info.index;
 
-                                        borderBottomColor:
-                                            theme.border,
-                                    },
-                                ]}
-                            >
-                                <Text
-                                    numberOfLines={
-                                        2
-                                    }
-                                    style={[
-                                        styles.originalDumpText,
-                                        {
-                                            color:
-                                                theme.textSoft,
-                                        },
-                                    ]}
-                                >
-                                    {
-                                        dump.content
-                                    }
-                                </Text>
-                            </View>
-                        )}
+                            commentsListRef.current
+                                ?.scrollToOffset({
+                                    offset:
+                                        approximateOffset,
+                                    animated:
+                                        false,
+                                });
 
-                        <FlatList
-                            ref={
-                                commentsListRef
-                            }
-                            data={
-                                flattenedComments
-                            }
-                            keyExtractor={(
-                                item
-                            ) =>
-                                String(
-                                    item._id
-                                )
-                            }
-                            renderItem={
-                                renderComment
-                            }
-                            refreshing={
-                                loading
-                            }
-                            showsVerticalScrollIndicator={
-                                false
-                            }
-                            keyboardShouldPersistTaps="handled"
-                            onScrollToIndexFailed={(
-                                info
-                            ) => {
-                                const approximateOffset =
-                                    info.averageItemLength *
-                                    info.index;
-
+                            setTimeout(() => {
                                 commentsListRef.current
-                                    ?.scrollToOffset({
-                                        offset:
-                                            approximateOffset,
+                                    ?.scrollToIndex({
+                                        index:
+                                            info.index,
                                         animated:
-                                            false,
+                                            true,
+                                        viewPosition:
+                                            0.35,
                                     });
-
-                                setTimeout(() => {
-                                    commentsListRef.current
-                                        ?.scrollToIndex({
-                                            index:
-                                                info.index,
-                                            animated:
-                                                true,
-                                            viewPosition:
-                                                0.35,
-                                        });
-                                }, 300);
-                            }}
-                            refreshControl={
-                                <RefreshControl
-                                    refreshing={
-                                        refreshing
-                                    }
-                                    onRefresh={
-                                        handleRefresh
-                                    }
-                                    tintColor={
-                                        theme.cyan
-                                    }
-                                    colors={[
-                                        theme.cyan,
-                                    ]}
-                                    progressBackgroundColor={
-                                        theme.surface
-                                    }
-                                />
-                            }
-                            contentContainerStyle={
-                                styles.commentsList
-                            }
-                            ListEmptyComponent={
-                                !loading ? (
-                                    <View
-                                        style={
-                                            styles.emptyComments
-                                        }
-                                    >
-                                        <Ionicons
-                                            name="chatbubbles-outline"
-                                            size={
-                                                30
-                                            }
-                                            color={
-                                                theme.cyan
-                                            }
-                                        />
-
-                                        <Text
-                                            style={[
-                                                styles.emptyTitle,
-                                                {
-                                                    color:
-                                                        theme.text,
-                                                },
-                                            ]}
-                                        >
-                                            No comments yet
-                                        </Text>
-
-                                        <Text
-                                            style={[
-                                                styles.emptyText,
-                                                {
-                                                    color:
-                                                        theme.muted,
-                                                },
-                                            ]}
-                                        >
-                                            Be the first student to respond.
-                                        </Text>
-                                    </View>
-                                ) : null
-                            }
-                        />
-
-                        {replyingTo && (
-                            <View
-                                style={[
-                                    styles.replyingBar,
-                                    {
-                                        backgroundColor:
-                                            theme.surface,
-
-                                        borderTopColor:
-                                            theme.border,
-                                    },
+                            }, 300);
+                        }}
+                        refreshControl={
+                            <RefreshControl
+                                refreshing={
+                                    refreshing
+                                }
+                                onRefresh={
+                                    handleRefresh
+                                }
+                                tintColor={
+                                    theme.cyan
+                                }
+                                colors={[
+                                    theme.cyan,
                                 ]}
-                            >
-                                <Text
-                                    numberOfLines={
-                                        1
+                                progressBackgroundColor={
+                                    theme.surface
+                                }
+                            />
+                        }
+                        contentContainerStyle={
+                            styles.commentsList
+                        }
+                        ListEmptyComponent={
+                            !loading ? (
+                                <View
+                                    style={
+                                        styles.emptyComments
                                     }
-                                    style={[
-                                        styles.replyingText,
-                                        {
-                                            color:
-                                                theme.muted,
-                                        },
-                                    ]}
-                                >
-                                    Replying to @
-                                    {getAuthor(
-                                        replyingTo.author
-                                    )
-                                        ?.username ||
-                                        "student"}
-                                </Text>
-
-                                <TouchableOpacity
-                                    onPress={() => {
-                                        setReplyingTo(
-                                            null
-                                        );
-
-                                        setCommentText(
-                                            ""
-                                        );
-                                    }}
                                 >
                                     <Ionicons
-                                        name="close-circle"
+                                        name="chatbubbles-outline"
                                         size={
-                                            18
+                                            30
                                         }
                                         color={
-                                            theme.muted
+                                            theme.cyan
                                         }
                                     />
-                                </TouchableOpacity>
-                            </View>
-                        )}
+
+                                    <Text
+                                        style={[
+                                            styles.emptyTitle,
+                                            {
+                                                color:
+                                                    theme.text,
+                                            },
+                                        ]}
+                                    >
+                                        No comments yet
+                                    </Text>
+
+                                    <Text
+                                        style={[
+                                            styles.emptyText,
+                                            {
+                                                color:
+                                                    theme.muted,
+                                            },
+                                        ]}
+                                    >
+                                        Be the first student to respond.
+                                    </Text>
+                                </View>
+                            ) : null
+                        }
+                    />
+
+                    <View
+                        style={[
+                            styles.professorFoolsBar,
+                            {
+                                backgroundColor:
+                                    theme.surface,
+
+                                borderTopColor:
+                                    theme.border,
+                            },
+                        ]}
+                    >
+                        <Image
+                            source={
+                                professorFoolsAvatar
+                            }
+                            style={
+                                styles.professorFoolsAvatar
+                            }
+                            resizeMode="cover"
+                        />
 
                         <View
+                            style={
+                                styles.professorFoolsCopy
+                            }
+                        >
+                            <Text
+                                style={[
+                                    styles.professorFoolsTitle,
+                                    {
+                                        color:
+                                            theme.text,
+                                    },
+                                ]}
+                            >
+                                Professor Fools
+                            </Text>
+
+                            <Text
+                                numberOfLines={
+                                    2
+                                }
+                                style={[
+                                    styles.professorFoolsText,
+                                    {
+                                        color:
+                                            moderationStatus ===
+                                                "scanning"
+                                                ? "#EF4444"
+                                                : moderationStatus ===
+                                                    "approved"
+                                                    ? "#22C55E"
+                                                    : theme.muted,
+                                    },
+                                ]}
+                            >
+                                {moderationStatus ===
+                                    "scanning"
+                                    ? "Scanning, making sure your comment isn’t too goofy"
+                                    : moderationStatus ===
+                                        "approved"
+                                        ? "Alright, you good 😏"
+                                        : "Checks comments and replies before they are posted."}
+                            </Text>
+                        </View>
+
+                        {moderationStatus ===
+                            "scanning" ? (
+                            <View
+                                style={
+                                    styles.moderationActivityDots
+                                }
+                            >
+                                {[
+                                    moderationDotOne,
+                                    moderationDotTwo,
+                                    moderationDotThree,
+                                ].map(
+                                    (
+                                        dotValue,
+                                        index
+                                    ) => (
+                                        <Animated.View
+                                            key={
+                                                index
+                                            }
+                                            style={[
+                                                styles.moderationActivityDot,
+                                                {
+                                                    backgroundColor:
+                                                        "#EF4444",
+
+                                                    opacity:
+                                                        dotValue,
+
+                                                    transform:
+                                                        [
+                                                            {
+                                                                scale:
+                                                                    dotValue.interpolate(
+                                                                        {
+                                                                            inputRange:
+                                                                                [
+                                                                                    0.35,
+                                                                                    1,
+                                                                                ],
+
+                                                                            outputRange:
+                                                                                [
+                                                                                    0.75,
+                                                                                    1.15,
+                                                                                ],
+                                                                        }
+                                                                    ),
+                                                            },
+                                                        ],
+                                                },
+                                            ]}
+                                        />
+                                    )
+                                )}
+                            </View>
+                        ) : (
+                            <Ionicons
+                                name={
+                                    moderationStatus ===
+                                        "approved"
+                                        ? "checkmark-circle"
+                                        : "shield-checkmark"
+                                }
+                                size={
+                                    moderationStatus ===
+                                        "approved"
+                                        ? 23
+                                        : 20
+                                }
+                                color={
+                                    moderationStatus ===
+                                        "approved"
+                                        ? "#22C55E"
+                                        : theme.cyan
+                                }
+                            />
+                        )}
+                    </View>
+
+                    {replyingTo && (
+                        <View
                             style={[
-                                styles.composer,
+                                styles.replyingBar,
                                 {
                                     backgroundColor:
-                                        theme.bg,
+                                        theme.surface,
 
                                     borderTopColor:
                                         theme.border,
                                 },
                             ]}
                         >
-                            <Image
-                                source={
-                                    currentRemoteAvatarUrl
-                                        ? {
-                                            uri: currentRemoteAvatarUrl,
-                                        }
-                                        : currentAvatarSource
-                                }
-                                style={
-                                    styles.currentUserAvatar
-                                }
-                                resizeMode="cover"
-                            />
-
-                            <TextInput
-                                value={
-                                    commentText
-                                }
-                                onChangeText={
-                                    setCommentText
-                                }
-                                placeholder="Add a comment..."
-                                placeholderTextColor={
-                                    theme.muted
-                                }
-                                multiline
-                                maxLength={
-                                    250
-                                }
-                                editable={
-                                    !posting &&
-                                    !deletingCommentId
+                            <Text
+                                numberOfLines={
+                                    1
                                 }
                                 style={[
-                                    styles.commentInput,
+                                    styles.replyingText,
                                     {
                                         color:
-                                            theme.text,
-
-                                        backgroundColor:
-                                            theme.input,
-                                    },
-                                ]}
-                            />
-
-                            <TouchableOpacity
-                                activeOpacity={
-                                    0.8
-                                }
-                                disabled={
-                                    !commentText.trim() ||
-                                    posting ||
-                                    Boolean(
-                                        deletingCommentId
-                                    )
-                                }
-                                onPress={
-                                    handlePostComment
-                                }
-                                style={[
-                                    styles.postButton,
-                                    {
-                                        backgroundColor:
-                                            theme.cyan,
-
-                                        opacity:
-                                            commentText.trim() &&
-                                                !posting &&
-                                                !deletingCommentId
-                                                ? 1
-                                                : 0.4,
+                                            theme.muted,
                                     },
                                 ]}
                             >
+                                Replying to @
+                                {getAuthor(
+                                    replyingTo.author
+                                )
+                                    ?.username ||
+                                    "student"}
+                            </Text>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    setReplyingTo(
+                                        null
+                                    );
+
+                                    setCommentText(
+                                        ""
+                                    );
+                                }}
+                            >
                                 <Ionicons
-                                    name={
-                                        posting
-                                            ? "hourglass-outline"
-                                            : "arrow-up"
-                                    }
+                                    name="close-circle"
                                     size={
-                                        17
+                                        18
                                     }
-                                    color="#07111F"
+                                    color={
+                                        theme.muted
+                                    }
                                 />
                             </TouchableOpacity>
                         </View>
-                    </SafeAreaView>
-                </KeyboardAvoidingView>
-            </View>
+                    )}
+
+                    <View
+                        style={[
+                            styles.composer,
+                            {
+                                backgroundColor:
+                                    theme.bg,
+
+                                borderTopColor:
+                                    theme.border,
+                            },
+                        ]}
+                    >
+                        <Image
+                            source={
+                                currentRemoteAvatarUrl
+                                    ? {
+                                        uri: currentRemoteAvatarUrl,
+                                    }
+                                    : currentAvatarSource
+                            }
+                            style={
+                                styles.currentUserAvatar
+                            }
+                            resizeMode="cover"
+                        />
+
+                        <TextInput
+                            ref={commentInputRef}
+                            value={commentText}
+                            onChangeText={setCommentText}
+                            placeholder="Add a comment..."
+                            placeholderTextColor={theme.muted}
+                            multiline
+                            maxLength={250}
+                            disableFullscreenUI
+                            textAlignVertical="top"
+                            onFocus={() => {
+                                setTimeout(() => {
+                                    commentsListRef.current
+                                        ?.scrollToEnd({
+                                            animated: true,
+                                        });
+                                }, 250);
+                            }}
+                            editable={
+                                !posting &&
+                                !deletingCommentId
+                            }
+                            style={[
+                                styles.commentInput,
+                                {
+                                    color:
+                                        theme.text,
+
+                                    backgroundColor:
+                                        theme.input,
+                                },
+                            ]}
+                        />
+
+                        <TouchableOpacity
+                            activeOpacity={
+                                0.8
+                            }
+                            disabled={
+                                !commentText.trim() ||
+                                posting ||
+                                Boolean(
+                                    deletingCommentId
+                                )
+                            }
+                            onPress={
+                                handlePostComment
+                            }
+                            style={[
+                                styles.postButton,
+                                {
+                                    backgroundColor:
+                                        theme.cyan,
+
+                                    opacity:
+                                        commentText.trim() &&
+                                            !posting &&
+                                            !deletingCommentId
+                                            ? 1
+                                            : 0.4,
+                                },
+                            ]}
+                        >
+                            <Ionicons
+                                name={
+                                    posting
+                                        ? "hourglass-outline"
+                                        : "arrow-up"
+                                }
+                                size={
+                                    17
+                                }
+                                color="#07111F"
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </SafeAreaView>
+            </KeyboardAvoidingView>
         </Modal>
     );
 }
@@ -2037,16 +2421,10 @@ const styles =
                 "flex-end",
         },
 
-        backdropPressArea: {
-            flex: 1,
-        },
-
-        keyboardContainer: {
-            maxHeight: "88%",
-        },
-
         sheet: {
-            height: "100%",
+            width: "100%",
+            height: "88%",
+            alignSelf: "flex-end",
             borderTopLeftRadius:
                 22,
             borderTopRightRadius:
@@ -2119,23 +2497,23 @@ const styles =
         commentContainer: {
             flexDirection: "row",
             paddingHorizontal:
-                s(13),
+                s(14),
             paddingVertical:
-                vs(9),
+                vs(12),
             borderBottomWidth: 1,
         },
 
         commentAvatar: {
-            width: s(32),
-            height: s(32),
-            borderRadius: s(10),
-            marginRight: s(8),
+            width: s(38),
+            height: s(38),
+            borderRadius: s(12),
+            marginRight: s(10),
         },
 
         replyAvatar: {
-            width: s(27),
-            height: s(27),
-            borderRadius: s(9),
+            width: s(33),
+            height: s(33),
+            borderRadius: s(11),
         },
 
         commentBody: {
@@ -2161,15 +2539,15 @@ const styles =
 
         commentUsername: {
             flexShrink: 1,
-            fontSize: ms(11.5),
+            fontSize: ms(13.5),
             fontFamily:
                 "Rajdhani_700Bold",
         },
 
         athleteEmoji: {
             marginLeft: s(1),
-            fontSize: ms(10),
-            lineHeight: ms(13),
+            fontSize: ms(12),
+            lineHeight: ms(15),
         },
 
         commentTopRight: {
@@ -2179,7 +2557,7 @@ const styles =
         },
 
         commentTime: {
-            fontSize: ms(8.5),
+            fontSize: ms(10),
             fontWeight: "700",
         },
 
@@ -2194,9 +2572,9 @@ const styles =
         },
 
         commentContent: {
-            marginTop: vs(4),
-            fontSize: ms(11),
-            lineHeight: ms(15),
+            marginTop: vs(5),
+            fontSize: ms(13),
+            lineHeight: ms(18),
             fontWeight: "600",
         },
 
@@ -2215,12 +2593,66 @@ const styles =
         },
 
         commentActionText: {
-            fontSize: ms(8.5),
+            fontSize: ms(10),
             fontWeight: "800",
         },
 
+        professorFoolsBar: {
+            minHeight: 58,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal:
+                s(13),
+            paddingVertical:
+                vs(7),
+            borderTopWidth: 1,
+        },
+
+        professorFoolsAvatar: {
+            width: s(38),
+            height: s(38),
+            borderRadius: s(12),
+            marginRight: s(9),
+        },
+
+        professorFoolsCopy: {
+            flex: 1,
+            minWidth: 0,
+            marginRight: s(8),
+        },
+
+        professorFoolsTitle: {
+            fontSize: ms(12.5),
+            fontFamily:
+                "Rajdhani_700Bold",
+        },
+
+        professorFoolsText: {
+            marginTop: 1,
+            fontSize: ms(9.5),
+            lineHeight: ms(12),
+            fontWeight: "600",
+        },
+
+        moderationActivityDots: {
+            width: s(34),
+            height: s(22),
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent:
+                "space-between",
+            paddingHorizontal:
+                s(2),
+        },
+
+        moderationActivityDot: {
+            width: s(7),
+            height: s(7),
+            borderRadius: s(4),
+        },
+
         replyingBar: {
-            minHeight: 35,
+            minHeight: 40,
             flexDirection: "row",
             alignItems: "center",
             justifyContent:
@@ -2232,7 +2664,7 @@ const styles =
 
         replyingText: {
             flex: 1,
-            fontSize: ms(9),
+            fontSize: ms(10.5),
             fontWeight: "700",
             marginRight: s(8),
         },
@@ -2253,30 +2685,31 @@ const styles =
         },
 
         currentUserAvatar: {
-            width: s(31),
-            height: s(31),
-            borderRadius: s(10),
+            width: s(38),
+            height: s(38),
+            borderRadius: s(12),
             marginRight: s(7),
             marginBottom: 2,
         },
 
         commentInput: {
             flex: 1,
-            minHeight: 36,
-            maxHeight: 90,
-            borderRadius: 17,
+            minHeight: 44,
+            maxHeight: 110,
+            borderRadius: 20,
             paddingHorizontal:
                 s(11),
             paddingTop: 8,
             paddingBottom: 8,
-            fontSize: ms(10.5),
+            fontSize: ms(12.5),
+            lineHeight: ms(17),
             fontWeight: "600",
         },
 
         postButton: {
-            width: 34,
-            height: 34,
-            borderRadius: 17,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
             alignItems: "center",
             justifyContent:
                 "center",

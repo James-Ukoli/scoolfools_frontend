@@ -29,66 +29,131 @@ import {
 } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import ConfettiCannon from "react-native-confetti-cannon";
+
 import { COLLEGES } from "../../assets/data/colleges";
 import BlogsPaywallModal from "../components/BlogsPaywallModal";
+
 import {
     initializeIAP,
     getBlogsSubscriptionProduct,
     buyBlogsSubscription,
 } from "../services/iap";
-import { finishTransaction } from "react-native-iap";
-import ConfettiCannon from "react-native-confetti-cannon";
+
+import {
+    isOwnershipMismatchError,
+    isPurchaseAlreadyLinkedError,
+    SubscriptionVerificationError,
+    verifyScoolFoolsSubscription,
+} from "../services/subscriptionVerification";
+
 import { registerCurrentDevice } from "../services/pushRegistration";
 
 const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
+
 const MINIMUM_LOADING_DURATION_MS = 2000;
 
-const waitForMinimumLoadingDuration = async (startedAt: number) => {
+const waitForMinimumLoadingDuration = async (
+    startedAt: number
+) => {
     const elapsed = Date.now() - startedAt;
-    const remaining = MINIMUM_LOADING_DURATION_MS - elapsed;
+    const remaining =
+        MINIMUM_LOADING_DURATION_MS - elapsed;
 
     if (remaining > 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, remaining));
+        await new Promise<void>((resolve) =>
+            setTimeout(resolve, remaining)
+        );
     }
 };
 
-type SchoolLevel = "college" | "highSchool";
+type SchoolLevel =
+    | "college"
+    | "highSchool";
+
 type HighSchoolClassification =
     | "freshman"
     | "sophomore"
     | "junior"
     | "senior";
-type AthleteChoice = boolean | null;
-type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
-type TimeTheme = "day" | "night";
 
-const getCurrentThemeMode = (): TimeTheme => {
-    const hour = new Date().getHours();
-    return hour >= 6 && hour < 19 ? "day" : "night";
-};
+type AthleteChoice =
+    | boolean
+    | null;
 
-const getSetupProfileTheme = (mode: TimeTheme) => {
-    const isNight = mode === "night";
+type SocialPlatform =
+    | "instagram"
+    | "x"
+    | "youtube"
+    | "snapchat";
+
+type TimeTheme =
+    | "day"
+    | "night";
+
+const getCurrentThemeMode =
+    (): TimeTheme => {
+        const hour =
+            new Date().getHours();
+
+        return hour >= 6 && hour < 19
+            ? "day"
+            : "night";
+    };
+
+const getSetupProfileTheme = (
+    mode: TimeTheme
+) => {
+    const isNight =
+        mode === "night";
 
     return {
         mode,
-        bg: isNight ? "#020617" : "#FFFFFF",
-        surface: isNight ? "#0F172A" : "#F8F9FA",
-        surfaceSoft: isNight ? "#111827" : "#F1F3F5",
-        text: isNight ? "#F8FAFC" : "#07111F",
-        subtext: isNight ? "#CBD5E1" : "#697580",
-        muted: isNight ? "#94A3B8" : "#89939D",
-        placeholder: isNight ? "#64748B" : "#9AA4AE",
-        border: isNight ? "rgba(255,255,255,0.12)" : "#DDE3E7",
-        divider: isNight ? "rgba(255,255,255,0.09)" : "#EEF1F3",
-        selected: isNight ? "rgba(34,211,238,0.12)" : "#E6FAFC",
-        errorBg: isNight ? "#2A1215" : "#FFF8F8",
-        error: isNight ? "#FF7A7A" : "#D92D20",
-        cyan: isNight ? "#22D3EE" : "#06B6D4",
-        cyanDark: isNight ? "#22D3EE" : "#06A8C0",
+        bg: isNight
+            ? "#020617"
+            : "#FFFFFF",
+        surface: isNight
+            ? "#0F172A"
+            : "#F8F9FA",
+        surfaceSoft: isNight
+            ? "#111827"
+            : "#F1F3F5",
+        text: isNight
+            ? "#F8FAFC"
+            : "#07111F",
+        subtext: isNight
+            ? "#CBD5E1"
+            : "#697580",
+        muted: isNight
+            ? "#94A3B8"
+            : "#89939D",
+        placeholder: isNight
+            ? "#64748B"
+            : "#9AA4AE",
+        border: isNight
+            ? "rgba(255,255,255,0.12)"
+            : "#DDE3E7",
+        divider: isNight
+            ? "rgba(255,255,255,0.09)"
+            : "#EEF1F3",
+        selected: isNight
+            ? "rgba(34,211,238,0.12)"
+            : "#E6FAFC",
+        errorBg: isNight
+            ? "#2A1215"
+            : "#FFF8F8",
+        error: isNight
+            ? "#FF7A7A"
+            : "#D92D20",
+        cyan: isNight
+            ? "#22D3EE"
+            : "#06B6D4",
+        cyanDark: isNight
+            ? "#22D3EE"
+            : "#06A8C0",
         yellow: "#FACC15",
         darkText: "#07111F",
         white: "#FFFFFF",
@@ -102,7 +167,6 @@ type AvatarOption = {
 };
 
 const AVATARS: AvatarOption[] = [
-    // Top row
     {
         id: "basicBlue",
         source: require("../../assets/images/profileimages/basicBlue.png"),
@@ -122,8 +186,6 @@ const AVATARS: AvatarOption[] = [
         source: require("../../assets/images/profileimages/diamondBoy.png"),
         subscriberOnly: true,
     },
-
-    // Bottom row
     {
         id: "basicYellow",
         source: require("../../assets/images/profileimages/basicYellow.png"),
@@ -149,11 +211,24 @@ const HIGH_SCHOOL_CLASSIFICATIONS: Array<{
     value: HighSchoolClassification;
     label: string;
 }> = [
-        { value: "freshman", label: "Freshman" },
-        { value: "sophomore", label: "Sophomore" },
-        { value: "junior", label: "Junior" },
-        { value: "senior", label: "Senior" },
+        {
+            value: "freshman",
+            label: "Freshman",
+        },
+        {
+            value: "sophomore",
+            label: "Sophomore",
+        },
+        {
+            value: "junior",
+            label: "Junior",
+        },
+        {
+            value: "senior",
+            label: "Senior",
+        },
     ];
+
 const SPORTS = [
     "Basketball",
     "Football",
@@ -178,7 +253,11 @@ const SPORTS = [
 const SOCIAL_PLATFORMS: Array<{
     value: SocialPlatform;
     label: string;
-    icon: "instagram" | "x-twitter" | "youtube" | "snapchat";
+    icon:
+    | "instagram"
+    | "x-twitter"
+    | "youtube"
+    | "snapchat";
     iconColor: string;
     backgroundColor: string;
     placeholder: string;
@@ -189,7 +268,8 @@ const SOCIAL_PLATFORMS: Array<{
             icon: "instagram",
             iconColor: "#E4405F",
             backgroundColor: "#F8F9FA",
-            placeholder: "https://instagram.com/yourusername",
+            placeholder:
+                "https://instagram.com/yourusername",
         },
         {
             value: "x",
@@ -197,7 +277,8 @@ const SOCIAL_PLATFORMS: Array<{
             icon: "x-twitter",
             iconColor: "#000000",
             backgroundColor: "#F8F9FA",
-            placeholder: "https://x.com/yourusername",
+            placeholder:
+                "https://x.com/yourusername",
         },
         {
             value: "youtube",
@@ -205,7 +286,8 @@ const SOCIAL_PLATFORMS: Array<{
             icon: "youtube",
             iconColor: "#FF0000",
             backgroundColor: "#F8F9FA",
-            placeholder: "https://youtube.com/@yourchannel",
+            placeholder:
+                "https://youtube.com/@yourchannel",
         },
         {
             value: "snapchat",
@@ -213,144 +295,343 @@ const SOCIAL_PLATFORMS: Array<{
             icon: "snapchat",
             iconColor: "#F2DE00",
             backgroundColor: "#F8F9FA",
-            placeholder: "https://snapchat.com/add/yourusername",
+            placeholder:
+                "https://snapchat.com/add/yourusername",
         },
     ];
 
-const SOCIAL_DOMAINS: Record<SocialPlatform, string[]> = {
-    instagram: ["instagram.com"],
-    x: ["x.com", "twitter.com"],
-    youtube: ["youtube.com", "youtu.be"],
-    snapchat: ["snapchat.com"],
+const SOCIAL_DOMAINS: Record<
+    SocialPlatform,
+    string[]
+> = {
+    instagram: [
+        "instagram.com",
+    ],
+    x: [
+        "x.com",
+        "twitter.com",
+    ],
+    youtube: [
+        "youtube.com",
+        "youtu.be",
+    ],
+    snapchat: [
+        "snapchat.com",
+    ],
 };
 
-const normalizeSocialUrl = (value: string) => {
-    const trimmed = value.trim();
+const normalizeSocialUrl = (
+    value: string
+) => {
+    const trimmed =
+        value.trim();
 
     if (!trimmed) {
         return "";
     }
 
-    if (/^https?:\/\//i.test(trimmed)) {
+    if (
+        /^https?:\/\//i.test(
+            trimmed
+        )
+    ) {
         return trimmed;
     }
 
     return `https://${trimmed}`;
 };
 
-const isValidSocialUrl = (platform: SocialPlatform, value: string) => {
+const isValidSocialUrl = (
+    platform: SocialPlatform,
+    value: string
+) => {
     try {
-        const parsedUrl = new URL(normalizeSocialUrl(value));
-        const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+        const parsedUrl =
+            new URL(
+                normalizeSocialUrl(
+                    value
+                )
+            );
 
-        if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
+        const hostname =
+            parsedUrl.hostname
+                .toLowerCase()
+                .replace(
+                    /^www\./,
+                    ""
+                );
+
+        if (
+            parsedUrl.protocol !==
+            "https:" &&
+            parsedUrl.protocol !==
+            "http:"
+        ) {
             return false;
         }
 
-        return SOCIAL_DOMAINS[platform].some(
-            (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+        return SOCIAL_DOMAINS[
+            platform
+        ].some(
+            (domain) =>
+                hostname === domain ||
+                hostname.endsWith(
+                    `.${domain}`
+                )
         );
     } catch {
         return false;
     }
 };
 
-const normalizeUsername = (value: string) => {
+const normalizeUsername = (
+    value: string
+) => {
     return value
         .toLowerCase()
         .replace(/\s/g, "")
-        .replace(/[^a-z0-9._]/g, "");
+        .replace(
+            /[^a-z0-9._]/g,
+            ""
+        );
 };
 
-export default function SetupProfileScreen({ navigation }: any) {
-    const insets = useSafeAreaInsets();
-    const [themeMode, setThemeMode] = useState<TimeTheme>(
-        getCurrentThemeMode(),
+export default function SetupProfileScreen({
+    navigation,
+}: any) {
+    const insets =
+        useSafeAreaInsets();
+
+    const [
+        themeMode,
+        setThemeMode,
+    ] = useState<TimeTheme>(
+        getCurrentThemeMode()
     );
+
     const theme = useMemo(
-        () => getSetupProfileTheme(themeMode),
-        [themeMode],
+        () =>
+            getSetupProfileTheme(
+                themeMode
+            ),
+        [themeMode]
     );
-    const styles = useMemo(() => createStyles(theme), [theme]);
-    const [selectedAvatar, setSelectedAvatar] = useState("");
-    const [username, setUsername] = useState("");
-    const [usernameError, setUsernameError] = useState("");
 
-    const [schoolLevel, setSchoolLevel] = useState<SchoolLevel | null>(null);
+    const styles = useMemo(
+        () =>
+            createStyles(theme),
+        [theme]
+    );
 
-    const [collegeName, setCollegeName] = useState("");
-    const [collegeSearch, setCollegeSearch] = useState("");
-    const [collegeModalVisible, setCollegeModalVisible] = useState(false);
+    const [
+        selectedAvatar,
+        setSelectedAvatar,
+    ] = useState("");
+
+    const [
+        username,
+        setUsername,
+    ] = useState("");
+
+    const [
+        usernameError,
+        setUsernameError,
+    ] = useState("");
+
+    const [
+        schoolLevel,
+        setSchoolLevel,
+    ] =
+        useState<SchoolLevel | null>(
+            null
+        );
+
+    const [
+        collegeName,
+        setCollegeName,
+    ] = useState("");
+
+    const [
+        collegeSearch,
+        setCollegeSearch,
+    ] = useState("");
+
+    const [
+        collegeModalVisible,
+        setCollegeModalVisible,
+    ] = useState(false);
+
     const [
         highSchoolClassification,
         setHighSchoolClassification,
-    ] = useState<HighSchoolClassification | null>(null);
+    ] =
+        useState<HighSchoolClassification | null>(
+            null
+        );
 
-    const [isStudentAthlete, setIsStudentAthlete] = useState<AthleteChoice>(null);
+    const [
+        isStudentAthlete,
+        setIsStudentAthlete,
+    ] =
+        useState<AthleteChoice>(
+            null
+        );
 
-    const [selectedSport, setSelectedSport] = useState("");
-    const [sportModalVisible, setSportModalVisible] = useState(false);
+    const [
+        selectedSport,
+        setSelectedSport,
+    ] = useState("");
 
-    const [socialPlatform, setSocialPlatform] = useState<SocialPlatform | null>(
-        null,
-    );
-    const [socialMediaUrl, setSocialMediaUrl] = useState("");
-    const [socialMediaError, setSocialMediaError] = useState("");
+    const [
+        sportModalVisible,
+        setSportModalVisible,
+    ] = useState(false);
 
-    const [loading, setLoading] = useState(false);
-    const [isSubscribed, setIsSubscribed] = useState(false);
-    const [paywallVisible, setPaywallVisible] = useState(false);
-    const [loadingSubscription, setLoadingSubscription] = useState(false);
-    const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
-    const [showConfetti, setShowConfetti] = useState(false);
-    const savingProgress = useRef(new Animated.Value(0)).current;
-    const avatarRotation = useRef(new Animated.Value(0)).current;
+    const [
+        socialPlatform,
+        setSocialPlatform,
+    ] =
+        useState<SocialPlatform | null>(
+            null
+        );
 
-    const selectedAvatarSource = useMemo(
-        () =>
-            AVATARS.find((avatar) => avatar.id === selectedAvatar)?.source ||
-            AVATARS[0].source,
-        [selectedAvatar],
-    );
+    const [
+        socialMediaUrl,
+        setSocialMediaUrl,
+    ] = useState("");
 
-    const avatarSpin = avatarRotation.interpolate({
-        inputRange: [0, 1],
-        outputRange: ["0deg", "360deg"],
-    });
+    const [
+        socialMediaError,
+        setSocialMediaError,
+    ] = useState("");
+
+    const [
+        loading,
+        setLoading,
+    ] = useState(false);
+
+    const [
+        isSubscribed,
+        setIsSubscribed,
+    ] = useState(false);
+
+    const [
+        paywallVisible,
+        setPaywallVisible,
+    ] = useState(false);
+
+    const [
+        loadingSubscription,
+        setLoadingSubscription,
+    ] = useState(false);
+
+    const [
+        subscriptionProduct,
+        setSubscriptionProduct,
+    ] = useState<any>(null);
+
+    const [
+        showConfetti,
+        setShowConfetti,
+    ] = useState(false);
+
+    const savingProgress =
+        useRef(
+            new Animated.Value(0)
+        ).current;
+
+    const avatarRotation =
+        useRef(
+            new Animated.Value(0)
+        ).current;
+
+    const selectedAvatarSource =
+        useMemo(
+            () =>
+                AVATARS.find(
+                    (avatar) =>
+                        avatar.id ===
+                        selectedAvatar
+                )?.source ||
+                AVATARS[0].source,
+            [selectedAvatar]
+        );
+
+    const avatarSpin =
+        avatarRotation.interpolate({
+            inputRange: [
+                0,
+                1,
+            ],
+            outputRange: [
+                "0deg",
+                "360deg",
+            ],
+        });
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setThemeMode(getCurrentThemeMode());
-        }, 60000);
+        const interval =
+            setInterval(() => {
+                setThemeMode(
+                    getCurrentThemeMode()
+                );
+            }, 60000);
 
-        return () => clearInterval(interval);
+        return () =>
+            clearInterval(interval);
     }, []);
 
     useEffect(() => {
         if (!loading) {
-            savingProgress.setValue(0);
-            avatarRotation.setValue(0);
+            savingProgress.setValue(
+                0
+            );
+
+            avatarRotation.setValue(
+                0
+            );
+
             return;
         }
 
-        savingProgress.setValue(0);
-        avatarRotation.setValue(0);
-
-        const progressAnimation = Animated.timing(savingProgress, {
-            toValue: 1,
-            duration: MINIMUM_LOADING_DURATION_MS,
-            easing: Easing.inOut(Easing.cubic),
-            useNativeDriver: false,
-        });
-
-        const spinAnimation = Animated.loop(
-            Animated.timing(avatarRotation, {
-                toValue: 1,
-                duration: 850,
-                easing: Easing.linear,
-                useNativeDriver: true,
-            }),
+        savingProgress.setValue(
+            0
         );
+
+        avatarRotation.setValue(
+            0
+        );
+
+        const progressAnimation =
+            Animated.timing(
+                savingProgress,
+                {
+                    toValue: 1,
+                    duration:
+                        MINIMUM_LOADING_DURATION_MS,
+                    easing:
+                        Easing.inOut(
+                            Easing.cubic
+                        ),
+                    useNativeDriver:
+                        false,
+                }
+            );
+
+        const spinAnimation =
+            Animated.loop(
+                Animated.timing(
+                    avatarRotation,
+                    {
+                        toValue: 1,
+                        duration: 850,
+                        easing:
+                            Easing.linear,
+                        useNativeDriver:
+                            true,
+                    }
+                )
+            );
 
         progressAnimation.start();
         spinAnimation.start();
@@ -359,692 +640,1367 @@ export default function SetupProfileScreen({ navigation }: any) {
             progressAnimation.stop();
             spinAnimation.stop();
         };
-    }, [avatarRotation, loading, savingProgress]);
+    }, [
+        avatarRotation,
+        loading,
+        savingProgress,
+    ]);
 
-    const updateStoredSubscriptionState = useCallback(
-        async (subscribed: boolean) => {
-            const storedUserRaw = await AsyncStorage.getItem("user");
-            if (!storedUserRaw) return;
+    const updateStoredSubscriptionState =
+        useCallback(
+            async (
+                subscribed: boolean
+            ) => {
+                const storedUserRaw =
+                    await AsyncStorage.getItem(
+                        "user"
+                    );
 
-            try {
-                const storedUser = JSON.parse(storedUserRaw);
-
-                await AsyncStorage.setItem(
-                    "user",
-                    JSON.stringify({
-                        ...storedUser,
-                        isSubscribed: subscribed,
-                    }),
-                );
-            } catch (error) {
-                console.log("Setup stored subscription update error:", error);
-            }
-        },
-        [],
-    );
-
-    const loadSubscriptionProduct = async () => {
-        try {
-            await initializeIAP();
-            const product = await getBlogsSubscriptionProduct();
-            setSubscriptionProduct(product);
-        } catch (error) {
-            console.log("Setup subscription load error:", error);
-        }
-    };
-
-    const verifySubscriptionOnBackend = useCallback(
-        async (purchase: any) => {
-            try {
-                const token = await AsyncStorage.getItem("token");
-
-                if (!token || !API_BASE_URL) {
-                    throw new Error("Missing token or API base URL");
+                if (!storedUserRaw) {
+                    return;
                 }
 
-                const response = await fetch(
-                    `${API_BASE_URL}/api/subscriptions/verify`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({
-                            platform: Platform.OS === "ios" ? "ios" : "android",
-                            productId: purchase?.productId,
-                            transactionId:
-                                purchase?.transactionId ||
-                                purchase?.transactionIdIOS ||
-                                purchase?.id ||
-                                null,
-                            purchaseToken:
-                                purchase?.purchaseToken ||
-                                purchase?.purchaseTokenAndroid ||
-                                null,
-                        }),
-                    },
-                );
+                try {
+                    const storedUser =
+                        JSON.parse(
+                            storedUserRaw
+                        );
 
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(
-                        data?.message ||
-                        data?.error ||
-                        "Subscription verification failed",
+                    await AsyncStorage.setItem(
+                        "user",
+                        JSON.stringify({
+                            ...storedUser,
+                            isSubscribed:
+                                subscribed,
+                        })
+                    );
+                } catch (error) {
+                    console.log(
+                        "Setup stored subscription update error:",
+                        error
                     );
                 }
+            },
+            []
+        );
 
-                await finishTransaction({
-                    purchase,
-                    isConsumable: false,
-                });
+    const loadSubscriptionProduct =
+        async () => {
+            try {
+                await initializeIAP();
 
-                const subscribed = !!data?.isSubscribed;
+                const product =
+                    await getBlogsSubscriptionProduct();
 
-                setIsSubscribed(subscribed);
-                setPaywallVisible(false);
-                await updateStoredSubscriptionState(subscribed);
-
-                if (subscribed) {
-                    setShowConfetti(true);
-                }
-            } catch (error) {
-                console.log("Setup subscription verification error:", error);
-
-                Alert.alert(
-                    "Purchase Complete",
-                    "Your purchase was received, but verifying it with your account failed.",
+                setSubscriptionProduct(
+                    product
                 );
-            } finally {
-                setLoadingSubscription(false);
+            } catch (error) {
+                console.log(
+                    "Setup subscription load error:",
+                    error
+                );
             }
-        },
-        [updateStoredSubscriptionState],
-    );
+        };
 
-    const handleSubscribePress = async () => {
-        setLoadingSubscription(true);
+    const verifySubscriptionOnBackend =
+        useCallback(
+            async (
+                purchase: any
+            ) => {
+                try {
+                    const result =
+                        await verifyScoolFoolsSubscription(
+                            purchase
+                        );
 
-        try {
-            await buyBlogsSubscription({
-                onSuccess: verifySubscriptionOnBackend,
-                onError: (error: any) => {
-                    setLoadingSubscription(false);
+                    const subscribed =
+                        result.isSubscribed ===
+                        true;
+
+                    setIsSubscribed(
+                        subscribed
+                    );
+
+                    setPaywallVisible(
+                        false
+                    );
+
+                    await updateStoredSubscriptionState(
+                        subscribed
+                    );
 
                     if (
-                        error?.code === "user-cancelled" ||
-                        error?.code === "E_USER_CANCELLED"
+                        subscribed
+                    ) {
+                        setShowConfetti(
+                            true
+                        );
+
+                        Alert.alert(
+                            "Subscribed 🎉",
+                            "Your ScoolFools subscriber benefits are now unlocked."
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Subscription Inactive",
+                        "The store verified this subscription, but it is not currently active."
+                    );
+                } catch (
+                error: unknown
+                ) {
+                    console.log(
+                        "Setup subscription verification error:",
+                        error
+                    );
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Purchase belongs to another ScoolFools account
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        isPurchaseAlreadyLinkedError(
+                            error
+                        )
+                    ) {
+                        setIsSubscribed(
+                            false
+                        );
+
+                        await updateStoredSubscriptionState(
+                            false
+                        );
+
+                        Alert.alert(
+                            "Subscription Already Linked",
+                            "This App Store or Google Play subscription is already connected to another ScoolFools account."
+                        );
+
+                        return;
+                    }
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Current account already has another ownership key
+                    |--------------------------------------------------------------------------
+                    */
+
+                    if (
+                        isOwnershipMismatchError(
+                            error
+                        )
+                    ) {
+                        Alert.alert(
+                            "Different Subscription Detected",
+                            "This ScoolFools account is already connected to a different store subscription."
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        error instanceof
+                        SubscriptionVerificationError
+                    ) {
+                        if (
+                            error.code ===
+                            "UNAUTHORIZED"
+                        ) {
+                            Alert.alert(
+                                "Sign In Required",
+                                error.message
+                            );
+
+                            return;
+                        }
+
+                        /*
+                         * The backend accepted the subscription before
+                         * finishTransaction failed.
+                         *
+                         * Preserve the verified backend result when available.
+                         */
+                        if (
+                            error.code ===
+                            "FINISH_TRANSACTION_FAILED"
+                        ) {
+                            const verification =
+                                (
+                                    error.responseData as {
+                                        verification?: {
+                                            isSubscribed?: boolean;
+                                        };
+                                    } | null
+                                )
+                                    ?.verification;
+
+                            const backendSubscribed =
+                                verification?.isSubscribed ===
+                                true;
+
+                            if (
+                                backendSubscribed
+                            ) {
+                                setIsSubscribed(
+                                    true
+                                );
+
+                                setPaywallVisible(
+                                    false
+                                );
+
+                                await updateStoredSubscriptionState(
+                                    true
+                                );
+                            }
+
+                            Alert.alert(
+                                "Subscription Verified",
+                                "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and try restoring again."
+                            );
+
+                            return;
+                        }
+
+                        Alert.alert(
+                            "Verification Failed",
+                            error.message
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Verification Failed",
+                        "Your subscription could not be securely linked to your ScoolFools account."
+                    );
+                } finally {
+                    setLoadingSubscription(
+                        false
+                    );
+                }
+            },
+            [
+                updateStoredSubscriptionState,
+            ]
+        );
+
+    const handleSubscribePress =
+        async () => {
+            setLoadingSubscription(
+                true
+            );
+
+            try {
+                await buyBlogsSubscription({
+                    onSuccess:
+                        verifySubscriptionOnBackend,
+
+                    onError: (
+                        error: any
+                    ) => {
+                        setLoadingSubscription(
+                            false
+                        );
+
+                        if (
+                            error?.code ===
+                            "user-cancelled" ||
+                            error?.code ===
+                            "E_USER_CANCELLED"
+                        ) {
+                            return;
+                        }
+
+                        console.log(
+                            "Setup subscription purchase error:",
+                            error
+                        );
+
+                        Alert.alert(
+                            "Subscription Failed",
+                            error?.message ||
+                            "Something went wrong while processing your subscription."
+                        );
+                    },
+                });
+            } catch (
+            error: any
+            ) {
+                setLoadingSubscription(
+                    false
+                );
+
+                console.log(
+                    "Unexpected setup subscription error:",
+                    error
+                );
+
+                Alert.alert(
+                    "Subscription Failed",
+                    error?.message ||
+                    "Something went wrong while processing your subscription."
+                );
+            }
+        };
+
+    const openSubscriberPaywall =
+        () => {
+            setPaywallVisible(
+                true
+            );
+
+            void loadSubscriptionProduct();
+        };
+
+    useEffect(() => {
+        const loadStoredSubscription =
+            async () => {
+                try {
+                    const storedUserRaw =
+                        await AsyncStorage.getItem(
+                            "user"
+                        );
+
+                    if (
+                        !storedUserRaw
                     ) {
                         return;
                     }
 
+                    const storedUser =
+                        JSON.parse(
+                            storedUserRaw
+                        );
+
+                    setIsSubscribed(
+                        storedUser?.isSubscribed ===
+                        true
+                    );
+                } catch (error) {
                     console.log(
-                        "Setup subscription purchase error:",
-                        error,
+                        "Setup stored user load error:",
+                        error
                     );
-
-                    Alert.alert(
-                        "Subscription Failed",
-                        error?.message ||
-                        "Something went wrong while processing your subscription.",
-                    );
-                },
-            });
-        } catch (error: any) {
-            setLoadingSubscription(false);
-
-            console.log(
-                "Unexpected setup subscription error:",
-                error,
-            );
-
-            Alert.alert(
-                "Subscription Failed",
-                error?.message ||
-                "Something went wrong while processing your subscription.",
-            );
-        }
-    };
-
-    const openSubscriberPaywall = () => {
-        setPaywallVisible(true);
-        void loadSubscriptionProduct();
-    };
-
-
-
-    useEffect(() => {
-        const loadStoredSubscription = async () => {
-            try {
-                const storedUserRaw = await AsyncStorage.getItem("user");
-                if (!storedUserRaw) return;
-
-                const storedUser = JSON.parse(storedUserRaw);
-                setIsSubscribed(!!storedUser?.isSubscribed);
-            } catch (error) {
-                console.log("Setup stored user load error:", error);
-            }
-        };
+                }
+            };
 
         void loadStoredSubscription();
     }, []);
 
-    const filteredColleges = useMemo(() => {
-        const search = collegeSearch.trim().toLowerCase();
+    const filteredColleges =
+        useMemo(() => {
+            const search =
+                collegeSearch
+                    .trim()
+                    .toLowerCase();
 
-        if (!search) {
-            return COLLEGES;
-        }
+            if (!search) {
+                return COLLEGES;
+            }
 
-        return COLLEGES.filter((college) => college.toLowerCase().includes(search));
-    }, [collegeSearch]);
+            return COLLEGES.filter(
+                (college) =>
+                    college
+                        .toLowerCase()
+                        .includes(search)
+            );
+        }, [collegeSearch]);
 
-    const filteredSports = useMemo(() => {
-        return SPORTS;
-    }, []);
+    const filteredSports =
+        useMemo(() => {
+            return SPORTS;
+        }, []);
 
-    const isUsernameValid = useMemo(() => {
-        return (
-            username.length >= 3 &&
-            username.length <= 20 &&
-            /^[a-z0-9._]+$/.test(username)
-        );
-    }, [username]);
+    const isUsernameValid =
+        useMemo(() => {
+            return (
+                username.length >=
+                3 &&
+                username.length <=
+                20 &&
+                /^[a-z0-9._]+$/.test(
+                    username
+                )
+            );
+        }, [username]);
 
-    const isSocialMediaValid = useMemo(() => {
-        if (!socialPlatform) {
+    const isSocialMediaValid =
+        useMemo(() => {
+            if (
+                !socialPlatform
+            ) {
+                return true;
+            }
+
+            return isValidSocialUrl(
+                socialPlatform,
+                socialMediaUrl
+            );
+        }, [
+            socialMediaUrl,
+            socialPlatform,
+        ]);
+
+    const canContinue =
+        useMemo(() => {
+            if (
+                !selectedAvatar
+            ) {
+                return false;
+            }
+
+            if (
+                !isUsernameValid
+            ) {
+                return false;
+            }
+
+            if (
+                !schoolLevel
+            ) {
+                return false;
+            }
+
+            if (
+                schoolLevel ===
+                "college" &&
+                !COLLEGES.includes(
+                    collegeName
+                )
+            ) {
+                return false;
+            }
+
+            if (
+                schoolLevel ===
+                "highSchool" &&
+                !highSchoolClassification
+            ) {
+                return false;
+            }
+
+            if (
+                isStudentAthlete ===
+                null
+            ) {
+                return false;
+            }
+
+            if (
+                isStudentAthlete &&
+                !selectedSport
+            ) {
+                return false;
+            }
+
+            if (
+                !isSocialMediaValid
+            ) {
+                return false;
+            }
+
             return true;
-        }
+        }, [
+            selectedAvatar,
+            isUsernameValid,
+            schoolLevel,
+            collegeName,
+            highSchoolClassification,
+            isStudentAthlete,
+            selectedSport,
+            isSocialMediaValid,
+        ]);
 
-        return isValidSocialUrl(socialPlatform, socialMediaUrl);
-    }, [socialMediaUrl, socialPlatform]);
-
-    const canContinue = useMemo(() => {
-        if (!selectedAvatar) {
-            return false;
-        }
-
-        if (!isUsernameValid) {
-            return false;
-        }
-
-        if (!schoolLevel) {
-            return false;
-        }
-
-        if (schoolLevel === "college" && !COLLEGES.includes(collegeName)) {
-            return false;
-        }
-
-        if (
-            schoolLevel === "highSchool" &&
-            !highSchoolClassification
-        ) {
-            return false;
-        }
-
-        if (isStudentAthlete === null) {
-            return false;
-        }
-
-        if (isStudentAthlete && !selectedSport) {
-            return false;
-        }
-
-        if (!isSocialMediaValid) {
-            return false;
-        }
-
-        return true;
-    }, [
-        selectedAvatar,
-        isUsernameValid,
-        schoolLevel,
-        collegeName,
-        highSchoolClassification,
-        isStudentAthlete,
-        selectedSport,
-        isSocialMediaValid,
-    ]);
-
-    const handleUsernameChange = (value: string) => {
-        const cleaned = normalizeUsername(value);
+    const handleUsernameChange = (
+        value: string
+    ) => {
+        const cleaned =
+            normalizeUsername(
+                value
+            );
 
         setUsername(cleaned);
         setUsernameError("");
     };
 
-    const handleSchoolLevelChange = (level: SchoolLevel) => {
+    const handleSchoolLevelChange = (
+        level: SchoolLevel
+    ) => {
         setSchoolLevel(level);
 
-        if (level === "highSchool") {
+        if (
+            level ===
+            "highSchool"
+        ) {
             setCollegeName("");
             setCollegeSearch("");
         }
 
-        if (level === "college") {
-            setHighSchoolClassification(null);
+        if (
+            level ===
+            "college"
+        ) {
+            setHighSchoolClassification(
+                null
+            );
         }
     };
 
-    const handleAthleteChoice = (choice: boolean) => {
-        setIsStudentAthlete(choice);
+    const handleAthleteChoice = (
+        choice: boolean
+    ) => {
+        setIsStudentAthlete(
+            choice
+        );
 
         if (!choice) {
             setSelectedSport("");
         }
     };
 
-    const handleSocialPlatformPress = (platform: SocialPlatform) => {
-        if (socialPlatform === platform) {
-            setSocialPlatform(null);
-            setSocialMediaUrl("");
-            setSocialMediaError("");
-            return;
-        }
+    const handleSocialPlatformPress =
+        (
+            platform: SocialPlatform
+        ) => {
+            if (
+                socialPlatform ===
+                platform
+            ) {
+                setSocialPlatform(
+                    null
+                );
 
-        setSocialPlatform(platform);
-        setSocialMediaUrl("");
-        setSocialMediaError("");
-    };
+                setSocialMediaUrl(
+                    ""
+                );
 
-    const validateSocialMediaLink = () => {
-        if (!socialPlatform) {
-            setSocialMediaError("");
-            return true;
-        }
+                setSocialMediaError(
+                    ""
+                );
 
-        if (!socialMediaUrl.trim()) {
-            setSocialMediaError("Add your social media profile link.");
-            return false;
-        }
-
-        if (!isValidSocialUrl(socialPlatform, socialMediaUrl)) {
-            const platformLabel = SOCIAL_PLATFORMS.find(
-                (platform) => platform.value === socialPlatform,
-            )?.label;
-
-            setSocialMediaError(
-                `Enter a valid ${platformLabel || "social media"} link.`,
-            );
-            return false;
-        }
-
-        setSocialMediaUrl(normalizeSocialUrl(socialMediaUrl));
-        setSocialMediaError("");
-        return true;
-    };
-
-    const openCollegePicker = () => {
-        setCollegeSearch(collegeName);
-        setCollegeModalVisible(true);
-    };
-
-    const selectCollege = (college: string) => {
-        setCollegeName(college);
-        setCollegeSearch(college);
-        setCollegeModalVisible(false);
-        Keyboard.dismiss();
-    };
-
-    const validateForm = () => {
-        if (!selectedAvatar) {
-            Alert.alert(
-                "Choose an avatar",
-                "Select a ScoolFools avatar to continue.",
-            );
-            return false;
-        }
-
-        if (!username.trim()) {
-            setUsernameError("Create a username to continue.");
-            return false;
-        }
-
-        if (username.length < 3) {
-            setUsernameError("Your username must contain at least 3 characters.");
-            return false;
-        }
-
-        if (username.length > 20) {
-            setUsernameError("Your username cannot exceed 20 characters.");
-            return false;
-        }
-
-        if (!/^[a-z0-9._]+$/.test(username)) {
-            setUsernameError("Use only letters, numbers, periods, and underscores.");
-            return false;
-        }
-
-        if (!schoolLevel) {
-            Alert.alert("Choose your school level", "Select College or High School.");
-            return false;
-        }
-
-        if (schoolLevel === "college" && !COLLEGES.includes(collegeName)) {
-            Alert.alert(
-                "Choose your college",
-                "Please select an option from the college list.",
-            );
-            return false;
-        }
-
-        if (
-            schoolLevel === "highSchool" &&
-            !highSchoolClassification
-        ) {
-            Alert.alert(
-                "Choose your classification",
-                "Select Freshman, Sophomore, Junior, or Senior.",
-            );
-            return false;
-        }
-
-        if (isStudentAthlete === null) {
-            Alert.alert("Student athlete", "Choose Yes or No to continue.");
-            return false;
-        }
-
-        if (isStudentAthlete && !selectedSport) {
-            Alert.alert("Choose your sport", "Select the sport you play.");
-            return false;
-        }
-
-        if (!validateSocialMediaLink()) {
-            return false;
-        }
-
-        return true;
-    };
-
-    const handleContinue = async () => {
-        setUsernameError("");
-
-        if (!validateForm()) {
-            return;
-        }
-
-        const loadingStartedAt = Date.now();
-
-        try {
-            setLoading(true);
-
-            if (!API_BASE_URL) {
-                throw new Error("EXPO_PUBLIC_API_BASE_URL is missing.");
-            }
-
-            const token = await AsyncStorage.getItem("token");
-
-            if (!token) {
-                throw new Error("Your session has expired. Please sign in again.");
-            }
-
-            const payload = {
-                username: username.trim(),
-                avatar: selectedAvatar,
-                selectedAvatar,
-                schoolLevel,
-                collegeName: schoolLevel === "college" ? collegeName.trim() : "",
-                highSchoolClassification:
-                    schoolLevel === "highSchool"
-                        ? highSchoolClassification
-                        : null,
-                isStudentAthlete,
-                sport: isStudentAthlete ? selectedSport : "",
-                socialMediaPlatform: socialPlatform || "",
-                socialMediaUrl: socialPlatform
-                    ? normalizeSocialUrl(socialMediaUrl)
-                    : "",
-            };
-
-            const response = await fetch(
-                `${API_BASE_URL}/api/auth/me/setup-profile`,
-                {
-                    method: "PATCH",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(payload),
-                },
-            );
-
-            let data: any = {};
-
-            try {
-                data = await response.json();
-            } catch {
-                data = {};
-            }
-
-            if (!response.ok) {
-                const backendMessage =
-                    data?.message || data?.error || "Unable to save your profile.";
-
-                const usernameHasError =
-                    response.status === 409 ||
-                    data?.code === "USERNAME_TAKEN" ||
-                    data?.code === "USERNAME_REQUIRED" ||
-                    data?.code === "USERNAME_TOO_SHORT" ||
-                    data?.code === "USERNAME_TOO_LONG" ||
-                    data?.code === "USERNAME_INVALID_FORMAT" ||
-                    data?.code === "USERNAME_NOT_ALLOWED" ||
-                    data?.code === "USERNAME_RESERVED";
-
-                if (usernameHasError) {
-                    setUsernameError(backendMessage || "Please choose another username.");
-
-                    throw new Error("USERNAME_ERROR");
-                }
-
-                throw new Error(backendMessage);
-            }
-
-            const returnedUser = data?.user || data?.updatedUser || data;
-
-            const currentStoredUser = await AsyncStorage.getItem("user");
-
-            let existingUser = {};
-
-            if (currentStoredUser) {
-                try {
-                    existingUser = JSON.parse(currentStoredUser);
-                } catch {
-                    existingUser = {};
-                }
-            }
-
-            const userToStore = {
-                ...existingUser,
-                ...returnedUser,
-                username: returnedUser?.username || username,
-                avatar: returnedUser?.avatar || selectedAvatar,
-                selectedAvatar: returnedUser?.selectedAvatar || selectedAvatar,
-                schoolLevel: returnedUser?.schoolLevel || schoolLevel,
-                collegeName: returnedUser?.collegeName ?? payload.collegeName,
-                highSchoolClassification:
-                    returnedUser?.highSchoolClassification ??
-                    payload.highSchoolClassification,
-                isStudentAthlete: returnedUser?.isStudentAthlete ?? isStudentAthlete,
-                sport: returnedUser?.sport ?? payload.sport,
-                socialMediaPlatform:
-                    returnedUser?.socialMediaPlatform ?? payload.socialMediaPlatform,
-                socialMediaUrl: returnedUser?.socialMediaUrl ?? payload.socialMediaUrl,
-                onboardingStage: returnedUser?.onboardingStage || "introVideo",
-            };
-
-            await AsyncStorage.setItem("user", JSON.stringify(userToStore));
-            try {
-                await registerCurrentDevice();
-            } catch (error) {
-                console.log("Push registration after profile setup failed:", error);
-            }
-            await waitForMinimumLoadingDuration(loadingStartedAt);
-
-            navigation.reset({
-                index: 0,
-                routes: [
-                    {
-                        name: "IntroVideo",
-                    },
-                ],
-            });
-        } catch (error: any) {
-            await waitForMinimumLoadingDuration(loadingStartedAt);
-
-            if (error?.message === "USERNAME_ERROR") {
                 return;
             }
 
-            console.log("Setup profile error:", error);
-
-            Alert.alert(
-                "Profile Setup Failed",
-                error?.message || "Something went wrong while saving your profile.",
+            setSocialPlatform(
+                platform
             );
-        } finally {
-            setLoading(false);
-        }
+
+            setSocialMediaUrl("");
+            setSocialMediaError("");
+        };
+
+    const validateSocialMediaLink =
+        () => {
+            if (
+                !socialPlatform
+            ) {
+                setSocialMediaError(
+                    ""
+                );
+
+                return true;
+            }
+
+            if (
+                !socialMediaUrl.trim()
+            ) {
+                setSocialMediaError(
+                    "Add your social media profile link."
+                );
+
+                return false;
+            }
+
+            if (
+                !isValidSocialUrl(
+                    socialPlatform,
+                    socialMediaUrl
+                )
+            ) {
+                const platformLabel =
+                    SOCIAL_PLATFORMS.find(
+                        (
+                            platform
+                        ) =>
+                            platform.value ===
+                            socialPlatform
+                    )?.label;
+
+                setSocialMediaError(
+                    `Enter a valid ${platformLabel ||
+                    "social media"
+                    } link.`
+                );
+
+                return false;
+            }
+
+            setSocialMediaUrl(
+                normalizeSocialUrl(
+                    socialMediaUrl
+                )
+            );
+
+            setSocialMediaError(
+                ""
+            );
+
+            return true;
+        };
+
+    const openCollegePicker =
+        () => {
+            setCollegeSearch(
+                collegeName
+            );
+
+            setCollegeModalVisible(
+                true
+            );
+        };
+
+    const selectCollege = (
+        college: string
+    ) => {
+        setCollegeName(college);
+        setCollegeSearch(college);
+
+        setCollegeModalVisible(
+            false
+        );
+
+        Keyboard.dismiss();
     };
 
+    const validateForm =
+        () => {
+            if (
+                !selectedAvatar
+            ) {
+                Alert.alert(
+                    "Choose an avatar",
+                    "Select a ScoolFools avatar to continue."
+                );
+
+                return false;
+            }
+
+            if (
+                !username.trim()
+            ) {
+                setUsernameError(
+                    "Create a username to continue."
+                );
+
+                return false;
+            }
+
+            if (
+                username.length < 3
+            ) {
+                setUsernameError(
+                    "Your username must contain at least 3 characters."
+                );
+
+                return false;
+            }
+
+            if (
+                username.length >
+                20
+            ) {
+                setUsernameError(
+                    "Your username cannot exceed 20 characters."
+                );
+
+                return false;
+            }
+
+            if (
+                !/^[a-z0-9._]+$/.test(
+                    username
+                )
+            ) {
+                setUsernameError(
+                    "Use only letters, numbers, periods, and underscores."
+                );
+
+                return false;
+            }
+
+            if (
+                !schoolLevel
+            ) {
+                Alert.alert(
+                    "Choose your school level",
+                    "Select College or High School."
+                );
+
+                return false;
+            }
+
+            if (
+                schoolLevel ===
+                "college" &&
+                !COLLEGES.includes(
+                    collegeName
+                )
+            ) {
+                Alert.alert(
+                    "Choose your college",
+                    "Please select an option from the college list."
+                );
+
+                return false;
+            }
+
+            if (
+                schoolLevel ===
+                "highSchool" &&
+                !highSchoolClassification
+            ) {
+                Alert.alert(
+                    "Choose your classification",
+                    "Select Freshman, Sophomore, Junior, or Senior."
+                );
+
+                return false;
+            }
+
+            if (
+                isStudentAthlete ===
+                null
+            ) {
+                Alert.alert(
+                    "Student athlete",
+                    "Choose Yes or No to continue."
+                );
+
+                return false;
+            }
+
+            if (
+                isStudentAthlete &&
+                !selectedSport
+            ) {
+                Alert.alert(
+                    "Choose your sport",
+                    "Select the sport you play."
+                );
+
+                return false;
+            }
+
+            if (
+                !validateSocialMediaLink()
+            ) {
+                return false;
+            }
+
+            return true;
+        };
+
+    const handleContinue =
+        async () => {
+            setUsernameError("");
+
+            if (
+                !validateForm()
+            ) {
+                return;
+            }
+
+            const loadingStartedAt =
+                Date.now();
+
+            try {
+                setLoading(true);
+
+                if (
+                    !API_BASE_URL
+                ) {
+                    throw new Error(
+                        "EXPO_PUBLIC_API_BASE_URL is missing."
+                    );
+                }
+
+                const token =
+                    await AsyncStorage.getItem(
+                        "token"
+                    );
+
+                if (!token) {
+                    throw new Error(
+                        "Your session has expired. Please sign in again."
+                    );
+                }
+
+                const payload = {
+                    username:
+                        username.trim(),
+
+                    avatar:
+                        selectedAvatar,
+
+                    selectedAvatar,
+
+                    schoolLevel,
+
+                    collegeName:
+                        schoolLevel ===
+                            "college"
+                            ? collegeName.trim()
+                            : "",
+
+                    highSchoolClassification:
+                        schoolLevel ===
+                            "highSchool"
+                            ? highSchoolClassification
+                            : null,
+
+                    isStudentAthlete,
+
+                    sport:
+                        isStudentAthlete
+                            ? selectedSport
+                            : "",
+
+                    socialMediaPlatform:
+                        socialPlatform ||
+                        "",
+
+                    socialMediaUrl:
+                        socialPlatform
+                            ? normalizeSocialUrl(
+                                socialMediaUrl
+                            )
+                            : "",
+                };
+
+                const response =
+                    await fetch(
+                        `${API_BASE_URL}/api/auth/me/setup-profile`,
+                        {
+                            method:
+                                "PATCH",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+
+                                Authorization:
+                                    `Bearer ${token}`,
+                            },
+
+                            body:
+                                JSON.stringify(
+                                    payload
+                                ),
+                        }
+                    );
+
+                let data: any = {};
+
+                try {
+                    data =
+                        await response.json();
+                } catch {
+                    data = {};
+                }
+
+                if (
+                    !response.ok
+                ) {
+                    const backendMessage =
+                        data?.message ||
+                        data?.error ||
+                        "Unable to save your profile.";
+
+                    const usernameHasError =
+                        response.status ===
+                        409 ||
+                        data?.code ===
+                        "USERNAME_TAKEN" ||
+                        data?.code ===
+                        "USERNAME_REQUIRED" ||
+                        data?.code ===
+                        "USERNAME_TOO_SHORT" ||
+                        data?.code ===
+                        "USERNAME_TOO_LONG" ||
+                        data?.code ===
+                        "USERNAME_INVALID_FORMAT" ||
+                        data?.code ===
+                        "USERNAME_NOT_ALLOWED" ||
+                        data?.code ===
+                        "USERNAME_RESERVED";
+
+                    if (
+                        usernameHasError
+                    ) {
+                        setUsernameError(
+                            backendMessage ||
+                            "Please choose another username."
+                        );
+
+                        throw new Error(
+                            "USERNAME_ERROR"
+                        );
+                    }
+
+                    throw new Error(
+                        backendMessage
+                    );
+                }
+
+                const returnedUser =
+                    data?.user ||
+                    data?.updatedUser ||
+                    data;
+
+                const currentStoredUser =
+                    await AsyncStorage.getItem(
+                        "user"
+                    );
+
+                let existingUser = {};
+
+                if (
+                    currentStoredUser
+                ) {
+                    try {
+                        existingUser =
+                            JSON.parse(
+                                currentStoredUser
+                            );
+                    } catch {
+                        existingUser =
+                            {};
+                    }
+                }
+
+                const userToStore = {
+                    ...existingUser,
+                    ...returnedUser,
+
+                    username:
+                        returnedUser?.username ||
+                        username,
+
+                    avatar:
+                        returnedUser?.avatar ||
+                        selectedAvatar,
+
+                    selectedAvatar:
+                        returnedUser?.selectedAvatar ||
+                        selectedAvatar,
+
+                    schoolLevel:
+                        returnedUser?.schoolLevel ||
+                        schoolLevel,
+
+                    collegeName:
+                        returnedUser?.collegeName ??
+                        payload.collegeName,
+
+                    highSchoolClassification:
+                        returnedUser?.highSchoolClassification ??
+                        payload.highSchoolClassification,
+
+                    isStudentAthlete:
+                        returnedUser?.isStudentAthlete ??
+                        isStudentAthlete,
+
+                    sport:
+                        returnedUser?.sport ??
+                        payload.sport,
+
+                    socialMediaPlatform:
+                        returnedUser?.socialMediaPlatform ??
+                        payload.socialMediaPlatform,
+
+                    socialMediaUrl:
+                        returnedUser?.socialMediaUrl ??
+                        payload.socialMediaUrl,
+
+                    onboardingStage:
+                        returnedUser?.onboardingStage ||
+                        "introVideo",
+                };
+
+                await AsyncStorage.setItem(
+                    "user",
+                    JSON.stringify(
+                        userToStore
+                    )
+                );
+
+                try {
+                    await registerCurrentDevice();
+                } catch (error) {
+                    console.log(
+                        "Push registration after profile setup failed:",
+                        error
+                    );
+                }
+
+                await waitForMinimumLoadingDuration(
+                    loadingStartedAt
+                );
+
+                navigation.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name:
+                                "IntroVideo",
+                        },
+                    ],
+                });
+            } catch (
+            error: any
+            ) {
+                await waitForMinimumLoadingDuration(
+                    loadingStartedAt
+                );
+
+                if (
+                    error?.message ===
+                    "USERNAME_ERROR"
+                ) {
+                    return;
+                }
+
+                console.log(
+                    "Setup profile error:",
+                    error
+                );
+
+                Alert.alert(
+                    "Profile Setup Failed",
+                    error?.message ||
+                    "Something went wrong while saving your profile."
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
+
     return (
-        <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
+        <SafeAreaView
+            style={
+                styles.safeArea
+            }
+            edges={[
+                "top",
+                "left",
+                "right",
+            ]}
+        >
             <KeyboardAvoidingView
-                style={styles.keyboardView}
-                behavior={Platform.OS === "ios" ? "padding" : undefined}
-                keyboardVerticalOffset={0}
+                style={
+                    styles.keyboardView
+                }
+                behavior={
+                    Platform.OS ===
+                        "ios"
+                        ? "padding"
+                        : undefined
+                }
+                keyboardVerticalOffset={
+                    0
+                }
             >
-                <View style={styles.screen}>
+                <View
+                    style={
+                        styles.screen
+                    }
+                >
                     <ScrollView
-                        style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
-                        showsVerticalScrollIndicator={false}
+                        style={
+                            styles.scrollView
+                        }
+                        contentContainerStyle={
+                            styles.scrollContent
+                        }
+                        showsVerticalScrollIndicator={
+                            false
+                        }
                         keyboardShouldPersistTaps="handled"
                     >
-                        <View style={styles.header}>
-                            <Text style={styles.title}>Create your profile</Text>
+                        <View
+                            style={
+                                styles.header
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.title
+                                }
+                            >
+                                Create your profile
+                            </Text>
 
-                            <Text style={styles.subtitle}>
+                            <Text
+                                style={
+                                    styles.subtitle
+                                }
+                            >
                                 Choose how you will appear on ScoolFools.
                             </Text>
                         </View>
 
-                        <View style={styles.formSection}>
-                            <Text style={styles.label}>Choose an avatar</Text>
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                Choose an avatar
+                            </Text>
 
-                            <View style={styles.avatarGrid}>
-                                {AVATARS.map((avatar) => {
-                                    const isSelected = selectedAvatar === avatar.id;
-                                    const isLocked =
-                                        !!avatar.subscriberOnly && !isSubscribed;
+                            <View
+                                style={
+                                    styles.avatarGrid
+                                }
+                            >
+                                {AVATARS.map(
+                                    (
+                                        avatar
+                                    ) => {
+                                        const isSelected =
+                                            selectedAvatar ===
+                                            avatar.id;
 
-                                    return (
-                                        <TouchableOpacity
-                                            key={avatar.id}
-                                            style={[
-                                                styles.avatarButton,
-                                                isLocked && styles.avatarButtonLocked,
-                                                isSelected && styles.avatarButtonSelected,
-                                            ]}
-                                            onPress={() => {
-                                                if (isLocked) {
-                                                    openSubscriberPaywall();
-                                                    return;
+                                        const isLocked =
+                                            Boolean(
+                                                avatar.subscriberOnly
+                                            ) &&
+                                            !isSubscribed;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={
+                                                    avatar.id
                                                 }
-
-                                                setSelectedAvatar(avatar.id);
-                                            }}
-                                            activeOpacity={0.85}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={
-                                                isLocked
-                                                    ? "Locked subscriber avatar. Opens subscription options."
-                                                    : "Available profile avatar"
-                                            }
-                                            accessibilityState={{
-                                                selected: isSelected,
-                                            }}
-                                        >
-                                            <Image
-                                                source={avatar.source}
                                                 style={[
-                                                    styles.avatarImage,
-                                                    isLocked && styles.avatarImageLocked,
+                                                    styles.avatarButton,
+                                                    isLocked &&
+                                                    styles.avatarButtonLocked,
+                                                    isSelected &&
+                                                    styles.avatarButtonSelected,
                                                 ]}
-                                                resizeMode="cover"
-                                            />
+                                                onPress={() => {
+                                                    if (
+                                                        isLocked
+                                                    ) {
+                                                        openSubscriberPaywall();
 
-                                            {isLocked && (
-                                                <View style={styles.avatarLockBadge}>
-                                                    <FontAwesome6 name="lock" size={11} color={theme.white} />
-                                                </View>
-                                            )}
+                                                        return;
+                                                    }
 
-                                            {isSelected && (
-                                                <View style={styles.avatarCheck}>
-                                                    <Text style={styles.avatarCheckText}>✓</Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                                                    setSelectedAvatar(
+                                                        avatar.id
+                                                    );
+                                                }}
+                                                activeOpacity={
+                                                    0.85
+                                                }
+                                                accessibilityRole="button"
+                                                accessibilityLabel={
+                                                    isLocked
+                                                        ? "Locked subscriber avatar. Opens subscription options."
+                                                        : "Available profile avatar"
+                                                }
+                                                accessibilityState={{
+                                                    selected:
+                                                        isSelected,
+                                                }}
+                                            >
+                                                <Image
+                                                    source={
+                                                        avatar.source
+                                                    }
+                                                    style={[
+                                                        styles.avatarImage,
+                                                        isLocked &&
+                                                        styles.avatarImageLocked,
+                                                    ]}
+                                                    resizeMode="cover"
+                                                />
+
+                                                {isLocked && (
+                                                    <View
+                                                        style={
+                                                            styles.avatarLockBadge
+                                                        }
+                                                    >
+                                                        <FontAwesome6
+                                                            name="lock"
+                                                            size={
+                                                                11
+                                                            }
+                                                            color={
+                                                                theme.white
+                                                            }
+                                                        />
+                                                    </View>
+                                                )}
+
+                                                {isSelected && (
+                                                    <View
+                                                        style={
+                                                            styles.avatarCheck
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.avatarCheckText
+                                                            }
+                                                        >
+                                                            ✓
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    }
+                                )}
                             </View>
                         </View>
 
-                        <View style={styles.formSection}>
-                            <Text style={styles.label}>Username</Text>
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                Username
+                            </Text>
 
                             <View
                                 style={[
                                     styles.usernameContainer,
-                                    usernameError ? styles.inputErrorBorder : null,
+                                    usernameError
+                                        ? styles.inputErrorBorder
+                                        : null,
                                 ]}
                             >
-                                <Text style={styles.usernameAt}>@</Text>
+                                <Text
+                                    style={
+                                        styles.usernameAt
+                                    }
+                                >
+                                    @
+                                </Text>
 
                                 <TextInput
-                                    style={styles.usernameInput}
-                                    value={username}
-                                    onChangeText={handleUsernameChange}
+                                    style={
+                                        styles.usernameInput
+                                    }
+                                    value={
+                                        username
+                                    }
+                                    onChangeText={
+                                        handleUsernameChange
+                                    }
                                     placeholder="username"
-                                    placeholderTextColor={theme.placeholder}
+                                    placeholderTextColor={
+                                        theme.placeholder
+                                    }
                                     autoCapitalize="none"
-                                    autoCorrect={false}
-                                    maxLength={20}
+                                    autoCorrect={
+                                        false
+                                    }
+                                    maxLength={
+                                        20
+                                    }
                                     returnKeyType="done"
                                 />
                             </View>
 
                             {usernameError ? (
-                                <Text style={styles.errorText}>{usernameError}</Text>
+                                <Text
+                                    style={
+                                        styles.errorText
+                                    }
+                                >
+                                    {
+                                        usernameError
+                                    }
+                                </Text>
                             ) : (
-                                <Text style={styles.helperText}>
-                                    3 to 20 characters. Letters, numbers, periods, and underscores
-                                    only.
+                                <Text
+                                    style={
+                                        styles.helperText
+                                    }
+                                >
+                                    3 to 20 characters. Letters, numbers, periods, and underscores only.
                                 </Text>
                             )}
                         </View>
 
-                        <View style={styles.formSection}>
-                            <Text style={styles.label}>School level</Text>
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                School level
+                            </Text>
 
-                            <View style={styles.optionRow}>
+                            <View
+                                style={
+                                    styles.optionRow
+                                }
+                            >
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        schoolLevel === "college" && styles.optionButtonSelected,
+                                        schoolLevel ===
+                                        "college" &&
+                                        styles.optionButtonSelected,
                                     ]}
-                                    onPress={() => handleSchoolLevelChange("college")}
-                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        handleSchoolLevelChange(
+                                            "college"
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
                                 >
-                                    <Text style={styles.optionEmoji}>🎓</Text>
+                                    <Text
+                                        style={
+                                            styles.optionEmoji
+                                        }
+                                    >
+                                        🎓
+                                    </Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            schoolLevel === "college" && styles.optionTextSelected,
+                                            schoolLevel ===
+                                            "college" &&
+                                            styles.optionTextSelected,
                                         ]}
                                     >
                                         College
@@ -1054,17 +2010,33 @@ export default function SetupProfileScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        schoolLevel === "highSchool" && styles.optionButtonSelected,
+                                        schoolLevel ===
+                                        "highSchool" &&
+                                        styles.optionButtonSelected,
                                     ]}
-                                    onPress={() => handleSchoolLevelChange("highSchool")}
-                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        handleSchoolLevelChange(
+                                            "highSchool"
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
                                 >
-                                    <Text style={styles.optionEmoji}>🎒</Text>
+                                    <Text
+                                        style={
+                                            styles.optionEmoji
+                                        }
+                                    >
+                                        🎒
+                                    </Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            schoolLevel === "highSchool" && styles.optionTextSelected,
+                                            schoolLevel ===
+                                            "highSchool" &&
+                                            styles.optionTextSelected,
                                         ]}
                                     >
                                         High School
@@ -1073,91 +2045,171 @@ export default function SetupProfileScreen({ navigation }: any) {
                             </View>
                         </View>
 
-                        {schoolLevel === "college" && (
-                            <View style={styles.formSection}>
-                                <Text style={styles.label}>College</Text>
-
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={openCollegePicker}
-                                    activeOpacity={0.85}
+                        {schoolLevel ===
+                            "college" && (
+                                <View
+                                    style={
+                                        styles.formSection
+                                    }
                                 >
                                     <Text
-                                        numberOfLines={1}
-                                        style={[
-                                            styles.dropdownText,
-                                            !collegeName && styles.dropdownPlaceholder,
-                                        ]}
+                                        style={
+                                            styles.label
+                                        }
                                     >
-                                        {collegeName || "Search for your college"}
+                                        College
                                     </Text>
 
-                                    <Text style={styles.dropdownArrow}>›</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
+                                    <TouchableOpacity
+                                        style={
+                                            styles.dropdownButton
+                                        }
+                                        onPress={
+                                            openCollegePicker
+                                        }
+                                        activeOpacity={
+                                            0.85
+                                        }
+                                    >
+                                        <Text
+                                            numberOfLines={
+                                                1
+                                            }
+                                            style={[
+                                                styles.dropdownText,
+                                                !collegeName &&
+                                                styles.dropdownPlaceholder,
+                                            ]}
+                                        >
+                                            {collegeName ||
+                                                "Search for your college"}
+                                        </Text>
 
-                        {schoolLevel === "highSchool" && (
-                            <View style={styles.formSection}>
-                                <Text style={styles.label}>Classification</Text>
-
-                                <View style={styles.classificationGrid}>
-                                    {HIGH_SCHOOL_CLASSIFICATIONS.map(
-                                        (classification) => {
-                                            const isSelected =
-                                                highSchoolClassification ===
-                                                classification.value;
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={classification.value}
-                                                    style={[
-                                                        styles.classificationButton,
-                                                        isSelected &&
-                                                        styles.optionButtonSelected,
-                                                    ]}
-                                                    onPress={() =>
-                                                        setHighSchoolClassification(
-                                                            classification.value,
-                                                        )
-                                                    }
-                                                    activeOpacity={0.85}
-                                                >
-                                                    <Text
-                                                        style={[
-                                                            styles.optionText,
-                                                            isSelected &&
-                                                            styles.optionTextSelected,
-                                                        ]}
-                                                    >
-                                                        {classification.label}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
-                                        },
-                                    )}
+                                        <Text
+                                            style={
+                                                styles.dropdownArrow
+                                            }
+                                        >
+                                            ›
+                                        </Text>
+                                    </TouchableOpacity>
                                 </View>
-                            </View>
-                        )}
+                            )}
 
-                        <View style={styles.formSection}>
-                            <Text style={styles.label}>Are you a student athlete?</Text>
+                        {schoolLevel ===
+                            "highSchool" && (
+                                <View
+                                    style={
+                                        styles.formSection
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.label
+                                        }
+                                    >
+                                        Classification
+                                    </Text>
 
-                            <View style={styles.optionRow}>
+                                    <View
+                                        style={
+                                            styles.classificationGrid
+                                        }
+                                    >
+                                        {HIGH_SCHOOL_CLASSIFICATIONS.map(
+                                            (
+                                                classification
+                                            ) => {
+                                                const isSelected =
+                                                    highSchoolClassification ===
+                                                    classification.value;
+
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={
+                                                            classification.value
+                                                        }
+                                                        style={[
+                                                            styles.classificationButton,
+                                                            isSelected &&
+                                                            styles.optionButtonSelected,
+                                                        ]}
+                                                        onPress={() =>
+                                                            setHighSchoolClassification(
+                                                                classification.value
+                                                            )
+                                                        }
+                                                        activeOpacity={
+                                                            0.85
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                styles.optionText,
+                                                                isSelected &&
+                                                                styles.optionTextSelected,
+                                                            ]}
+                                                        >
+                                                            {
+                                                                classification.label
+                                                            }
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            }
+                                        )}
+                                    </View>
+                                </View>
+                            )}
+
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                Are you a student athlete?
+                            </Text>
+
+                            <View
+                                style={
+                                    styles.optionRow
+                                }
+                            >
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        isStudentAthlete === true && styles.optionButtonSelected,
+                                        isStudentAthlete ===
+                                        true &&
+                                        styles.optionButtonSelected,
                                     ]}
-                                    onPress={() => handleAthleteChoice(true)}
-                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        handleAthleteChoice(
+                                            true
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
                                 >
-                                    <Text style={styles.optionEmoji}>🏆</Text>
+                                    <Text
+                                        style={
+                                            styles.optionEmoji
+                                        }
+                                    >
+                                        🏆
+                                    </Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            isStudentAthlete === true && styles.optionTextSelected,
+                                            isStudentAthlete ===
+                                            true &&
+                                            styles.optionTextSelected,
                                         ]}
                                     >
                                         Yes
@@ -1167,17 +2219,33 @@ export default function SetupProfileScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     style={[
                                         styles.optionButton,
-                                        isStudentAthlete === false && styles.optionButtonSelected,
+                                        isStudentAthlete ===
+                                        false &&
+                                        styles.optionButtonSelected,
                                     ]}
-                                    onPress={() => handleAthleteChoice(false)}
-                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        handleAthleteChoice(
+                                            false
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
                                 >
-                                    <Text style={styles.optionEmoji}>🙌</Text>
+                                    <Text
+                                        style={
+                                            styles.optionEmoji
+                                        }
+                                    >
+                                        🙌
+                                    </Text>
 
                                     <Text
                                         style={[
                                             styles.optionText,
-                                            isStudentAthlete === false && styles.optionTextSelected,
+                                            isStudentAthlete ===
+                                            false &&
+                                            styles.optionTextSelected,
                                         ]}
                                     >
                                         No
@@ -1186,85 +2254,182 @@ export default function SetupProfileScreen({ navigation }: any) {
                             </View>
                         </View>
 
-                        {isStudentAthlete === true && (
-                            <View style={styles.formSection}>
-                                <Text style={styles.label}>Sport</Text>
-
-                                <TouchableOpacity
-                                    style={styles.dropdownButton}
-                                    onPress={() => setSportModalVisible(true)}
-                                    activeOpacity={0.85}
+                        {isStudentAthlete ===
+                            true && (
+                                <View
+                                    style={
+                                        styles.formSection
+                                    }
                                 >
                                     <Text
-                                        numberOfLines={1}
-                                        style={[
-                                            styles.dropdownText,
-                                            !selectedSport && styles.dropdownPlaceholder,
-                                        ]}
+                                        style={
+                                            styles.label
+                                        }
                                     >
-                                        {selectedSport || "Select your sport"}
+                                        Sport
                                     </Text>
 
-                                    <Text style={styles.dropdownArrow}>›</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
+                                    <TouchableOpacity
+                                        style={
+                                            styles.dropdownButton
+                                        }
+                                        onPress={() =>
+                                            setSportModalVisible(
+                                                true
+                                            )
+                                        }
+                                        activeOpacity={
+                                            0.85
+                                        }
+                                    >
+                                        <Text
+                                            numberOfLines={
+                                                1
+                                            }
+                                            style={[
+                                                styles.dropdownText,
+                                                !selectedSport &&
+                                                styles.dropdownPlaceholder,
+                                            ]}
+                                        >
+                                            {selectedSport ||
+                                                "Select your sport"}
+                                        </Text>
 
-                        <View style={styles.formSection}>
-                            <Text style={styles.label}>
+                                        <Text
+                                            style={
+                                                styles.dropdownArrow
+                                            }
+                                        >
+                                            ›
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
                                 Promote your social media with your Dumps
                             </Text>
 
-                            <Text style={styles.socialOptionalText}>
+                            <Text
+                                style={
+                                    styles.socialOptionalText
+                                }
+                            >
                                 Optional. Choose one platform to attach to your posts.
                             </Text>
 
-                            <View style={styles.socialPlatformGrid}>
-                                {SOCIAL_PLATFORMS.map((platform) => {
-                                    const isSelected = socialPlatform === platform.value;
+                            <View
+                                style={
+                                    styles.socialPlatformGrid
+                                }
+                            >
+                                {SOCIAL_PLATFORMS.map(
+                                    (
+                                        platform
+                                    ) => {
+                                        const isSelected =
+                                            socialPlatform ===
+                                            platform.value;
 
-                                    return (
-                                        <TouchableOpacity
-                                            key={platform.value}
-                                            style={[
-                                                styles.socialPlatformButton,
-                                                { backgroundColor: theme.surface },
-                                                isSelected && styles.socialPlatformButtonSelected,
-                                            ]}
-                                            onPress={() => handleSocialPlatformPress(platform.value)}
-                                            activeOpacity={0.85}
-                                            accessibilityRole="button"
-                                            accessibilityLabel={platform.label}
-                                            accessibilityState={{ selected: isSelected }}
-                                        >
-                                            <FontAwesome6
-                                                name={platform.icon}
-                                                size={15}
-                                                color={
-                                                    platform.value === "x" &&
-                                                        themeMode === "night"
-                                                        ? theme.white
-                                                        : platform.iconColor
+                                        return (
+                                            <TouchableOpacity
+                                                key={
+                                                    platform.value
                                                 }
-                                            />
+                                                style={[
+                                                    styles.socialPlatformButton,
+                                                    {
+                                                        backgroundColor:
+                                                            theme.surface,
+                                                    },
+                                                    isSelected &&
+                                                    styles.socialPlatformButtonSelected,
+                                                ]}
+                                                onPress={() =>
+                                                    handleSocialPlatformPress(
+                                                        platform.value
+                                                    )
+                                                }
+                                                activeOpacity={
+                                                    0.85
+                                                }
+                                                accessibilityRole="button"
+                                                accessibilityLabel={
+                                                    platform.label
+                                                }
+                                                accessibilityState={{
+                                                    selected:
+                                                        isSelected,
+                                                }}
+                                            >
+                                                <FontAwesome6
+                                                    name={
+                                                        platform.icon
+                                                    }
+                                                    size={
+                                                        15
+                                                    }
+                                                    color={
+                                                        platform.value ===
+                                                            "x" &&
+                                                            themeMode ===
+                                                            "night"
+                                                            ? theme.white
+                                                            : platform.iconColor
+                                                    }
+                                                />
 
-                                            {isSelected && (
-                                                <View style={styles.socialSelectedCheck}>
-                                                    <Text style={styles.socialSelectedCheckText}>✓</Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                })}
+                                                {isSelected && (
+                                                    <View
+                                                        style={
+                                                            styles.socialSelectedCheck
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.socialSelectedCheckText
+                                                            }
+                                                        >
+                                                            ✓
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    }
+                                )}
                             </View>
 
                             {socialPlatform && (
-                                <View style={styles.socialLinkSection}>
-                                    <Text style={styles.socialLinkLabel}>
+                                <View
+                                    style={
+                                        styles.socialLinkSection
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.socialLinkLabel
+                                        }
+                                    >
                                         {
                                             SOCIAL_PLATFORMS.find(
-                                                (platform) => platform.value === socialPlatform,
-                                            )?.label
+                                                (
+                                                    platform
+                                                ) =>
+                                                    platform.value ===
+                                                    socialPlatform
+                                            )
+                                                ?.label
                                         }{" "}
                                         profile link
                                     </Text>
@@ -1272,30 +2437,64 @@ export default function SetupProfileScreen({ navigation }: any) {
                                     <TextInput
                                         style={[
                                             styles.socialLinkInput,
-                                            socialMediaError ? styles.inputErrorBorder : null,
+                                            socialMediaError
+                                                ? styles.inputErrorBorder
+                                                : null,
                                         ]}
-                                        value={socialMediaUrl}
-                                        onChangeText={(value) => {
-                                            setSocialMediaUrl(value);
-                                            setSocialMediaError("");
+                                        value={
+                                            socialMediaUrl
+                                        }
+                                        onChangeText={(
+                                            value
+                                        ) => {
+                                            setSocialMediaUrl(
+                                                value
+                                            );
+
+                                            setSocialMediaError(
+                                                ""
+                                            );
                                         }}
-                                        onBlur={validateSocialMediaLink}
+                                        onBlur={
+                                            validateSocialMediaLink
+                                        }
                                         placeholder={
                                             SOCIAL_PLATFORMS.find(
-                                                (platform) => platform.value === socialPlatform,
-                                            )?.placeholder
+                                                (
+                                                    platform
+                                                ) =>
+                                                    platform.value ===
+                                                    socialPlatform
+                                            )
+                                                ?.placeholder
                                         }
-                                        placeholderTextColor={theme.placeholder}
+                                        placeholderTextColor={
+                                            theme.placeholder
+                                        }
                                         keyboardType="url"
                                         autoCapitalize="none"
-                                        autoCorrect={false}
+                                        autoCorrect={
+                                            false
+                                        }
                                         returnKeyType="done"
                                     />
 
                                     {socialMediaError ? (
-                                        <Text style={styles.errorText}>{socialMediaError}</Text>
+                                        <Text
+                                            style={
+                                                styles.errorText
+                                            }
+                                        >
+                                            {
+                                                socialMediaError
+                                            }
+                                        </Text>
                                     ) : (
-                                        <Text style={styles.helperText}>
+                                        <Text
+                                            style={
+                                                styles.helperText
+                                            }
+                                        >
                                             Paste the full link to your profile or channel.
                                         </Text>
                                     )}
@@ -1303,7 +2502,11 @@ export default function SetupProfileScreen({ navigation }: any) {
                             )}
                         </View>
 
-                        <Text style={styles.footerText}>
+                        <Text
+                            style={
+                                styles.footerText
+                            }
+                        >
                             You can update these details later in Account Settings.
                         </Text>
                     </ScrollView>
@@ -1312,102 +2515,244 @@ export default function SetupProfileScreen({ navigation }: any) {
                         style={[
                             styles.bottomContainer,
                             {
-                                paddingBottom: Math.max(
-                                    insets.bottom + 10,
-                                    Platform.OS === "android" ? 24 : 18,
-                                ),
+                                paddingBottom:
+                                    Math.max(
+                                        insets.bottom +
+                                        10,
+                                        Platform.OS ===
+                                            "android"
+                                            ? 24
+                                            : 18
+                                    ),
                             },
                         ]}
                     >
                         <TouchableOpacity
                             style={[
                                 styles.continueButton,
-                                (!canContinue || loading) && styles.continueButtonDisabled,
+                                (!canContinue ||
+                                    loading) &&
+                                styles.continueButtonDisabled,
                             ]}
-                            onPress={handleContinue}
-                            disabled={!canContinue || loading}
-                            activeOpacity={0.88}
+                            onPress={
+                                handleContinue
+                            }
+                            disabled={
+                                !canContinue ||
+                                loading
+                            }
+                            activeOpacity={
+                                0.88
+                            }
                         >
                             {loading ? (
-                                <ActivityIndicator color={theme.darkText} />
+                                <ActivityIndicator
+                                    color={
+                                        theme.darkText
+                                    }
+                                />
                             ) : (
-                                <Text style={styles.continueButtonText}>Continue</Text>
+                                <Text
+                                    style={
+                                        styles.continueButtonText
+                                    }
+                                >
+                                    Continue
+                                </Text>
                             )}
                         </TouchableOpacity>
                     </View>
                 </View>
 
                 <Modal
-                    visible={collegeModalVisible}
+                    visible={
+                        collegeModalVisible
+                    }
                     animationType="slide"
                     presentationStyle="pageSheet"
-                    onRequestClose={() => setCollegeModalVisible(false)}
+                    onRequestClose={() =>
+                        setCollegeModalVisible(
+                            false
+                        )
+                    }
                 >
-                    <SafeAreaView style={styles.modalSafeArea}>
-                        <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={() => setCollegeModalVisible(false)}>
-                                <Text style={styles.modalCancel}>Cancel</Text>
+                    <SafeAreaView
+                        style={
+                            styles.modalSafeArea
+                        }
+                    >
+                        <View
+                            style={
+                                styles.modalHeader
+                            }
+                        >
+                            <TouchableOpacity
+                                onPress={() =>
+                                    setCollegeModalVisible(
+                                        false
+                                    )
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.modalCancel
+                                    }
+                                >
+                                    Cancel
+                                </Text>
                             </TouchableOpacity>
 
-                            <Text style={styles.modalTitle}>Choose College</Text>
+                            <Text
+                                style={
+                                    styles.modalTitle
+                                }
+                            >
+                                Choose College
+                            </Text>
 
-                            <View style={styles.modalHeaderSpacer} />
+                            <View
+                                style={
+                                    styles.modalHeaderSpacer
+                                }
+                            />
                         </View>
 
-                        <View style={styles.modalSearchContainer}>
+                        <View
+                            style={
+                                styles.modalSearchContainer
+                            }
+                        >
                             <TextInput
-                                style={styles.modalSearchInput}
-                                value={collegeSearch}
-                                onChangeText={setCollegeSearch}
+                                style={
+                                    styles.modalSearchInput
+                                }
+                                value={
+                                    collegeSearch
+                                }
+                                onChangeText={
+                                    setCollegeSearch
+                                }
                                 placeholder="Search colleges"
-                                placeholderTextColor={theme.placeholder}
+                                placeholderTextColor={
+                                    theme.placeholder
+                                }
                                 autoCapitalize="words"
-                                autoCorrect={false}
+                                autoCorrect={
+                                    false
+                                }
                                 autoFocus
                                 returnKeyType="search"
                             />
                         </View>
 
                         <FlatList
-                            data={filteredColleges}
-                            keyExtractor={(item, index) => `${item}-${index}`}
+                            data={
+                                filteredColleges
+                            }
+                            keyExtractor={(
+                                item,
+                                index
+                            ) =>
+                                `${item}-${index}`
+                            }
                             keyboardShouldPersistTaps="handled"
-                            contentContainerStyle={styles.modalListContent}
-                            renderItem={({ item }) => {
+                            contentContainerStyle={
+                                styles.modalListContent
+                            }
+                            renderItem={({
+                                item,
+                            }) => {
                                 const showMainListMarker =
-                                    item === "Not Listed" && !collegeSearch.trim();
+                                    item ===
+                                    "Not Listed" &&
+                                    !collegeSearch.trim();
 
                                 return (
                                     <View>
                                         <TouchableOpacity
-                                            style={styles.modalListItem}
-                                            onPress={() => selectCollege(item)}
-                                            activeOpacity={0.8}
+                                            style={
+                                                styles.modalListItem
+                                            }
+                                            onPress={() =>
+                                                selectCollege(
+                                                    item
+                                                )
+                                            }
+                                            activeOpacity={
+                                                0.8
+                                            }
                                         >
-                                            <Text style={styles.modalListText}>{item}</Text>
+                                            <Text
+                                                style={
+                                                    styles.modalListText
+                                                }
+                                            >
+                                                {
+                                                    item
+                                                }
+                                            </Text>
 
-                                            {collegeName === item && (
-                                                <Text style={styles.modalCheck}>✓</Text>
-                                            )}
+                                            {collegeName ===
+                                                item && (
+                                                    <Text
+                                                        style={
+                                                            styles.modalCheck
+                                                        }
+                                                    >
+                                                        ✓
+                                                    </Text>
+                                                )}
                                         </TouchableOpacity>
 
                                         {showMainListMarker && (
-                                            <View style={styles.collegeListDivider}>
-                                                <View style={styles.collegeDividerLine} />
+                                            <View
+                                                style={
+                                                    styles.collegeListDivider
+                                                }
+                                            >
+                                                <View
+                                                    style={
+                                                        styles.collegeDividerLine
+                                                    }
+                                                />
 
-                                                <Text style={styles.collegeDividerText}>COLLEGES</Text>
+                                                <Text
+                                                    style={
+                                                        styles.collegeDividerText
+                                                    }
+                                                >
+                                                    COLLEGES
+                                                </Text>
 
-                                                <View style={styles.collegeDividerLine} />
+                                                <View
+                                                    style={
+                                                        styles.collegeDividerLine
+                                                    }
+                                                />
                                             </View>
                                         )}
                                     </View>
                                 );
                             }}
                             ListEmptyComponent={
-                                <View style={styles.emptyContainer}>
-                                    <Text style={styles.emptyTitle}>No matching college</Text>
+                                <View
+                                    style={
+                                        styles.emptyContainer
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.emptyTitle
+                                        }
+                                    >
+                                        No matching college
+                                    </Text>
 
-                                    <Text style={styles.emptyText}>
+                                    <Text
+                                        style={
+                                            styles.emptyText
+                                        }
+                                    >
                                         Try another spelling, or select Other College or Not Listed.
                                     </Text>
                                 </View>
@@ -1417,40 +2762,111 @@ export default function SetupProfileScreen({ navigation }: any) {
                 </Modal>
 
                 <Modal
-                    visible={sportModalVisible}
+                    visible={
+                        sportModalVisible
+                    }
                     animationType="slide"
                     presentationStyle="pageSheet"
-                    onRequestClose={() => setSportModalVisible(false)}
+                    onRequestClose={() =>
+                        setSportModalVisible(
+                            false
+                        )
+                    }
                 >
-                    <SafeAreaView style={styles.modalSafeArea}>
-                        <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={() => setSportModalVisible(false)}>
-                                <Text style={styles.modalCancel}>Cancel</Text>
+                    <SafeAreaView
+                        style={
+                            styles.modalSafeArea
+                        }
+                    >
+                        <View
+                            style={
+                                styles.modalHeader
+                            }
+                        >
+                            <TouchableOpacity
+                                onPress={() =>
+                                    setSportModalVisible(
+                                        false
+                                    )
+                                }
+                            >
+                                <Text
+                                    style={
+                                        styles.modalCancel
+                                    }
+                                >
+                                    Cancel
+                                </Text>
                             </TouchableOpacity>
 
-                            <Text style={styles.modalTitle}>Choose Sport</Text>
+                            <Text
+                                style={
+                                    styles.modalTitle
+                                }
+                            >
+                                Choose Sport
+                            </Text>
 
-                            <View style={styles.modalHeaderSpacer} />
+                            <View
+                                style={
+                                    styles.modalHeaderSpacer
+                                }
+                            />
                         </View>
 
                         <FlatList
-                            data={filteredSports}
-                            keyExtractor={(item, index) => `${item}-${index}`}
-                            contentContainerStyle={styles.modalListContent}
-                            renderItem={({ item }) => (
+                            data={
+                                filteredSports
+                            }
+                            keyExtractor={(
+                                item,
+                                index
+                            ) =>
+                                `${item}-${index}`
+                            }
+                            contentContainerStyle={
+                                styles.modalListContent
+                            }
+                            renderItem={({
+                                item,
+                            }) => (
                                 <TouchableOpacity
-                                    style={styles.modalListItem}
+                                    style={
+                                        styles.modalListItem
+                                    }
                                     onPress={() => {
-                                        setSelectedSport(item);
-                                        setSportModalVisible(false);
-                                    }}
-                                    activeOpacity={0.8}
-                                >
-                                    <Text style={styles.modalListText}>{item}</Text>
+                                        setSelectedSport(
+                                            item
+                                        );
 
-                                    {selectedSport === item && (
-                                        <Text style={styles.modalCheck}>✓</Text>
-                                    )}
+                                        setSportModalVisible(
+                                            false
+                                        );
+                                    }}
+                                    activeOpacity={
+                                        0.8
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.modalListText
+                                        }
+                                    >
+                                        {
+                                            item
+                                        }
+                                    </Text>
+
+                                    {selectedSport ===
+                                        item && (
+                                            <Text
+                                                style={
+                                                    styles.modalCheck
+                                                }
+                                            >
+                                                ✓
+                                            </Text>
+                                        )}
                                 </TouchableOpacity>
                             )}
                         />
@@ -1459,50 +2875,90 @@ export default function SetupProfileScreen({ navigation }: any) {
             </KeyboardAvoidingView>
 
             <Modal
-                visible={loading}
+                visible={
+                    loading
+                }
                 transparent
                 animationType="fade"
                 statusBarTranslucent
                 navigationBarTranslucent
             >
-                <View style={styles.savingOverlay}>
-                    <View style={styles.savingCard}>
+                <View
+                    style={
+                        styles.savingOverlay
+                    }
+                >
+                    <View
+                        style={
+                            styles.savingCard
+                        }
+                    >
                         <Animated.View
                             style={[
                                 styles.savingAvatarWrap,
                                 {
                                     transform: [
                                         {
-                                            rotate: avatarSpin,
+                                            rotate:
+                                                avatarSpin,
                                         },
                                     ],
                                 },
                             ]}
                         >
                             <Image
-                                source={selectedAvatarSource}
-                                style={styles.savingAvatar}
+                                source={
+                                    selectedAvatarSource
+                                }
+                                style={
+                                    styles.savingAvatar
+                                }
                                 resizeMode="cover"
                             />
                         </Animated.View>
 
-                        <Text style={styles.savingTitle}>
-                            {username || "ScoolFools user"}, your profile is being created
+                        <Text
+                            style={
+                                styles.savingTitle
+                            }
+                        >
+                            {username ||
+                                "ScoolFools user"}
+                            , your profile is being created
                         </Text>
 
-                        <Text style={styles.savingSubtitle}>
+                        <Text
+                            style={
+                                styles.savingSubtitle
+                            }
+                        >
                             Getting everything ready for you...
                         </Text>
 
-                        <View style={styles.progressTrack}>
+                        <View
+                            style={
+                                styles.progressTrack
+                            }
+                        >
                             <Animated.View
                                 style={[
                                     styles.progressFill,
                                     {
-                                        width: savingProgress.interpolate({
-                                            inputRange: [0, 1],
-                                            outputRange: ["0%", "100%"],
-                                        }),
+                                        width:
+                                            savingProgress.interpolate(
+                                                {
+                                                    inputRange:
+                                                        [
+                                                            0,
+                                                            1,
+                                                        ],
+                                                    outputRange:
+                                                        [
+                                                            "0%",
+                                                            "100%",
+                                                        ],
+                                                }
+                                            ),
                                     },
                                 ]}
                             />
@@ -1512,35 +2968,66 @@ export default function SetupProfileScreen({ navigation }: any) {
             </Modal>
 
             <BlogsPaywallModal
-                visible={paywallVisible}
-                onClose={() => setPaywallVisible(false)}
-                onSubscribe={handleSubscribePress}
-                loading={loadingSubscription}
-                localizedPrice={subscriptionProduct?.localizedPrice ?? null}
+                visible={
+                    paywallVisible
+                }
+                onClose={() =>
+                    setPaywallVisible(
+                        false
+                    )
+                }
+                onSubscribe={
+                    handleSubscribePress
+                }
+                loading={
+                    loadingSubscription
+                }
+                localizedPrice={
+                    subscriptionProduct?.localizedPrice ??
+                    null
+                }
                 billingPeriodLabel="every 6 months"
                 buttonLabel="Unlock Subscriber Access"
-                themeMode={themeMode}
+                themeMode={
+                    themeMode
+                }
             />
 
             {showConfetti && (
                 <ConfettiCannon
                     count={140}
-                    origin={{ x: -10, y: 0 }}
+                    origin={{
+                        x: -10,
+                        y: 0,
+                    }}
                     fadeOut
-                    explosionSpeed={350}
-                    fallSpeed={2600}
-                    onAnimationEnd={() => setShowConfetti(false)}
+                    explosionSpeed={
+                        350
+                    }
+                    fallSpeed={
+                        2600
+                    }
+                    onAnimationEnd={() =>
+                        setShowConfetti(
+                            false
+                        )
+                    }
                 />
             )}
         </SafeAreaView>
     );
 }
 
-const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
+const createStyles = (
+    theme: ReturnType<
+        typeof getSetupProfileTheme
+    >
+) =>
     StyleSheet.create({
         safeArea: {
             flex: 1,
-            backgroundColor: theme.bg,
+            backgroundColor:
+                theme.bg,
         },
 
         keyboardView: {
@@ -1549,7 +3036,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
 
         screen: {
             flex: 1,
-            backgroundColor: theme.bg,
+            backgroundColor:
+                theme.bg,
         },
 
         scrollView: {
@@ -1557,9 +3045,11 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         scrollContent: {
-            paddingHorizontal: 22,
+            paddingHorizontal:
+                22,
             paddingTop: 22,
-            paddingBottom: 130,
+            paddingBottom:
+                130,
         },
 
         header: {
@@ -1574,7 +3064,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         subtitle: {
-            color: theme.subtext,
+            color:
+                theme.subtext,
             fontSize: 15,
             lineHeight: 21,
             fontWeight: "600",
@@ -1593,29 +3084,48 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         avatarGrid: {
-            flexDirection: "row",
+            flexDirection:
+                "row",
             flexWrap: "wrap",
-            justifyContent: "space-between",
+            justifyContent:
+                "space-between",
             rowGap: 12,
         },
 
         avatarButton: {
-            width: Platform.OS === "android" ? 64 : 72,
-            height: Platform.OS === "android" ? 64 : 72,
-            borderRadius: Platform.OS === "android" ? 32 : 36,
+            width:
+                Platform.OS ===
+                    "android"
+                    ? 64
+                    : 72,
+            height:
+                Platform.OS ===
+                    "android"
+                    ? 64
+                    : 72,
+            borderRadius:
+                Platform.OS ===
+                    "android"
+                    ? 32
+                    : 36,
             borderWidth: 3,
-            borderColor: theme.divider,
-            backgroundColor: theme.surface,
+            borderColor:
+                theme.divider,
+            backgroundColor:
+                theme.surface,
             padding: 2,
-            position: "relative",
+            position:
+                "relative",
         },
 
         avatarButtonSelected: {
-            borderColor: theme.cyan,
+            borderColor:
+                theme.cyan,
         },
 
         avatarButtonLocked: {
-            borderColor: theme.border,
+            borderColor:
+                theme.border,
         },
 
         avatarImage: {
@@ -1629,33 +3139,43 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         avatarLockBadge: {
-            position: "absolute",
+            position:
+                "absolute",
             top: 2,
             right: 2,
             bottom: 2,
             left: 2,
             borderRadius: 999,
-            backgroundColor: "rgba(2,6,23,0.50)",
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor:
+                "rgba(2,6,23,0.50)",
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
         },
 
         avatarCheck: {
-            position: "absolute",
+            position:
+                "absolute",
             right: -3,
             bottom: -3,
             width: 23,
             height: 23,
             borderRadius: 12,
-            backgroundColor: theme.yellow,
+            backgroundColor:
+                theme.yellow,
             borderWidth: 2,
-            borderColor: theme.bg,
-            alignItems: "center",
-            justifyContent: "center",
+            borderColor:
+                theme.bg,
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
         },
 
         avatarCheckText: {
-            color: theme.darkText,
+            color:
+                theme.darkText,
             fontSize: 12,
             fontWeight: "900",
         },
@@ -1664,11 +3184,16 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             minHeight: 55,
             borderRadius: 15,
             borderWidth: 1.5,
-            borderColor: theme.border,
-            backgroundColor: theme.surface,
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 15,
+            borderColor:
+                theme.border,
+            backgroundColor:
+                theme.surface,
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            paddingHorizontal:
+                15,
         },
 
         usernameAt: {
@@ -1688,12 +3213,15 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         inputErrorBorder: {
-            borderColor: theme.error,
-            backgroundColor: theme.errorBg,
+            borderColor:
+                theme.error,
+            backgroundColor:
+                theme.errorBg,
         },
 
         helperText: {
-            color: theme.muted,
+            color:
+                theme.muted,
             fontSize: 11,
             lineHeight: 16,
             fontWeight: "600",
@@ -1701,7 +3229,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         errorText: {
-            color: theme.error,
+            color:
+                theme.error,
             fontSize: 12,
             lineHeight: 17,
             fontWeight: "700",
@@ -1709,14 +3238,17 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         optionRow: {
-            flexDirection: "row",
+            flexDirection:
+                "row",
             gap: 11,
         },
 
         classificationGrid: {
-            flexDirection: "row",
+            flexDirection:
+                "row",
             flexWrap: "wrap",
-            justifyContent: "space-between",
+            justifyContent:
+                "space-between",
             rowGap: 10,
         },
 
@@ -1725,11 +3257,16 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             minHeight: 52,
             borderRadius: 15,
             borderWidth: 1.5,
-            borderColor: theme.border,
-            backgroundColor: theme.surface,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 10,
+            borderColor:
+                theme.border,
+            backgroundColor:
+                theme.surface,
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
+            paddingHorizontal:
+                10,
         },
 
         optionButton: {
@@ -1737,17 +3274,25 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             minHeight: 69,
             borderRadius: 15,
             borderWidth: 1.5,
-            borderColor: theme.border,
-            backgroundColor: theme.surface,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            paddingHorizontal: 12,
+            borderColor:
+                theme.border,
+            backgroundColor:
+                theme.surface,
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
+            paddingHorizontal:
+                12,
         },
 
         optionButtonSelected: {
-            backgroundColor: theme.selected,
-            borderColor: theme.cyan,
+            backgroundColor:
+                theme.selected,
+            borderColor:
+                theme.cyan,
         },
 
         optionEmoji: {
@@ -1756,7 +3301,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         optionText: {
-            color: theme.subtext,
+            color:
+                theme.subtext,
             fontSize: 14,
             fontWeight: "800",
         },
@@ -1767,7 +3313,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         socialOptionalText: {
-            color: theme.muted,
+            color:
+                theme.muted,
             fontSize: 12,
             lineHeight: 17,
             fontWeight: "600",
@@ -1776,7 +3323,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         socialPlatformGrid: {
-            flexDirection: "row",
+            flexDirection:
+                "row",
             width: "100%",
             gap: 6,
         },
@@ -1789,38 +3337,53 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             height: 34,
             borderRadius: 9,
             borderWidth: 1,
-            borderColor: theme.border,
-            alignItems: "center",
-            justifyContent: "center",
-            position: "relative",
+            borderColor:
+                theme.border,
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
+            position:
+                "relative",
         },
 
         socialPlatformButtonSelected: {
-            borderColor: theme.cyan,
+            borderColor:
+                theme.cyan,
             borderWidth: 2,
-            shadowColor: theme.cyan,
+            shadowColor:
+                theme.cyan,
             shadowOpacity: 0.25,
             shadowRadius: 8,
-            shadowOffset: { width: 0, height: 0 },
+            shadowOffset: {
+                width: 0,
+                height: 0,
+            },
             elevation: 4,
         },
 
         socialSelectedCheck: {
-            position: "absolute",
+            position:
+                "absolute",
             top: 2,
             right: 3,
             width: 11,
             height: 11,
             borderRadius: 6,
-            backgroundColor: theme.cyan,
+            backgroundColor:
+                theme.cyan,
             borderWidth: 1.5,
-            borderColor: theme.bg,
-            alignItems: "center",
-            justifyContent: "center",
+            borderColor:
+                theme.bg,
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
         },
 
         socialSelectedCheckText: {
-            color: theme.white,
+            color:
+                theme.white,
             fontSize: 6,
             fontWeight: "900",
         },
@@ -1840,23 +3403,31 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             minHeight: 55,
             borderRadius: 15,
             borderWidth: 1.5,
-            borderColor: theme.border,
-            backgroundColor: theme.surface,
+            borderColor:
+                theme.border,
+            backgroundColor:
+                theme.surface,
             color: theme.text,
             fontSize: 14,
             fontWeight: "700",
-            paddingHorizontal: 15,
+            paddingHorizontal:
+                15,
         },
 
         dropdownButton: {
             minHeight: 55,
             borderRadius: 15,
             borderWidth: 1.5,
-            borderColor: theme.border,
-            backgroundColor: theme.surface,
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 15,
+            borderColor:
+                theme.border,
+            backgroundColor:
+                theme.surface,
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            paddingHorizontal:
+                15,
         },
 
         dropdownText: {
@@ -1868,7 +3439,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         dropdownPlaceholder: {
-            color: theme.placeholder,
+            color:
+                theme.placeholder,
             fontWeight: "600",
         },
 
@@ -1880,35 +3452,49 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         footerText: {
-            color: theme.muted,
+            color:
+                theme.muted,
             fontSize: 11,
             lineHeight: 16,
-            textAlign: "center",
+            textAlign:
+                "center",
             fontWeight: "600",
-            paddingHorizontal: 18,
+            paddingHorizontal:
+                18,
             marginTop: 2,
         },
 
         bottomContainer: {
-            position: "absolute",
+            position:
+                "absolute",
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: theme.bg,
-            paddingHorizontal: 22,
+            backgroundColor:
+                theme.bg,
+            paddingHorizontal:
+                22,
             paddingTop: 12,
-            paddingBottom: Platform.OS === "ios" ? 22 : 16,
+            paddingBottom:
+                Platform.OS ===
+                    "ios"
+                    ? 22
+                    : 16,
             borderTopWidth: 1,
-            borderTopColor: theme.divider,
+            borderTopColor:
+                theme.divider,
         },
 
         continueButton: {
             width: "100%",
             height: 57,
             borderRadius: 17,
-            backgroundColor: theme.yellow,
-            alignItems: "center",
-            justifyContent: "center",
+            backgroundColor:
+                theme.yellow,
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
         },
 
         continueButtonDisabled: {
@@ -1916,33 +3502,42 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         continueButtonText: {
-            color: theme.darkText,
+            color:
+                theme.darkText,
             fontSize: 17,
             fontWeight: "900",
         },
 
         savingOverlay: {
             flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems:
+                "center",
+            justifyContent:
+                "center",
             backgroundColor:
-                theme.mode === "night"
+                theme.mode ===
+                    "night"
                     ? "rgba(0,0,0,0.86)"
                     : "rgba(2,6,23,0.66)",
-            paddingHorizontal: 24,
+            paddingHorizontal:
+                24,
         },
 
         savingCard: {
             width: "100%",
             maxWidth: 360,
-            alignItems: "center",
-            backgroundColor: theme.bg,
+            alignItems:
+                "center",
+            backgroundColor:
+                theme.bg,
             borderRadius: 24,
-            paddingHorizontal: 24,
+            paddingHorizontal:
+                24,
             paddingTop: 28,
             paddingBottom: 26,
             borderWidth: 1,
-            borderColor: theme.border,
+            borderColor:
+                theme.border,
         },
 
         savingAvatarWrap: {
@@ -1950,9 +3545,11 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             height: 78,
             borderRadius: 39,
             borderWidth: 3,
-            borderColor: theme.cyan,
+            borderColor:
+                theme.cyan,
             padding: 3,
-            backgroundColor: theme.surface,
+            backgroundColor:
+                theme.surface,
             marginBottom: 18,
         },
 
@@ -1967,15 +3564,18 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             fontSize: 20,
             lineHeight: 25,
             fontWeight: "900",
-            textAlign: "center",
+            textAlign:
+                "center",
         },
 
         savingSubtitle: {
-            color: theme.subtext,
+            color:
+                theme.subtext,
             fontSize: 13,
             lineHeight: 18,
             fontWeight: "600",
-            textAlign: "center",
+            textAlign:
+                "center",
             marginTop: 7,
         },
 
@@ -1983,34 +3583,45 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
             width: "100%",
             height: 9,
             borderRadius: 5,
-            overflow: "hidden",
-            backgroundColor: theme.surfaceSoft,
+            overflow:
+                "hidden",
+            backgroundColor:
+                theme.surfaceSoft,
             marginTop: 22,
         },
 
         progressFill: {
             height: "100%",
             borderRadius: 5,
-            backgroundColor: theme.cyan,
+            backgroundColor:
+                theme.cyan,
         },
 
         modalSafeArea: {
             flex: 1,
-            backgroundColor: theme.bg,
+            backgroundColor:
+                theme.bg,
         },
 
         modalHeader: {
             height: 58,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 20,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.divider,
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            justifyContent:
+                "space-between",
+            paddingHorizontal:
+                20,
+            borderBottomWidth:
+                1,
+            borderBottomColor:
+                theme.divider,
         },
 
         modalCancel: {
-            color: theme.cyanDark,
+            color:
+                theme.cyanDark,
             fontSize: 15,
             fontWeight: "800",
         },
@@ -2026,7 +3637,8 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         modalSearchContainer: {
-            paddingHorizontal: 18,
+            paddingHorizontal:
+                18,
             paddingTop: 15,
             paddingBottom: 10,
         },
@@ -2034,26 +3646,35 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         modalSearchInput: {
             height: 51,
             borderRadius: 15,
-            backgroundColor: theme.surfaceSoft,
+            backgroundColor:
+                theme.surfaceSoft,
             color: theme.text,
             fontSize: 15,
             fontWeight: "700",
-            paddingHorizontal: 15,
+            paddingHorizontal:
+                15,
         },
 
         modalListContent: {
-            paddingHorizontal: 18,
+            paddingHorizontal:
+                18,
             paddingBottom: 30,
         },
 
         modalListItem: {
             minHeight: 55,
-            borderBottomWidth: 1,
-            borderBottomColor: theme.divider,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 3,
+            borderBottomWidth:
+                1,
+            borderBottomColor:
+                theme.divider,
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
+            justifyContent:
+                "space-between",
+            paddingHorizontal:
+                3,
         },
 
         modalListText: {
@@ -2065,15 +3686,18 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         modalCheck: {
-            color: theme.cyan,
+            color:
+                theme.cyan,
             fontSize: 18,
             fontWeight: "900",
         },
 
         emptyContainer: {
-            alignItems: "center",
+            alignItems:
+                "center",
             paddingTop: 45,
-            paddingHorizontal: 25,
+            paddingHorizontal:
+                25,
         },
 
         emptyTitle: {
@@ -2083,15 +3707,20 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         },
 
         emptyText: {
-            color: theme.muted,
+            color:
+                theme.muted,
             fontSize: 13,
             lineHeight: 19,
-            textAlign: "center",
+            textAlign:
+                "center",
             marginTop: 6,
         },
+
         collegeListDivider: {
-            flexDirection: "row",
-            alignItems: "center",
+            flexDirection:
+                "row",
+            alignItems:
+                "center",
             marginTop: 5,
             marginBottom: 7,
         },
@@ -2099,14 +3728,17 @@ const createStyles = (theme: ReturnType<typeof getSetupProfileTheme>) =>
         collegeDividerLine: {
             flex: 1,
             height: 1,
-            backgroundColor: theme.border,
+            backgroundColor:
+                theme.border,
         },
-        // this is a test comment on 7/22
+
         collegeDividerText: {
-            color: theme.muted,
+            color:
+                theme.muted,
             fontSize: 11,
             fontWeight: "900",
             letterSpacing: 1.1,
-            marginHorizontal: 12,
+            marginHorizontal:
+                12,
         },
     });

@@ -16,6 +16,8 @@ import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { charadesWords } from "../../../../assets/data/charades";
 
+const THEME_MODE = "night" as const;
+
 type Team = 1 | 2;
 
 type RouteParams = {
@@ -339,9 +341,9 @@ export default function CharadesPlayScreen() {
     const canEditScores = editingScores && roundOver && !running && !gameOver;
 
     return (
-        <GameScreenWrapper>
+        <GameScreenWrapper themeMode={THEME_MODE}>
             <View style={styles.topRow}>
-                <GameBackButton />
+                <GameBackButton themeMode={THEME_MODE} />
                 <Text style={styles.screenTitle}>Charades</Text>
             </View>
 
@@ -539,10 +541,10 @@ const styles = StyleSheet.create({
     },
     scoreCard: {
         flex: 1,
-        backgroundColor: "#050816",
+        backgroundColor: "#070B14",
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: "#12203A",
+        borderColor: "rgba(255,255,255,0.10)",
         padding: 12,
         alignItems: "center",
     },
@@ -550,7 +552,7 @@ const styles = StyleSheet.create({
         borderColor: "#FFD166",
     },
     scoreLabel: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 13,
         fontWeight: "800",
         marginBottom: 4,
@@ -594,7 +596,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     timerText: {
-        color: "#3CF2FF",
+        color: "#22D3EE",
         fontSize: 46,
         fontWeight: "900",
         marginBottom: 18,
@@ -609,16 +611,16 @@ const styles = StyleSheet.create({
         width: "100%",
         minHeight: 220,
         borderRadius: 28,
-        backgroundColor: "#050816",
+        backgroundColor: "#070B14",
         borderWidth: 1.5,
-        borderColor: "#12203A",
+        borderColor: "rgba(255,255,255,0.10)",
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
         marginBottom: 20,
     },
     wordLabel: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 14,
         marginBottom: 10,
     },
@@ -635,7 +637,7 @@ const styles = StyleSheet.create({
         textAlign: "center",
     },
     readySubText: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         marginTop: 6,
         textAlign: "center",
         lineHeight: 20,
@@ -643,7 +645,7 @@ const styles = StyleSheet.create({
     startButton: {
         height: 56,
         borderRadius: 28,
-        backgroundColor: "#3CF2FF",
+        backgroundColor: "#22D3EE",
         alignItems: "center",
         justifyContent: "center",
         paddingHorizontal: 30,
@@ -694,14 +696,14 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     resetText: {
-        color: "#AAA",
+        color: "#94A3B8",
     },
     gameOverCard: {
         width: "100%",
-        backgroundColor: "#071426",
+        backgroundColor: "#070B14",
         borderRadius: 30,
         borderWidth: 2,
-        borderColor: "#3CF2FF",
+        borderColor: "#22D3EE",
         padding: 26,
         alignItems: "center",
     },
@@ -719,7 +721,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     finalScoreText: {
-        color: "#AAA",
+        color: "#94A3B8",
         marginTop: 8,
         marginBottom: 24,
     },

@@ -19,6 +19,7 @@
     },
     "android": {
       "versionCode": 3,
+           "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/iconandroid.png",
         "backgroundColor": "#000000"

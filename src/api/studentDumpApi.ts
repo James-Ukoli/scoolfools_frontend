@@ -234,6 +234,18 @@ export const getMyDumps = async (
 
 /*
 |--------------------------------------------------------------------------
+| Daily Dump Limit
+|--------------------------------------------------------------------------
+*/
+
+export const getDailyDumpLimit =
+  async (): Promise<DailyDumpLimitResponse> => {
+    return protectedRequest<DailyDumpLimitResponse>(
+      "/api/dumps/daily-limit"
+    );
+  };
+/*
+|--------------------------------------------------------------------------
 | Get Single Dump
 |--------------------------------------------------------------------------
 */
@@ -246,6 +258,18 @@ export const getDumpById = async (
   );
 };
 
+
+export type DailyDumpLimit = {
+  allowed: boolean;
+  used: number;
+  remaining: number;
+  dailyLimit: number;
+};
+
+type DailyDumpLimitResponse = {
+  success: boolean;
+  limit: DailyDumpLimit;
+};
 /*
 |--------------------------------------------------------------------------
 | Create Dump
@@ -257,15 +281,15 @@ type CreateDumpPayload = {
   anonymous?: boolean;
   image_url?: string | null;
 };
-
+// comment hahahhahahahhaah
 type CreateDumpResponse = {
   success: boolean;
   message: string;
   dump: Dump;
-  dailyLimit?: {
-    used: number;
+
+  limit?: {
     remaining: number;
-    limit: number;
+    dailyLimit: number;
   };
 };
 

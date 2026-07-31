@@ -31,7 +31,12 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
-import { finishTransaction } from "react-native-iap";
+import {
+    isOwnershipMismatchError,
+    isPurchaseAlreadyLinkedError,
+    SubscriptionVerificationError,
+    verifyScoolFoolsSubscription,
+} from "../services/subscriptionVerification";
 import ConfettiCannon from "react-native-confetti-cannon";
 import {
     useTimeTheme,
@@ -316,58 +321,121 @@ export default function TrendingScreen({ navigation }: any) {
         }
     };
 
-    const verifyBlogSubscriptionOnBackend = async (purchase: any) => {
-        try {
-            const token = await getToken();
+    const verifyBlogSubscriptionOnBackend = useCallback(
+        async (purchase: any) => {
+            try {
+                const result =
+                    await verifyScoolFoolsSubscription(
+                        purchase
+                    );
 
-            if (!token || !API_BASE_URL) {
-                throw new Error("Missing token or API base URL");
+                const subscribed =
+                    result.isSubscribed === true;
+
+                setIsSubscribed(subscribed);
+                setPaywallVisible(false);
+
+                await fetchEntitlements();
+
+                if (subscribed) {
+                    setShowConfetti(true);
+
+                    Alert.alert(
+                        "Subscribed 🎉",
+                        "Welcome to ScoolFools Blogs!"
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Subscription Inactive",
+                    "The store verified this subscription, but it is not currently active."
+                );
+            } catch (error: unknown) {
+                console.log(
+                    "Trending subscription verification error:",
+                    error
+                );
+
+                if (
+                    isPurchaseAlreadyLinkedError(
+                        error
+                    )
+                ) {
+                    setIsSubscribed(false);
+
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Subscription Already Linked",
+                        "This App Store or Google Play subscription is already connected to another ScoolFools account."
+                    );
+
+                    return;
+                }
+
+                if (
+                    isOwnershipMismatchError(error)
+                ) {
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Different Subscription Detected",
+                        "This ScoolFools account is already connected to a different store subscription."
+                    );
+
+                    return;
+                }
+
+                if (
+                    error instanceof
+                    SubscriptionVerificationError
+                ) {
+                    if (
+                        error.code ===
+                        "UNAUTHORIZED"
+                    ) {
+                        Alert.alert(
+                            "Sign In Required",
+                            error.message
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        error.code ===
+                        "FINISH_TRANSACTION_FAILED"
+                    ) {
+                        await fetchEntitlements();
+
+                        Alert.alert(
+                            "Subscription Verified",
+                            "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and restore again."
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Verification Failed",
+                        error.message
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Verification Failed",
+                    "Your subscription could not be securely linked to your ScoolFools account."
+                );
+            } finally {
+                setLoadingSubscription(false);
             }
-
-            const response = await fetch(`${API_BASE_URL}/api/subscriptions/verify`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({
-                    platform: Platform.OS === "ios" ? "ios" : "android",
-                    productId:
-                        purchase?.productId || purchase?.productIdIOS || "sfs_399_2y",
-                    transactionId:
-                        purchase?.transactionId ||
-                        purchase?.transactionIdIOS ||
-                        purchase?.id ||
-                        null,
-                    purchaseToken:
-                        purchase?.purchaseToken || purchase?.purchaseTokenAndroid || null,
-                }),
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Failed to verify subscription");
-            }
-
-            await finishTransaction({ purchase, isConsumable: false });
-
-            setIsSubscribed(!!data.isSubscribed);
-            setPaywallVisible(false);
-            setShowConfetti(true);
-            await fetchEntitlements();
-
-            Alert.alert("Subscribed 🎉", "Welcome to ScoolFools Blogs!");
-        } catch (error) {
-            console.log("Verify blog subscription error:", error);
-            Alert.alert(
-                "Purchase Complete",
-                "Purchase worked, but verifying the subscription with your account failed.",
-            );
-        } finally {
-            setLoadingSubscription(false);
-        }
-    };
+        },
+        [fetchEntitlements]
+    );
 
     const handleSubscribePress = async () => {
         setLoadingSubscription(true);

@@ -24,7 +24,6 @@ import {
 } from "react-native-safe-area-context";
 
 import {
-    useFocusEffect,
     useNavigation,
     useRoute,
 } from "@react-navigation/native";
@@ -779,44 +778,6 @@ export default function DumpScreen() {
     }, [
         handleNotificationDeepLink,
     ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Refresh Feed When Focused
-    |--------------------------------------------------------------------------
-    */
-
-    useFocusEffect(
-        useCallback(() => {
-            const refreshAfterFocus =
-                async () => {
-                    try {
-                        const user =
-                            await loadStoredUser();
-
-                        await fetchFeed(
-                            1,
-                            false,
-                            user,
-                            feedTab
-                        );
-                    } catch (
-                    error
-                    ) {
-                        console.log(
-                            "Dump focus refresh error:",
-                            error
-                        );
-                    }
-                };
-
-            void refreshAfterFocus();
-        }, [
-            feedTab,
-            fetchFeed,
-            loadStoredUser,
-        ])
-    );
 
     /*
     |--------------------------------------------------------------------------

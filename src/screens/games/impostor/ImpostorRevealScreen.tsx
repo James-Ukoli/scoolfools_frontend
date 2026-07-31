@@ -15,6 +15,10 @@ import GameBackButton from "../../../components/GameBackButton";
 import GameScreenWrapper from "../../../components/GameScreenWrapper";
 import { impostorWords } from "../../../../assets/data/impostor";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+    Rajdhani_700Bold,
+    useFonts,
+} from "@expo-google-fonts/rajdhani";
 
 type RouteParams = {
     ImpostorReveal: {
@@ -34,12 +38,17 @@ type GamePhase =
 
 type Winner = "crew" | "impostor";
 
+const THEME_MODE = "night" as const;
 const IMPOSTOR_GUESS_SECONDS = 15;
 
 export default function ImpostorRevealScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<RouteProp<RouteParams, "ImpostorReveal">>();
     const insets = useSafeAreaInsets();
+
+    const [fontsLoaded] = useFonts({
+        Rajdhani_700Bold,
+    });
 
     const bottomSafePadding =
         Platform.OS === "android"
@@ -367,7 +376,7 @@ export default function ImpostorRevealScreen() {
             >
                 {!revealed ? (
                     <>
-                        <Ionicons name="eye-off-outline" size={42} color="#3CF2FF" />
+                        <Ionicons name="eye-off-outline" size={42} color="#FF3B30" />
                         <Text style={styles.hiddenText}>Tap to reveal</Text>
                     </>
                 ) : (
@@ -397,7 +406,7 @@ export default function ImpostorRevealScreen() {
                     <Text style={styles.nextText}>
                         {currentPlayer >= players ? "Start Discussion" : "Hide & Pass"}
                     </Text>
-                    <Ionicons name="arrow-forward" size={20} color="#000000" />
+                    <Ionicons name="arrow-forward" size={20} color="#210403" />
                 </TouchableOpacity>
             )}
         </View>
@@ -575,18 +584,34 @@ export default function ImpostorRevealScreen() {
                         onPress={playAgain}
                     >
                         <Text style={styles.playAgainText}>Play Again</Text>
-                        <Ionicons name="refresh" size={18} color="#000000" />
+                        <Ionicons name="refresh" size={18} color="#210403" />
                     </TouchableOpacity>
                 </Animated.View>
             </View>
         );
     };
 
+    if (!fontsLoaded) {
+        return null;
+    }
+
     return (
-        <GameScreenWrapper>
+        <GameScreenWrapper themeMode={THEME_MODE}>
             <View style={styles.topRow}>
-                <GameBackButton />
-                <Text style={styles.screenTitle}>Impostor</Text>
+                <GameBackButton themeMode={THEME_MODE} />
+
+                <View style={styles.headerCopy}>
+                    <Text style={styles.eyebrow}>PARTY GAMES</Text>
+                    <Text style={styles.screenTitle}>Impostor</Text>
+                </View>
+
+                <View style={styles.headerIcon}>
+                    <Ionicons
+                        name="eye-outline"
+                        size={22}
+                        color="#FF3B30"
+                    />
+                </View>
             </View>
 
             {phase === "reveal" && renderRevealPhase()}
@@ -604,10 +629,34 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginBottom: 14,
     },
+
+    headerCopy: {
+        flex: 1,
+        marginLeft: 14,
+    },
+
+    eyebrow: {
+        color: "#FF3B30",
+        fontSize: 11,
+        fontFamily: "Rajdhani_700Bold",
+        letterSpacing: 1.8,
+    },
+
+    headerIcon: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(255,59,48,0.09)",
+        borderWidth: 1,
+        borderColor: "rgba(255,59,48,0.34)",
+    },
+
     screenTitle: {
         color: "#FFFFFF",
         fontSize: 26,
-        fontWeight: "800",
+        fontFamily: "Rajdhani_700Bold",
         marginLeft: 14,
     },
     center: {
@@ -618,11 +667,11 @@ const styles = StyleSheet.create({
     playerText: {
         color: "#FFFFFF",
         fontSize: 30,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: 8,
     },
     instruction: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 15,
         textAlign: "center",
         marginBottom: 24,
@@ -632,29 +681,30 @@ const styles = StyleSheet.create({
         width: "100%",
         minHeight: 280,
         borderRadius: 28,
-        backgroundColor: "#050816",
+        backgroundColor: "#070B14",
         borderWidth: 1.5,
-        borderColor: "#1A2A4A",
+        borderColor: "rgba(255,59,48,0.28)",
         padding: 24,
         justifyContent: "center",
         alignItems: "center",
     },
     impostorCard: {
-        borderColor: "#FF6B6B",
+        borderColor: "#FF3B30",
+        backgroundColor: "#120708",
     },
     wordCard: {
-        borderColor: "#3CF2FF",
+        borderColor: "rgba(255,255,255,0.20)",
     },
     hiddenText: {
         color: "#FFFFFF",
         fontSize: 22,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginTop: 14,
     },
     revealLabel: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 14,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: 12,
         letterSpacing: 1.2,
     },
@@ -664,13 +714,14 @@ const styles = StyleSheet.create({
     revealText: {
         color: "#FFFFFF",
         fontSize: 34,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
     },
     nextButton: {
+        width: "100%",
         height: 56,
-        borderRadius: 28,
-        backgroundColor: "#3CF2FF",
+        borderRadius: 18,
+        backgroundColor: "#FF3B30",
         alignItems: "center",
         justifyContent: "center",
         flexDirection: "row",
@@ -679,19 +730,19 @@ const styles = StyleSheet.create({
         marginTop: 22,
     },
     nextText: {
-        color: "#000000",
+        color: "#210403",
         fontSize: 16,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
     title: {
         color: "#FFFFFF",
         fontSize: 30,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: 10,
         textAlign: "center",
     },
     subtitle: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 15,
         textAlign: "center",
         marginBottom: 26,
@@ -699,10 +750,10 @@ const styles = StyleSheet.create({
     },
     timerCard: {
         width: "100%",
-        backgroundColor: "#050816",
+        backgroundColor: "#070B14",
         borderRadius: 28,
         borderWidth: 1.5,
-        borderColor: "#12203A",
+        borderColor: "rgba(255,255,255,0.10)",
         padding: 26,
         alignItems: "center",
         marginBottom: 22,
@@ -712,27 +763,27 @@ const styles = StyleSheet.create({
         backgroundColor: "#12070A",
     },
     impostorGuessCard: {
-        borderColor: "#FFD166",
+        borderColor: "#F97316",
         backgroundColor: "#120F05",
     },
     timerLabel: {
-        color: "#AAB2C0",
+        color: "#CBD5E1",
         fontSize: 14,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: 10,
         letterSpacing: 1.2,
         textTransform: "uppercase",
     },
     timerText: {
-        color: "#3CF2FF",
+        color: "#FF3B30",
         fontSize: 64,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
     votingTimerText: {
-        color: "#FFD166",
+        color: "#F97316",
     },
     impostorGuessTimerText: {
-        color: "#FFD166",
+        color: "#F97316",
     },
     timerDangerText: {
         color: "#FF6B6B",
@@ -741,7 +792,7 @@ const styles = StyleSheet.create({
         color: "#FFFFFF",
         marginTop: 8,
         fontSize: 15,
-        fontWeight: "800",
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
     },
     voteScreen: {
@@ -758,16 +809,16 @@ const styles = StyleSheet.create({
     voteButton: {
         height: 58,
         borderRadius: 29,
-        backgroundColor: "#050816",
+        backgroundColor: "#070B14",
         borderWidth: 1.5,
-        borderColor: "#3CF2FF",
+        borderColor: "#FF3B30",
         alignItems: "center",
         justifyContent: "center",
     },
     voteButtonText: {
         color: "#FFFFFF",
         fontSize: 17,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
     guessActions: {
         width: "100%",
@@ -780,70 +831,71 @@ const styles = StyleSheet.create({
         borderRadius: 28,
         backgroundColor: "#0B1220",
         borderWidth: 1,
-        borderColor: "#16233B",
+        borderColor: "rgba(255,255,255,0.11)",
         alignItems: "center",
         justifyContent: "center",
     },
     wrongGuessText: {
         color: "#FFFFFF",
         fontSize: 15,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
     correctGuessButton: {
         flex: 1,
         height: 56,
         borderRadius: 28,
-        backgroundColor: "#FFD166",
+        backgroundColor: "#F97316",
         alignItems: "center",
         justifyContent: "center",
     },
     correctGuessText: {
-        color: "#000000",
+        color: "#210403",
         fontSize: 15,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
     resultCard: {
         width: "100%",
-        backgroundColor: "#071426",
+        backgroundColor: "#0D0708",
         borderRadius: 30,
-        borderWidth: 2,
-        borderColor: "#3CF2FF",
+        borderWidth: 1.5,
+        borderColor: "rgba(255,59,48,0.58)",
         padding: 26,
         alignItems: "center",
     },
     resultKicker: {
-        color: "#FFD166",
+        color: "#F97316",
         fontSize: 13,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         letterSpacing: 1.5,
         marginBottom: 12,
     },
     resultTitle: {
         color: "#FFFFFF",
         fontSize: 34,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
         marginBottom: 10,
     },
     resultSubtitle: {
-        color: "#B8C4D6",
+        color: "#CBD5E1",
         fontSize: 17,
-        fontWeight: "800",
+        fontFamily: "Rajdhani_700Bold",
         textAlign: "center",
         marginBottom: 8,
     },
     resultSmallText: {
-        color: "#7A8599",
+        color: "#94A3B8",
         fontSize: 14,
-        fontWeight: "700",
+        fontFamily: "Rajdhani_700Bold",
         marginBottom: 24,
         textAlign: "center",
         lineHeight: 21,
     },
     playAgainButton: {
+        width: "100%",
         height: 52,
-        borderRadius: 26,
-        backgroundColor: "#3CF2FF",
+        borderRadius: 17,
+        backgroundColor: "#FF3B30",
         paddingHorizontal: 28,
         alignItems: "center",
         justifyContent: "center",
@@ -851,8 +903,8 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     playAgainText: {
-        color: "#000000",
+        color: "#210403",
         fontSize: 15,
-        fontWeight: "900",
+        fontFamily: "Rajdhani_700Bold",
     },
 });

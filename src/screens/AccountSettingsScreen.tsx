@@ -32,7 +32,13 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../services/iap";
-import { finishTransaction } from "react-native-iap";
+
+import {
+    isOwnershipMismatchError,
+    isPurchaseAlreadyLinkedError,
+    SubscriptionVerificationError,
+    verifyScoolFoolsSubscription,
+} from "../services/subscriptionVerification";
 import ConfettiCannon from "react-native-confetti-cannon";
 import {
     useTimeTheme,
@@ -425,94 +431,141 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const verifySubscriptionOnBackend = useCallback(
         async (purchase: any) => {
             try {
-                const token = await AsyncStorage.getItem("token");
-
-                if (!token || !API_BASE_URL) {
-                    throw new Error("Missing token or API base URL");
-                }
-
-                const response = await fetch(
-                    `${API_BASE_URL}/api/subscriptions/verify`,
-                    {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${token}`,
-                        },
-                        body: JSON.stringify({
-                            platform: Platform.OS === "ios" ? "ios" : "android",
-                            productId:
-                                purchase?.productId || purchase?.productIdIOS || "sfs_399_2y",
-                            transactionId:
-                                purchase?.transactionId ||
-                                purchase?.transactionIdIOS ||
-                                purchase?.id ||
-                                null,
-                            purchaseToken:
-                                purchase?.purchaseToken ||
-                                purchase?.purchaseTokenAndroid ||
-                                null,
-                        }),
-                    },
-                );
-
-                const rawResponse = await response.text();
-
-                let data: any = {};
-
-                try {
-                    data = rawResponse ? JSON.parse(rawResponse) : {};
-                } catch {
-                    data = {
-                        rawResponse,
-                    };
-                }
-
-                console.log("SUBSCRIPTION VERIFY RESPONSE:", {
-                    status: response.status,
-                    ok: response.ok,
-                    data,
-                });
-
-                if (!response.ok) {
-                    throw new Error(
-                        data?.message ||
-                        data?.error ||
-                        `Subscription verification failed with status ${response.status}`
+                const result =
+                    await verifyScoolFoolsSubscription(
+                        purchase
                     );
-                }
 
-                await finishTransaction({
-                    purchase,
-                    isConsumable: false,
-                });
-
-                const subscribed = !!data?.isSubscribed;
+                const subscribed =
+                    result.isSubscribed === true;
 
                 setIsSubscribed(subscribed);
                 setPaywallVisible(false);
-                await updateStoredSubscriptionState(subscribed);
+
+                await updateStoredSubscriptionState(
+                    subscribed
+                );
+
                 await fetchEntitlements();
 
                 if (subscribed) {
                     setShowConfetti(true);
+
                     Alert.alert(
                         "Subscribed 🎉",
-                        "Your ScoolFools subscriber avatars are now unlocked.",
+                        "Your ScoolFools subscriber avatars are now unlocked."
                     );
+
+                    return;
                 }
-            } catch (error) {
-                console.log("Account settings subscription verification error:", error);
 
                 Alert.alert(
-                    "Purchase Complete",
-                    "Your purchase was received, but verifying it with your account failed.",
+                    "Subscription Inactive",
+                    "The store verified this subscription, but it is not currently active."
+                );
+            } catch (error: unknown) {
+                console.log(
+                    "Account settings subscription verification error:",
+                    error
+                );
+
+                /*
+                 * The same App Store or Google Play purchase belongs to
+                 * another ScoolFools account.
+                 */
+                if (
+                    isPurchaseAlreadyLinkedError(
+                        error
+                    )
+                ) {
+                    setIsSubscribed(false);
+
+                    await updateStoredSubscriptionState(
+                        false
+                    );
+
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Subscription Already Linked",
+                        "This App Store or Google Play subscription is already connected to another ScoolFools account."
+                    );
+
+                    return;
+                }
+
+                /*
+                 * The current ScoolFools account already owns a different
+                 * subscription key. Never silently replace that ownership.
+                 */
+                if (
+                    isOwnershipMismatchError(error)
+                ) {
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Different Subscription Detected",
+                        "This ScoolFools account is already connected to a different store subscription."
+                    );
+
+                    return;
+                }
+
+                if (
+                    error instanceof
+                    SubscriptionVerificationError
+                ) {
+                    if (
+                        error.code ===
+                        "UNAUTHORIZED"
+                    ) {
+                        Alert.alert(
+                            "Sign In Required",
+                            error.message
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        error.code ===
+                        "FINISH_TRANSACTION_FAILED"
+                    ) {
+                        /*
+                         * The backend already accepted the subscription.
+                         * Refresh entitlements rather than marking the user
+                         * unsubscribed.
+                         */
+                        await fetchEntitlements();
+
+                        Alert.alert(
+                            "Subscription Verified",
+                            "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and try restoring again."
+                        );
+
+                        return;
+                    }
+
+                    Alert.alert(
+                        "Verification Failed",
+                        error.message
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Verification Failed",
+                    "Your subscription could not be securely linked to your ScoolFools account."
                 );
             } finally {
                 setLoadingSubscription(false);
             }
         },
-        [fetchEntitlements, updateStoredSubscriptionState],
+        [
+            fetchEntitlements,
+            updateStoredSubscriptionState,
+        ]
     );
 
     const handleSubscribePress = async () => {

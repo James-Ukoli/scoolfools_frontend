@@ -452,10 +452,6 @@ export default function DumpCard({
             new Animated.Value(1)
         ).current;
 
-
-    const reactionRequestId =
-        useRef(0);
-
     useEffect(() => {
         setReactions(
             createLocalReactions(
@@ -465,7 +461,7 @@ export default function DumpCard({
         );
     }, [
         currentUserId,
-        dump._id,
+        dump,
     ]);
 
     const isAnonymous =
@@ -603,28 +599,44 @@ export default function DumpCard({
         ) => {
             const scale =
                 reactionScales[
-                reactionType
+                    reactionType
                 ];
 
             scale.stopAnimation();
 
             scale.setValue(
-                0.94
+                0.82
             );
 
-            Animated.spring(
-                scale,
-                {
-                    toValue: 1,
+            Animated.sequence([
+                Animated.spring(
+                    scale,
+                    {
+                        toValue: 1.18,
 
-                    useNativeDriver:
-                        true,
+                        useNativeDriver:
+                            true,
 
-                    tension: 220,
+                        tension: 210,
 
-                    friction: 9,
-                }
-            ).start();
+                        friction: 4,
+                    }
+                ),
+
+                Animated.spring(
+                    scale,
+                    {
+                        toValue: 1,
+
+                        useNativeDriver:
+                            true,
+
+                        tension: 180,
+
+                        friction: 6,
+                    }
+                ),
+            ]).start();
         };
 
     const animateComment =
@@ -678,11 +690,11 @@ export default function DumpCard({
         async (
             reactionType: ReactionType
         ) => {
-            const requestId =
-                reactionRequestId.current + 1;
-
-            reactionRequestId.current =
-                requestId;
+            if (
+                updatingReaction
+            ) {
+                return;
+            }
 
             const previousReactions =
                 reactions.map(
@@ -756,13 +768,6 @@ export default function DumpCard({
                         reactionType
                     );
 
-                if (
-                    requestId !==
-                    reactionRequestId.current
-                ) {
-                    return;
-                }
-
                 applyReactionResponse(
                     response.reactions,
                     response.userReaction
@@ -770,29 +775,19 @@ export default function DumpCard({
             } catch (
             error: any
             ) {
-                if (
-                    requestId ===
-                    reactionRequestId.current
-                ) {
-                    setReactions(
-                        previousReactions
-                    );
+                setReactions(
+                    previousReactions
+                );
 
-                    Alert.alert(
-                        "Reaction Failed",
-                        error?.message ||
-                        "Your reaction could not be updated."
-                    );
-                }
+                Alert.alert(
+                    "Reaction Failed",
+                    error?.message ||
+                    "Your reaction could not be updated."
+                );
             } finally {
-                if (
-                    requestId ===
-                    reactionRequestId.current
-                ) {
-                    setUpdatingReaction(
-                        null
-                    );
-                }
+                setUpdatingReaction(
+                    null
+                );
             }
         };
 
@@ -1128,14 +1123,17 @@ export default function DumpCard({
                                                 {
                                                     scale:
                                                         reactionScales[
-                                                        reaction
-                                                            .type
+                                                            reaction
+                                                                .type
                                                         ],
                                                 },
                                             ],
                                     }}
                                 >
                                     <Pressable
+                                        disabled={Boolean(
+                                            updatingReaction
+                                        )}
                                         onPress={() =>
                                             handleReactionPress(
                                                 reaction.type
@@ -1208,7 +1206,7 @@ export default function DumpCard({
                                 author?.socialMediaPlatform,
 
                                 mode ===
-                                "night"
+                                    "night"
                             )}
                         />
 
@@ -1232,8 +1230,8 @@ export default function DumpCard({
                     </TouchableOpacity>
                 )}
             </View>
+            </View>
         </View>
-
     );
 }
 
