@@ -18,7 +18,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
-import { finishTransaction } from "react-native-iap";
+
 import ConfettiCannon from "react-native-confetti-cannon";
 import {
     useFonts,
@@ -36,6 +36,12 @@ import {
     setupPurchaseListeners,
     cleanupIAP,
 } from "../../services/iap";
+import {
+    GamePurchaseVerificationError,
+    isGameOwnershipMismatchError,
+    isGamePurchaseAlreadyLinkedError,
+    verifyScoolFoolsGamePurchase,
+} from "../../services/gamePurchaseVerification";
 
 /*
 |--------------------------------------------------------------------------
@@ -234,61 +240,31 @@ export default function GameHomeScreen() {
         setPaywallVisible(true);
     };
 
-    const verifyGamePurchaseOnBackend = async (purchase: any) => {
+    const verifyGamePurchaseOnBackend = async (
+        purchase: any
+    ) => {
         try {
-            const token = await getToken();
+            const result =
+                await verifyScoolFoolsGamePurchase(
+                    purchase
+                );
 
-            if (!token || !API_BASE_URL) {
-                throw new Error("Missing token or API base URL");
-            }
+            const purchased =
+                result.gamesPackagePurchased ===
+                true;
 
-            const response = await fetch(
-                `${API_BASE_URL}/api/games/verify`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`,
-                    },
-                    body: JSON.stringify({
-                        platform:
-                            Platform.OS === "ios"
-                                ? "ios"
-                                : "android",
-
-                        productId:
-                            purchase?.productId || "sbpg_499_1t",
-
-                        transactionId:
-                            purchase?.transactionId ||
-                            purchase?.transactionIdIOS ||
-                            purchase?.id ||
-                            null,
-
-                        purchaseToken:
-                            purchase?.purchaseToken || null,
-                    }),
-                },
+            setGamesPackagePurchased(
+                purchased
             );
 
-            const data = await response.json();
-
-            console.log("GAME VERIFY STATUS:", response.status);
-            console.log("GAME VERIFY DATA:", data);
-
-            if (!response.ok) {
-                throw new Error(
-                    data.message ||
-                    "Failed to verify game purchase",
+            if (!purchased) {
+                Alert.alert(
+                    "Purchase Inactive",
+                    "The store verified this game purchase, but access was not granted."
                 );
+
+                return;
             }
-
-            await finishTransaction({
-                purchase,
-                isConsumable: false,
-            });
-
-            setGamesPackagePurchased(true);
 
             await updateStoredGamesAccess();
 
@@ -297,14 +273,89 @@ export default function GameHomeScreen() {
 
             Alert.alert(
                 "Unlocked 🎉",
-                "All Study Break Party Group Games are now unlocked.",
+                "All Study Break Party Group Games are now unlocked."
             );
-        } catch (error) {
-            console.log("Verify game purchase error:", error);
+        } catch (error: unknown) {
+            console.log(
+                "Verify game purchase error:",
+                error
+            );
+
+            if (
+                isGamePurchaseAlreadyLinkedError(
+                    error
+                )
+            ) {
+                setGamesPackagePurchased(
+                    false
+                );
+
+                await fetchEntitlements();
+
+                Alert.alert(
+                    "Game Purchase Already Linked",
+                    "This App Store or Google Play game purchase is already connected to another ScoolFools account."
+                );
+
+                return;
+            }
+
+            if (
+                isGameOwnershipMismatchError(
+                    error
+                )
+            ) {
+                await fetchEntitlements();
+
+                Alert.alert(
+                    "Different Game Purchase Detected",
+                    "This ScoolFools account is already connected to a different game purchase."
+                );
+
+                return;
+            }
+
+            if (
+                error instanceof
+                GamePurchaseVerificationError
+            ) {
+                if (
+                    error.code ===
+                    "UNAUTHORIZED"
+                ) {
+                    Alert.alert(
+                        "Sign In Required",
+                        error.message
+                    );
+
+                    return;
+                }
+
+                if (
+                    error.code ===
+                    "FINISH_GAME_TRANSACTION_FAILED"
+                ) {
+                    await fetchEntitlements();
+
+                    Alert.alert(
+                        "Game Purchase Verified",
+                        "Your game purchase was linked successfully, but the app store transaction still needs to finish. Reopen the app and try Restore Purchase again."
+                    );
+
+                    return;
+                }
+
+                Alert.alert(
+                    "Verification Failed",
+                    error.message
+                );
+
+                return;
+            }
 
             Alert.alert(
-                "Purchase Complete",
-                "Your purchase worked, but saving the unlock to your account failed. Please try Restore Purchase.",
+                "Verification Failed",
+                "Your game purchase could not be securely linked to your ScoolFools account."
             );
         } finally {
             setLoadingPurchase(false);
@@ -325,19 +376,36 @@ export default function GameHomeScreen() {
     };
 
     const handleUnlockPress = async () => {
-        try {
-            setLoadingPurchase(true);
-            await buyGamesPack();
-        } catch (error) {
-            setLoadingPurchase(false);
+        setLoadingPurchase(true);
 
-            console.log("Purchase request error:", error);
+        await buyGamesPack({
+            onSuccess:
+                verifyGamePurchaseOnBackend,
 
-            Alert.alert(
-                "Purchase Failed",
-                "Something went wrong while starting the purchase.",
-            );
-        }
+            onError: (error: any) => {
+                setLoadingPurchase(false);
+
+                console.log(
+                    "Game purchase request error:",
+                    error
+                );
+
+                if (
+                    error?.code ===
+                    "user-cancelled" ||
+                    error?.code ===
+                    "E_USER_CANCELLED"
+                ) {
+                    return;
+                }
+
+                Alert.alert(
+                    "Purchase Failed",
+                    error?.message ||
+                    "Something went wrong while starting the game purchase."
+                );
+            },
+        });
     };
 
     const handleRestorePurchase = async () => {

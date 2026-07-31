@@ -990,7 +990,7 @@ export default function MyDumpsScreen() {
                             },
                         ]}
                     >
-                        My Dumps
+                        My Dumps 🗑️
                     </Text>
                 </Pressable>
 
@@ -1021,7 +1021,7 @@ export default function MyDumpsScreen() {
                             },
                         ]}
                     >
-                        Interactions
+                        Interactions 💬
                     </Text>
                 </Pressable>
             </View>

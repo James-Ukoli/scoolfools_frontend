@@ -28,10 +28,10 @@ import {
 import { shutdownIAP } from "../../src/services/iap";
 
 const PRIVACY_POLICY_URL =
-    "https://docs.google.com/document/d/1aouqTuruJxHGwKUf7yoNg3KgyZhksN9j9idc23HoQSE/edit?usp=sharing";
+    "https://docs.google.com/document/d/1x89dsZKNnP55mcu75N2DvPvFwjq0fDyH0bNQo-7cJYs/edit?usp=sharing";
 
 const TERMS_URL =
-    "https://docs.google.com/document/d/157PCh_AwbA-Yd76I-5hDVmWCEaJva2Vsmh_X2CkdFN4/edit?usp=sharing";
+    "https://docs.google.com/document/d/1LLgL85tlzF8FWpL_cag6nZJMMIB8dhLWaC0nKtncXAI/edit?usp=sharing";
 
 /*
 |--------------------------------------------------------------------------

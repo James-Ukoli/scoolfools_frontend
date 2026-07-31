@@ -1145,11 +1145,6 @@ export default function DumpScreen() {
                         },
                     ]}
                 >
-                    <View
-                        style={
-                            styles.headerAccent
-                        }
-                    />
 
                     <View
                         style={
@@ -1170,7 +1165,7 @@ export default function DumpScreen() {
                                     },
                                 ]}
                             >
-                                Student Dump
+                                The Student Dump 🗑️
                             </Text>
 
                             <Text
@@ -1241,20 +1236,15 @@ export default function DumpScreen() {
                                 },
                             ]}
                         >
-                            <Ionicons
-                                name={
-                                    schoolLevel ===
-                                        "highSchool"
-                                        ? "book"
-                                        : "school"
-                                }
-                                size={
-                                    14
-                                }
-                                color={
-                                    theme.cyan
-                                }
-                            />
+                            <Text
+                                style={{
+                                    fontSize: ms(14),
+                                }}
+                            >
+                                {schoolLevel === "highSchool"
+                                    ? "📚"
+                                    : "🎓"}
+                            </Text>
 
                             <Text
                                 style={[
@@ -1328,7 +1318,7 @@ export default function DumpScreen() {
                     {(
                         [
                             "Recent",
-                            "Trending",
+                            "Trending 🔥",
                         ] as FeedTab[]
                     ).map(
                         (
@@ -1715,16 +1705,7 @@ const styles =
                 "hidden",
         },
 
-        headerAccent: {
-            position:
-                "absolute",
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 4,
-            backgroundColor:
-                "#22D3EE",
-        },
+
 
         headerTopRow: {
             flexDirection:

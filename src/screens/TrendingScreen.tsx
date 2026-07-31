@@ -481,7 +481,11 @@ export default function TrendingScreen({ navigation }: any) {
         return () => {
             void cleanupIAP();
         };
-    }, [fetchEntitlements, fetchPosts]);
+    }, [
+        fetchEntitlements,
+        fetchPosts,
+        verifyBlogSubscriptionOnBackend,
+    ]);
 
     useEffect(() => {
         setVisibleStoriesCount(INITIAL_VISIBLE_STORIES);
@@ -515,7 +519,11 @@ export default function TrendingScreen({ navigation }: any) {
         } finally {
             setRefreshing(false);
         }
-    }, [fetchEntitlements, fetchPosts]);
+    }, [
+        fetchEntitlements,
+        fetchPosts,
+        verifyBlogSubscriptionOnBackend,
+    ]);
 
     const filteredPosts = useMemo(() => {
         const currentPosts = posts.filter(
