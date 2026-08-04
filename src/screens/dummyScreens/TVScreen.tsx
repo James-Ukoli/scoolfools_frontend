@@ -92,8 +92,8 @@ const PLAYER_HEIGHT =
     PLAYER_WIDTH * (9 / 16);
 
 const MEDIA_CARD_WIDTH = Math.min(
-    SCREEN_WIDTH * 0.60,
-    280,
+    SCREEN_WIDTH * 0.76,
+    300,
 );
 
 const MEDIA_THUMBNAIL_HEIGHT =

@@ -505,9 +505,6 @@ export default function NotificationsScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.headerTextContainer}>
-                        <Text style={styles.eyebrow}>
-                            SCOOLFOOLS
-                        </Text>
 
                         <View style={styles.titleRow}>
                             <Text style={styles.title}>
@@ -697,9 +694,9 @@ const createStyles = (theme: NotificationTheme) =>
             paddingHorizontal: 14,
             marginBottom: 12,
             borderRadius: 22,
-            borderWidth: 1,
-            borderColor: theme.strongBorder,
-            backgroundColor: theme.card,
+            // borderWidth: 1,
+            // borderColor: theme.strongBorder,
+            // backgroundColor: theme.card,
         },
 
         headerButton: {

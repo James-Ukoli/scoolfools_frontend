@@ -1978,7 +1978,7 @@ export default function SetupProfileScreen({
                                     styles.helperText
                                 }
                             >
-                                3 to 20 characters. Letters, numbers, periods, and underscores only.
+                                6 to 20 characters. Letters, numbers, periods, and underscores only.
                             </Text>
                         )}
                     </View>

@@ -856,7 +856,17 @@ export default function TrendingScreen({ navigation }: any) {
                             </TouchableOpacity>
 
                             {topStories.length > 0 && (
-                                <Text style={[styles.sectionTitle, { color: activeColor }]}>
+                                <Text
+                                    style={[
+                                        styles.sectionTitle,
+                                        {
+                                            color:
+                                                activeTab === "news"
+                                                    ? theme.text
+                                                    : theme.cyan,
+                                        },
+                                    ]}
+                                >
                                     {activeTab === "news" ? "Recent News" : "Latest Blogs"}
                                 </Text>
                             )}
@@ -994,7 +1004,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         paddingHorizontal: 16,
-        paddingBottom: 40,
+        paddingBottom: 120,
     },
     loadingContainer: {
         flex: 1,

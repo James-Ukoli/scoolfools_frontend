@@ -31,9 +31,11 @@ export type PushRegistrationResult = {
 export type NotificationReceivedHandler = (
     notification: Notifications.Notification,
 ) => unknown | Promise<unknown>;
+
 export type NotificationResponseHandler = (
     response: Notifications.NotificationResponse,
 ) => unknown | Promise<unknown>;
+
 export type PushNotificationListeners = {
     onNotificationReceived?: NotificationReceivedHandler;
     onNotificationResponse?: NotificationResponseHandler;
@@ -46,69 +48,166 @@ export type PushNotificationListenerCleanup = () => void;
 | Duplicate Response Protection
 |--------------------------------------------------------------------------
 |
-| Expo can occasionally expose the same notification response through:
+| Notification responses can be returned again after:
 |
-| 1. getLastNotificationResponseAsync() during cold start
-| 2. addNotificationResponseReceivedListener() after mounting
+| 1. A development reload
+| 2. A Fast Refresh
+| 3. A cold app launch
+| 4. The response listener mounting
 |
-| We track handled response identifiers so the same notification tap does
-| not navigate twice.
+| The in-memory set handles duplicates during the current JavaScript session.
+| AsyncStorage handles duplicates after a terminal reload or app restart.
 |--------------------------------------------------------------------------
 */
 
-const handledResponseIds = new Set<string>();
+const HANDLED_RESPONSE_IDS_STORAGE_KEY =
+    "handled_notification_response_ids";
 
 const MAX_HANDLED_RESPONSE_IDS = 100;
+
+const handledResponseIds =
+    new Set<string>();
+
+let storedResponseIdsLoaded = false;
 
 const getNotificationResponseId = (
     response: Notifications.NotificationResponse,
 ): string => {
-    const notification =
+    const request =
         response.notification.request;
 
     return [
-        notification.identifier,
+        request.identifier,
         response.actionIdentifier,
     ].join(":");
 };
 
-const rememberHandledResponse = (
-    responseId: string,
-): void => {
-    handledResponseIds.add(responseId);
+const loadStoredHandledResponseIds =
+    async (): Promise<void> => {
+        if (storedResponseIdsLoaded) {
+            return;
+        }
 
-    if (
-        handledResponseIds.size <=
-        MAX_HANDLED_RESPONSE_IDS
-    ) {
-        return;
-    }
+        try {
+            const storedValue =
+                await AsyncStorage.getItem(
+                    HANDLED_RESPONSE_IDS_STORAGE_KEY,
+                );
 
-    const firstStoredId =
-        handledResponseIds.values().next().value;
+            if (!storedValue) {
+                storedResponseIdsLoaded = true;
+                return;
+            }
 
-    if (typeof firstStoredId === "string") {
-        handledResponseIds.delete(firstStoredId);
-    }
-};
+            const parsedValue =
+                JSON.parse(storedValue);
 
-export const hasNotificationResponseBeenHandled = (
-    response: Notifications.NotificationResponse,
-): boolean => {
-    const responseId =
-        getNotificationResponseId(response);
+            if (Array.isArray(parsedValue)) {
+                parsedValue.forEach((value) => {
+                    if (
+                        typeof value === "string" &&
+                        value.trim()
+                    ) {
+                        handledResponseIds.add(
+                            value,
+                        );
+                    }
+                });
+            }
+        } catch (error) {
+            console.log(
+                "Unable to load handled notification responses:",
+                error,
+            );
+        } finally {
+            storedResponseIdsLoaded = true;
+        }
+    };
 
-    return handledResponseIds.has(responseId);
-};
+const saveHandledResponseIds =
+    async (): Promise<void> => {
+        try {
+            const responseIds =
+                Array.from(
+                    handledResponseIds,
+                ).slice(
+                    -MAX_HANDLED_RESPONSE_IDS,
+                );
 
-export const markNotificationResponseHandled = (
-    response: Notifications.NotificationResponse,
-): void => {
-    const responseId =
-        getNotificationResponseId(response);
+            await AsyncStorage.setItem(
+                HANDLED_RESPONSE_IDS_STORAGE_KEY,
+                JSON.stringify(responseIds),
+            );
+        } catch (error) {
+            console.log(
+                "Unable to save handled notification responses:",
+                error,
+            );
+        }
+    };
 
-    rememberHandledResponse(responseId);
-};
+const rememberHandledResponse =
+    async (
+        responseId: string,
+    ): Promise<void> => {
+        await loadStoredHandledResponseIds();
+
+        handledResponseIds.add(responseId);
+
+        while (
+            handledResponseIds.size >
+            MAX_HANDLED_RESPONSE_IDS
+        ) {
+            const firstStoredId =
+                handledResponseIds
+                    .values()
+                    .next()
+                    .value;
+
+            if (
+                typeof firstStoredId !==
+                "string"
+            ) {
+                break;
+            }
+
+            handledResponseIds.delete(
+                firstStoredId,
+            );
+        }
+
+        await saveHandledResponseIds();
+    };
+
+export const hasNotificationResponseBeenHandled =
+    async (
+        response: Notifications.NotificationResponse,
+    ): Promise<boolean> => {
+        await loadStoredHandledResponseIds();
+
+        const responseId =
+            getNotificationResponseId(
+                response,
+            );
+
+        return handledResponseIds.has(
+            responseId,
+        );
+    };
+
+export const markNotificationResponseHandled =
+    async (
+        response: Notifications.NotificationResponse,
+    ): Promise<void> => {
+        const responseId =
+            getNotificationResponseId(
+                response,
+            );
+
+        await rememberHandledResponse(
+            responseId,
+        );
+    };
 
 /*
 |--------------------------------------------------------------------------
@@ -116,10 +215,13 @@ export const markNotificationResponseHandled = (
 |--------------------------------------------------------------------------
 */
 
-const getExpoProjectId = (): string | undefined => {
+const getExpoProjectId = ():
+    | string
+    | undefined => {
     return (
         Constants.easConfig?.projectId ||
-        Constants.expoConfig?.extra?.eas?.projectId
+        Constants.expoConfig?.extra?.eas
+            ?.projectId
     );
 };
 
@@ -134,7 +236,9 @@ const configureAndroidNotificationChannel =
             {
                 name: "ScoolFools Notifications",
                 importance:
-                    Notifications.AndroidImportance.MAX,
+                    Notifications
+                        .AndroidImportance
+                        .MAX,
                 vibrationPattern: [
                     0,
                     250,
@@ -172,7 +276,8 @@ const requestNotificationPermission =
 
 const getExpoPushToken =
     async (): Promise<string> => {
-        const projectId = getExpoProjectId();
+        const projectId =
+            getExpoProjectId();
 
         if (!projectId) {
             throw new Error(
@@ -196,63 +301,74 @@ const getExpoPushToken =
         return tokenResponse.data;
     };
 
-const registerTokenWithBackend = async (
-    expoPushToken: string,
-): Promise<void> => {
-    if (!API_BASE_URL) {
-        throw new Error(
-            "The API base URL is missing from your Expo environment variables.",
-        );
-    }
+const registerTokenWithBackend =
+    async (
+        expoPushToken: string,
+    ): Promise<void> => {
+        if (!API_BASE_URL) {
+            throw new Error(
+                "The API base URL is missing from your Expo environment variables.",
+            );
+        }
 
-    const authToken =
-        await AsyncStorage.getItem("token");
+        const authToken =
+            await AsyncStorage.getItem(
+                "token",
+            );
 
-    if (!authToken) {
-        throw new Error(
-            "The user authentication token is missing.",
-        );
-    }
+        if (!authToken) {
+            throw new Error(
+                "The user authentication token is missing.",
+            );
+        }
 
-    const response = await fetch(
-        `${API_BASE_URL}/api/notifications/register-device`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type":
-                    "application/json",
-                Authorization: `Bearer ${authToken}`,
-            },
-            body: JSON.stringify({
-                token: expoPushToken,
-                platform: Platform.OS,
+        const response =
+            await fetch(
+                `${API_BASE_URL}/api/notifications/register-device`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+                        Authorization:
+                            `Bearer ${authToken}`,
+                    },
+                    body: JSON.stringify({
+                        token:
+                            expoPushToken,
+                        platform:
+                            Platform.OS,
 
-                featuredPostsEnabled: true,
-                alertsEnabled: true,
-                interactionsEnabled: true,
-            }),
-        },
-    );
+                        featuredPostsEnabled:
+                            true,
+                        alertsEnabled:
+                            true,
+                        interactionsEnabled:
+                            true,
+                    }),
+                },
+            );
 
-    let data: {
-        message?: string;
-        error?: string;
-    } = {};
+        let data: {
+            message?: string;
+            error?: string;
+        } = {};
 
-    try {
-        data = await response.json();
-    } catch {
-        data = {};
-    }
+        try {
+            data =
+                await response.json();
+        } catch {
+            data = {};
+        }
 
-    if (!response.ok) {
-        throw new Error(
-            data.message ||
-                data.error ||
-                `Push registration failed with status ${response.status}.`,
-        );
-    }
-};
+        if (!response.ok) {
+            throw new Error(
+                data.message ||
+                    data.error ||
+                    `Push registration failed with status ${response.status}.`,
+            );
+        }
+    };
 
 /*
 |--------------------------------------------------------------------------
@@ -270,7 +386,9 @@ const safelyHandleReceivedNotification =
         }
 
         try {
-            await handler(notification);
+            await handler(
+                notification,
+            );
         } catch (error) {
             console.log(
                 "Foreground notification handler error:",
@@ -283,34 +401,46 @@ const safelyHandleNotificationResponse =
     async (
         response: Notifications.NotificationResponse,
         handler?: NotificationResponseHandler,
-    ): Promise<void> => {
+    ): Promise<boolean> => {
         if (!handler) {
-            return;
+            return false;
         }
 
-        if (
-            hasNotificationResponseBeenHandled(
+        const alreadyHandled =
+            await hasNotificationResponseBeenHandled(
                 response,
-            )
-        ) {
+            );
+
+        if (alreadyHandled) {
             console.log(
                 "Duplicate notification response ignored:",
                 response.notification.request
                     .identifier,
             );
 
-            return;
+            return false;
         }
 
-        markNotificationResponseHandled(response);
+        /*
+         * Store the response before running navigation.
+         *
+         * This prevents a terminal reload from replaying the response even
+         * when navigation or another part of the handler throws an error.
+         */
+        await markNotificationResponseHandled(
+            response,
+        );
 
         try {
             await handler(response);
+            return true;
         } catch (error) {
             console.log(
                 "Notification response handler error:",
                 error,
             );
+
+            return false;
         }
     };
 
@@ -318,53 +448,45 @@ const safelyHandleNotificationResponse =
 |--------------------------------------------------------------------------
 | Public Notification Listener Function
 |--------------------------------------------------------------------------
-|
-| Mount this once near the root of the application.
-|
-| onNotificationReceived:
-| Runs when a push arrives while the app is open.
-|
-| onNotificationResponse:
-| Runs when the user taps a push while the app is open or backgrounded.
-|--------------------------------------------------------------------------
 */
 
-export const subscribeToPushNotificationEvents = (
-    listeners: PushNotificationListeners,
-): PushNotificationListenerCleanup => {
-    const receivedSubscription =
-        Notifications.addNotificationReceivedListener(
-            (notification) => {
-                void safelyHandleReceivedNotification(
-                    notification,
-                    listeners.onNotificationReceived,
-                );
-            },
-        );
+export const subscribeToPushNotificationEvents =
+    (
+        listeners: PushNotificationListeners,
+    ): PushNotificationListenerCleanup => {
+        const receivedSubscription =
+            Notifications.addNotificationReceivedListener(
+                (notification) => {
+                    void safelyHandleReceivedNotification(
+                        notification,
+                        listeners.onNotificationReceived,
+                    );
+                },
+            );
 
-    const responseSubscription =
-        Notifications.addNotificationResponseReceivedListener(
-            (response) => {
-                void safelyHandleNotificationResponse(
-                    response,
-                    listeners.onNotificationResponse,
-                );
-            },
-        );
+        const responseSubscription =
+            Notifications.addNotificationResponseReceivedListener(
+                (response) => {
+                    void safelyHandleNotificationResponse(
+                        response,
+                        listeners.onNotificationResponse,
+                    );
+                },
+            );
 
-    return () => {
-        receivedSubscription.remove();
-        responseSubscription.remove();
+        return () => {
+            receivedSubscription.remove();
+            responseSubscription.remove();
+        };
     };
-};
 
 /*
 |--------------------------------------------------------------------------
 | Cold-Start Notification Response
 |--------------------------------------------------------------------------
 |
-| This handles the case where ScoolFools was completely closed and the user
-| launched it by tapping a push notification.
+| This handles the case where ScoolFools was completely closed and opened
+| because the user tapped a notification.
 |--------------------------------------------------------------------------
 */
 
@@ -380,26 +502,33 @@ export const handleInitialNotificationResponse =
                 return false;
             }
 
-            if (
-                hasNotificationResponseBeenHandled(
+            const alreadyHandled =
+                await hasNotificationResponseBeenHandled(
                     response,
-                )
-            ) {
-                return false;
-            }
-
-            await safelyHandleNotificationResponse(
-                response,
-                handler,
-            );
+                );
 
             /*
-             * Clearing the stored response helps prevent an old notification
-             * from reopening its destination during a later normal app launch.
+             * Clear the Expo response before navigating.
+             *
+             * This is important during development because a terminal reload
+             * can occur before navigation finishes.
              */
             await Notifications.clearLastNotificationResponseAsync();
 
-            return true;
+            if (alreadyHandled) {
+                console.log(
+                    "Previously handled initial notification response ignored:",
+                    response.notification.request
+                        .identifier,
+                );
+
+                return false;
+            }
+
+            return await safelyHandleNotificationResponse(
+                response,
+                handler,
+            );
         } catch (error) {
             console.log(
                 "Initial notification response error:",
@@ -416,29 +545,33 @@ export const handleInitialNotificationResponse =
 |--------------------------------------------------------------------------
 */
 
-export const setApplicationBadgeCount = async (
-    count: number,
-): Promise<void> => {
-    const safeCount = Math.max(
-        0,
-        Math.floor(count),
-    );
+export const setApplicationBadgeCount =
+    async (
+        count: number,
+    ): Promise<void> => {
+        const safeCount =
+            Math.max(
+                0,
+                Math.floor(count),
+            );
 
-    try {
-        await Notifications.setBadgeCountAsync(
-            safeCount,
-        );
-    } catch (error) {
-        console.log(
-            "Unable to update application badge:",
-            error,
-        );
-    }
-};
+        try {
+            await Notifications.setBadgeCountAsync(
+                safeCount,
+            );
+        } catch (error) {
+            console.log(
+                "Unable to update application badge:",
+                error,
+            );
+        }
+    };
 
 export const clearApplicationBadge =
     async (): Promise<void> => {
-        await setApplicationBadgeCount(0);
+        await setApplicationBadgeCount(
+            0,
+        );
     };
 
 /*
@@ -449,10 +582,6 @@ export const clearApplicationBadge =
 
 export async function registerCurrentDevice(): Promise<PushRegistrationResult> {
     try {
-        /*
-         * Expo push notifications require a physical device.
-         * This safely skips token registration on simulators and emulators.
-         */
         if (!Device.isDevice) {
             console.log(
                 "Push registration skipped: a physical device is required.",
@@ -462,7 +591,8 @@ export async function registerCurrentDevice(): Promise<PushRegistrationResult> {
                 registered: false,
                 permissionGranted: false,
                 expoPushToken: null,
-                reason: "PHYSICAL_DEVICE_REQUIRED",
+                reason:
+                    "PHYSICAL_DEVICE_REQUIRED",
             };
         }
 
@@ -480,7 +610,8 @@ export async function registerCurrentDevice(): Promise<PushRegistrationResult> {
                 registered: false,
                 permissionGranted: false,
                 expoPushToken: null,
-                reason: "PERMISSION_DENIED",
+                reason:
+                    "PERMISSION_DENIED",
             };
         }
 

@@ -68,7 +68,8 @@ export type NotificationDeepLinkDestination =
 
 export type NotificationDeepLinkResult = {
     handled: boolean;
-    destination: NotificationDeepLinkDestination;
+    destination:
+        NotificationDeepLinkDestination;
     reason?: string;
 };
 
@@ -91,7 +92,10 @@ const normalizeString = (
     const normalizedValue =
         String(value).trim();
 
-    return normalizedValue || undefined;
+    return (
+        normalizedValue ||
+        undefined
+    );
 };
 
 const firstString = (
@@ -136,7 +140,8 @@ const getMetadata = (
 ): NotificationMetadata => {
     if (
         !data.metadata ||
-        typeof data.metadata !== "object" ||
+        typeof data.metadata !==
+            "object" ||
         Array.isArray(data.metadata)
     ) {
         return {};
@@ -218,7 +223,8 @@ const getDumpId = (
 
     if (
         resourceType === "dump" ||
-        resourceType === "student_dump"
+        resourceType ===
+            "student_dump"
     ) {
         return resourceId;
     }
@@ -341,7 +347,8 @@ const shouldRouteToStudentDump = (
 
     return (
         resourceType === "dump" ||
-        resourceType === "student_dump"
+        resourceType ===
+            "student_dump"
     );
 };
 
@@ -364,9 +371,6 @@ const safelyMarkNotificationAsRead =
                 notificationId,
             );
         } catch (error) {
-            /*
-             * A failed read-status request should not prevent navigation.
-             */
             console.log(
                 "Unable to mark notification as read during deep linking:",
                 error,
@@ -422,18 +426,6 @@ const navigateToStudentDump = ({
         commentId ||
         undefined;
 
-    /*
-     * Exact navigator path:
-     *
-     * Root stack:
-     * MainTabs
-     *
-     * AppShell stack:
-     * BottomTabs
-     *
-     * Bottom tab:
-     * Dump
-     */
     navigate(
         "MainTabs",
         {
@@ -464,14 +456,11 @@ const navigateToStudentDump = ({
 
 const navigateToNotifications =
     (): void => {
-        /*
-         * Notifications is registered inside AppShell, which is mounted by
-         * the root MainTabs route.
-         */
         navigate(
             "MainTabs",
             {
-                screen: "Notifications",
+                screen:
+                    "Notifications",
             } as never,
         );
     };
@@ -486,22 +475,26 @@ export const handleNotificationDeepLink =
     async (
         rawData: unknown,
     ): Promise<NotificationDeepLinkResult> => {
+        /*
+         * Do not navigate when the notification response has no usable data.
+         *
+         * Previously, an empty or stale Expo response automatically opened
+         * the Notifications screen during terminal reloads.
+         */
         if (
             !rawData ||
-            typeof rawData !== "object" ||
+            typeof rawData !==
+                "object" ||
             Array.isArray(rawData)
         ) {
             console.log(
-                "Notification deep link received an invalid payload:",
+                "Notification deep link ignored because the payload was missing or invalid:",
                 rawData,
             );
 
-            navigateToNotifications();
-
             return {
                 handled: false,
-                destination:
-                    "notifications",
+                destination: "none",
                 reason:
                     "Notification payload was missing or invalid.",
             };
@@ -564,6 +557,38 @@ export const handleNotificationDeepLink =
                 metadata,
             );
 
+        /*
+         * An object such as {} is technically an object, but it is not a
+         * valid ScoolFools notification payload.
+         */
+        const hasRecognizedNotificationData =
+            Boolean(
+                notificationId ||
+                    notificationType ||
+                    resourceType ||
+                    resourceId ||
+                    dumpId ||
+                    commentId ||
+                    replyId ||
+                    parentCommentId,
+            );
+
+        if (
+            !hasRecognizedNotificationData
+        ) {
+            console.log(
+                "Notification deep link ignored because no recognized notification fields were found:",
+                data,
+            );
+
+            return {
+                handled: false,
+                destination: "none",
+                reason:
+                    "No recognized notification fields were found.",
+            };
+        }
+
         await safelyMarkNotificationAsRead(
             notificationId,
         );
@@ -581,10 +606,15 @@ export const handleNotificationDeepLink =
                     data,
                 );
 
+                /*
+                 * This was a real notification tap, but its destination is
+                 * incomplete. Opening the notification feed is safer than
+                 * attempting to open an invalid Dump screen.
+                 */
                 navigateToNotifications();
 
                 return {
-                    handled: false,
+                    handled: true,
                     destination:
                         "notifications",
                     reason:
@@ -609,22 +639,21 @@ export const handleNotificationDeepLink =
         }
 
         /*
-         * Featured posts, alerts, TV, events and other notification
-         * destinations can be added after Student Dump interaction deep
-         * linking is complete.
+         * A valid notification with a currently unsupported destination
+         * opens the notification feed.
          *
-         * For now, unsupported notification types safely open the
-         * notification feed.
+         * Empty or stale responses were already rejected above, so they will
+         * no longer send the user here after a terminal reload.
          */
         console.log(
-            "No Student Dump deep-link destination matched this payload:",
+            "No Student Dump deep-link destination matched this valid payload:",
             data,
         );
 
         navigateToNotifications();
 
         return {
-            handled: false,
+            handled: true,
             destination:
                 "notifications",
             reason:
@@ -635,12 +664,6 @@ export const handleNotificationDeepLink =
 /*
 |--------------------------------------------------------------------------
 | Expo Response Handler
-|--------------------------------------------------------------------------
-|
-| Use this with:
-|
-| addNotificationResponseReceivedListener
-| getLastNotificationResponseAsync
 |--------------------------------------------------------------------------
 */
 

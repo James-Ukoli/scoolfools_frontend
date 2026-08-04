@@ -13,58 +13,136 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-export default function ReviewerLoginScreen({ navigation }: any) {
+type OnboardingStage =
+    | "profile"
+    | "introVideo"
+    | "complete";
+
+const getOnboardingRoute = (
+    onboardingStage?: OnboardingStage
+) => {
+    switch (onboardingStage) {
+        case "introVideo":
+            return "IntroVideo";
+
+        case "complete":
+            return "MainTabs";
+
+        case "profile":
+        default:
+            return "SetupProfile";
+    }
+};
+
+export default function ReviewerLoginScreen({
+    navigation,
+}: any) {
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
+    const [password, setPassword] =
+        useState("");
+    const [loading, setLoading] =
+        useState(false);
 
-    const handleReviewerLogin = async () => {
-        if (!email.trim() || !password.trim()) {
-            Alert.alert("Missing Info", "Please enter email and password.");
-            return;
-        }
+    const handleReviewerLogin =
+        async () => {
+            if (
+                !email.trim() ||
+                !password.trim()
+            ) {
+                Alert.alert(
+                    "Missing Info",
+                    "Please enter email and password."
+                );
 
-        try {
-            setLoading(true);
-
-            const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email: email.trim(),
-                    password: password.trim(),
-                }),
-            });
-
-            const data = await res.json();
-
-            if (!res.ok || !data?.token) {
-                throw new Error(data?.message || "Reviewer login failed");
+                return;
             }
 
-            await AsyncStorage.setItem("token", data.token);
-            await AsyncStorage.setItem("user", JSON.stringify(data.user));
+            try {
+                setLoading(true);
 
-            navigation.replace("MainTabs");
-        } catch (error: any) {
-            Alert.alert(
-                "Login Failed",
-                error?.message || "Something went wrong."
-            );
-        } finally {
-            setLoading(false);
-        }
-    };
+                const res = await fetch(
+                    `${API_BASE_URL}/api/auth/login`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+                        },
+                        body: JSON.stringify({
+                            email: email
+                                .trim()
+                                .toLowerCase(),
+                            password:
+                                password.trim(),
+                        }),
+                    }
+                );
+
+                const data =
+                    await res.json();
+
+                if (
+                    !res.ok ||
+                    !data?.token ||
+                    !data?.user
+                ) {
+                    throw new Error(
+                        data?.message ||
+                        "Reviewer login failed"
+                    );
+                }
+
+                await AsyncStorage.multiSet([
+                    ["token", data.token],
+                    [
+                        "user",
+                        JSON.stringify(
+                            data.user
+                        ),
+                    ],
+                ]);
+
+                const nextRoute =
+                    getOnboardingRoute(
+                        data.user
+                            ?.onboardingStage
+                    );
+
+                navigation.reset({
+                    index: 0,
+                    routes: [
+                        {
+                            name: nextRoute,
+                        },
+                    ],
+                });
+            } catch (error: any) {
+                Alert.alert(
+                    "Login Failed",
+                    error?.message ||
+                    "Something went wrong."
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
 
     return (
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView
+            style={styles.safeArea}
+        >
             <View style={styles.container}>
                 <View>
-                    <Text style={styles.title}>Login</Text>
-                    <Text style={styles.subtitle}>
-                        Sign in with the review credentials provided for Google Play.
+                    <Text style={styles.title}>
+                        Login
+                    </Text>
+
+                    <Text
+                        style={styles.subtitle}
+                    >
+                        Sign in with the review
+                        credentials provided for
+                        Google Play.
                     </Text>
 
                     <TextInput
@@ -76,6 +154,7 @@ export default function ReviewerLoginScreen({ navigation }: any) {
                         autoCapitalize="none"
                         keyboardType="email-address"
                         autoCorrect={false}
+                        editable={!loading}
                     />
 
                     <TextInput
@@ -87,27 +166,57 @@ export default function ReviewerLoginScreen({ navigation }: any) {
                         secureTextEntry
                         autoCapitalize="none"
                         autoCorrect={false}
+                        editable={!loading}
+                        onSubmitEditing={
+                            handleReviewerLogin
+                        }
                     />
 
                     <TouchableOpacity
-                        style={styles.loginButton}
-                        onPress={handleReviewerLogin}
+                        style={[
+                            styles.loginButton,
+                            loading &&
+                            styles.disabledButton,
+                        ]}
+                        onPress={
+                            handleReviewerLogin
+                        }
                         disabled={loading}
+                        activeOpacity={0.85}
                     >
                         {loading ? (
-                            <ActivityIndicator color="#000" />
+                            <ActivityIndicator
+                                color="#000"
+                            />
                         ) : (
-                            <Text style={styles.loginButtonText}>Log In</Text>
+                            <Text
+                                style={
+                                    styles.loginButtonText
+                                }
+                            >
+                                Log In
+                            </Text>
                         )}
                     </TouchableOpacity>
                 </View>
 
                 <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
+                    onPress={() =>
+                        navigation.goBack()
+                    }
+                    style={
+                        styles.backButton
+                    }
                     disabled={loading}
+                    activeOpacity={0.75}
                 >
-                    <Text style={styles.backButtonText}>Back</Text>
+                    <Text
+                        style={
+                            styles.backButtonText
+                        }
+                    >
+                        Back
+                    </Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -119,13 +228,16 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#000",
     },
+
     container: {
         flex: 1,
-        justifyContent: "space-between",
+        justifyContent:
+            "space-between",
         paddingHorizontal: 24,
         paddingTop: 32,
         paddingBottom: 28,
     },
+
     title: {
         color: "#39FF14",
         fontSize: 28,
@@ -133,9 +245,13 @@ const styles = StyleSheet.create({
         marginBottom: 10,
         textAlign: "center",
         textShadowColor: "#39FF14",
-        textShadowOffset: { width: 0, height: 0 },
+        textShadowOffset: {
+            width: 0,
+            height: 0,
+        },
         textShadowRadius: 10,
     },
+
     subtitle: {
         color: "#8EA0BF",
         fontSize: 14,
@@ -143,6 +259,7 @@ const styles = StyleSheet.create({
         marginBottom: 28,
         lineHeight: 20,
     },
+
     input: {
         height: 56,
         borderRadius: 16,
@@ -154,6 +271,7 @@ const styles = StyleSheet.create({
         fontSize: 16,
         marginBottom: 14,
     },
+
     loginButton: {
         height: 56,
         borderRadius: 16,
@@ -162,19 +280,27 @@ const styles = StyleSheet.create({
         alignItems: "center",
         marginTop: 6,
     },
+
+    disabledButton: {
+        opacity: 0.65,
+    },
+
     loginButtonText: {
         color: "#000",
         fontSize: 16,
         fontWeight: "700",
     },
+
     backButton: {
         alignSelf: "center",
         marginTop: 20,
     },
+
     backButtonText: {
         color: "#8EA0BF",
         fontSize: 14,
-        textDecorationLine: "underline",
+        textDecorationLine:
+            "underline",
         fontWeight: "600",
     },
 });

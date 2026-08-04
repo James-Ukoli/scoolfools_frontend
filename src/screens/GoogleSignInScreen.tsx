@@ -19,7 +19,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const PRIVACY_POLICY_URL =
-    "https://docs.google.com/document/d/1x89dsZKNnP55mcu75N2DvPvFwjq0fDyH0bNQo-7cJYs/edit?usp=sharing";
+    "https://.google.com/document/d/1x89dsZKNnP55mcu75N2DvPvFwjq0fDyH0bNQo-7cJYs/edit?usp=sharing";
 
 const TERMS_URL =
     "https://docs.google.com/document/d/1LLgL85tlzF8FWpL_cag6nZJMMIB8dhLWaC0nKtncXAI/edit?usp=sharing";
@@ -39,6 +39,7 @@ const getOnboardingRoute = (
             return "SetupProfile";
     }
 };
+
 export default function GoogleSignInScreen({ navigation }: any) {
     const [loadingProvider, setLoadingProvider] = useState<
         "google" | "apple" | null
@@ -59,6 +60,10 @@ export default function GoogleSignInScreen({ navigation }: any) {
                 "Something went wrong while opening the link."
             );
         }
+    };
+
+    const handleReviewerLogin = () => {
+        navigation.navigate("ReviewerLogin");
     };
 
     const handleGoogleSignIn = async () => {
@@ -227,16 +232,36 @@ export default function GoogleSignInScreen({ navigation }: any) {
                             <View style={styles.appleButtonWrapper}>
                                 <AppleAuthentication.AppleAuthenticationButton
                                     buttonType={
-                                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                                        AppleAuthentication
+                                            .AppleAuthenticationButtonType
+                                            .SIGN_IN
                                     }
                                     buttonStyle={
-                                        AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                                        AppleAuthentication
+                                            .AppleAuthenticationButtonStyle
+                                            .BLACK
                                     }
                                     cornerRadius={16}
                                     style={styles.appleButton}
                                     onPress={handleAppleSignIn}
                                 />
                             </View>
+                        )}
+
+                        {Platform.OS === "android" && (
+                            <TouchableOpacity
+                                style={styles.reviewerLoginButton}
+                                onPress={handleReviewerLogin}
+                                disabled={loadingProvider !== null}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={styles.reviewerLoginText}>
+                                    Already have an account?{" "}
+                                    <Text style={styles.reviewerLoginLink}>
+                                        Login
+                                    </Text>
+                                </Text>
+                            </TouchableOpacity>
                         )}
 
                         <TouchableOpacity
@@ -317,7 +342,46 @@ const styles = StyleSheet.create({
     appleButton: {
         width: "100%",
         height: 56,
+    },
 
+    appleButtonWrapper: {
+        borderRadius: 16,
+
+        shadowColor: "#FFFFFF",
+        shadowOffset: {
+            width: 0,
+            height: 0,
+        },
+        shadowOpacity: 0.65,
+        shadowRadius: 12,
+        elevation: 8,
+
+        marginBottom: 12,
+    },
+
+    reviewerLoginButton: {
+        alignSelf: "center",
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        marginBottom: 8,
+    },
+
+    reviewerLoginText: {
+        color: "#FFFFFF",
+        fontSize: 14,
+        fontWeight: "600",
+        textAlign: "center",
+        textShadowColor: "rgba(0, 0, 0, 0.35)",
+        textShadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        textShadowRadius: 3,
+    },
+
+    reviewerLoginLink: {
+        fontWeight: "900",
+        textDecorationLine: "underline",
     },
 
     googleButton: {
@@ -371,20 +435,4 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         textDecorationLine: "underline",
     },
-    appleButtonWrapper: {
-        borderRadius: 16,
-
-        shadowColor: "#FFFFFF",
-        shadowOffset: {
-            width: 0,
-            height: 0,
-        },
-        shadowOpacity: 0.65,
-        shadowRadius: 12,
-        elevation: 8,
-
-        marginBottom: 12,
-    },
-
-
 });
