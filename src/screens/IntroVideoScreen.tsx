@@ -284,7 +284,7 @@ export default function IntroVideoScreen({
                                 styles.loadingText
                             }
                         >
-                            Loading your welcome...
+                            Loading...
                         </Text>
                     </View>
                 )}

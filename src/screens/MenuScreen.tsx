@@ -226,13 +226,7 @@ export default function MenuScreen() {
                             styles.heroTextWrap
                         }
                     >
-                        <Text
-                            style={
-                                styles.heroEyebrow
-                            }
-                        >
-                            SCOOLFOOLS
-                        </Text>
+
 
                         <Text
                             style={

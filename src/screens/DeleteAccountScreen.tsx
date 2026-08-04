@@ -10,6 +10,8 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    Modal,
+    FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -99,10 +101,20 @@ export default function DeleteAccountScreen() {
 
     const [selectedReason, setSelectedReason] =
         useState("");
+    const [reasonModalVisible, setReasonModalVisible] =
+        useState(false);
     const [feedback, setFeedback] = useState("");
     const [confirmationText, setConfirmationText] =
         useState("");
     const [deleting, setDeleting] = useState(false);
+
+    const selectedReasonData = useMemo(
+        () =>
+            DELETE_REASONS.find(
+                (reason) => reason.id === selectedReason
+            ) || null,
+        [selectedReason]
+    );
 
     const canDelete =
         selectedReason.length > 0 &&
@@ -160,12 +172,6 @@ export default function DeleteAccountScreen() {
                     "Your session has expired. Please sign in again."
                 );
             }
-
-            const selectedReasonData =
-                DELETE_REASONS.find(
-                    (reason) =>
-                        reason.id === selectedReason
-                );
 
             const response = await fetch(
                 `${API_BASE_URL}/api/auth/me`,
@@ -248,6 +254,7 @@ export default function DeleteAccountScreen() {
         <SafeAreaView
             style={styles.container}
             edges={[
+                "top",
                 "left",
                 "right",
                 "bottom",
@@ -277,9 +284,6 @@ export default function DeleteAccountScreen() {
                     </TouchableOpacity>
 
                     <View style={styles.headerText}>
-                        <Text style={styles.eyebrow}>
-                            ACCOUNT
-                        </Text>
 
                         <Text style={styles.title}>
                             Delete Account
@@ -341,61 +345,40 @@ export default function DeleteAccountScreen() {
                         ScoolFools.
                     </Text>
 
-                    <View style={styles.reasonList}>
-                        {DELETE_REASONS.map(
-                            (reason) => {
-                                const selected =
-                                    selectedReason ===
-                                    reason.id;
+                    <TouchableOpacity
+                        style={[
+                            styles.reasonDropdown,
+                            selectedReason &&
+                            styles.reasonDropdownSelected,
+                        ]}
+                        activeOpacity={0.84}
+                        onPress={() =>
+                            setReasonModalVisible(true)
+                        }
+                        disabled={deleting}
+                    >
+                        <Text
+                            numberOfLines={1}
+                            style={[
+                                styles.reasonDropdownText,
+                                !selectedReasonData &&
+                                styles.reasonDropdownPlaceholder,
+                            ]}
+                        >
+                            {selectedReasonData?.label ||
+                                "Select a reason"}
+                        </Text>
 
-                                return (
-                                    <TouchableOpacity
-                                        key={reason.id}
-                                        style={[
-                                            styles.reasonRow,
-                                            selected &&
-                                            styles.reasonRowSelected,
-                                        ]}
-                                        activeOpacity={0.82}
-                                        onPress={() =>
-                                            setSelectedReason(
-                                                reason.id
-                                            )
-                                        }
-                                        disabled={
-                                            deleting
-                                        }
-                                    >
-                                        <Text
-                                            style={[
-                                                styles.reasonText,
-                                                selected &&
-                                                styles.reasonTextSelected,
-                                            ]}
-                                        >
-                                            {
-                                                reason.label
-                                            }
-                                        </Text>
-
-                                        <Ionicons
-                                            name={
-                                                selected
-                                                    ? "radio-button-on"
-                                                    : "radio-button-off"
-                                            }
-                                            size={22}
-                                            color={
-                                                selected
-                                                    ? theme.cyan
-                                                    : theme.muted
-                                            }
-                                        />
-                                    </TouchableOpacity>
-                                );
+                        <Ionicons
+                            name="chevron-down"
+                            size={20}
+                            color={
+                                selectedReason
+                                    ? theme.cyan
+                                    : theme.muted
                             }
-                        )}
-                    </View>
+                        />
+                    </TouchableOpacity>
 
                     <Text style={styles.inputLabel}>
                         Additional feedback
@@ -492,6 +475,95 @@ export default function DeleteAccountScreen() {
                         </Text>
                     </TouchableOpacity>
                 </ScrollView>
+
+                <Modal
+                    visible={reasonModalVisible}
+                    animationType="slide"
+                    presentationStyle="pageSheet"
+                    onRequestClose={() =>
+                        setReasonModalVisible(false)
+                    }
+                >
+                    <SafeAreaView
+                        style={styles.modalSafeArea}
+                        edges={[
+                            "top",
+                            "left",
+                            "right",
+                            "bottom",
+                        ]}
+                    >
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity
+                                onPress={() =>
+                                    setReasonModalVisible(false)
+                                }
+                                activeOpacity={0.8}
+                            >
+                                <Text style={styles.modalCancel}>
+                                    Cancel
+                                </Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.modalTitle}>
+                                Why are you leaving?
+                            </Text>
+
+                            <View style={styles.modalHeaderSpacer} />
+                        </View>
+
+                        <FlatList
+                            data={DELETE_REASONS}
+                            keyExtractor={(item) => item.id}
+                            contentContainerStyle={
+                                styles.modalListContent
+                            }
+                            renderItem={({ item }) => {
+                                const selected =
+                                    selectedReason === item.id;
+
+                                return (
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.modalReasonRow,
+                                            selected &&
+                                            styles.modalReasonRowSelected,
+                                        ]}
+                                        activeOpacity={0.82}
+                                        onPress={() => {
+                                            setSelectedReason(item.id);
+                                            setReasonModalVisible(false);
+                                        }}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.modalReasonText,
+                                                selected &&
+                                                styles.modalReasonTextSelected,
+                                            ]}
+                                        >
+                                            {item.label}
+                                        </Text>
+
+                                        <Ionicons
+                                            name={
+                                                selected
+                                                    ? "checkmark-circle"
+                                                    : "ellipse-outline"
+                                            }
+                                            size={22}
+                                            color={
+                                                selected
+                                                    ? theme.cyan
+                                                    : theme.muted
+                                            }
+                                        />
+                                    </TouchableOpacity>
+                                );
+                            }}
+                        />
+                    </SafeAreaView>
+                </Modal>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -511,12 +583,10 @@ const createStyles = (
         },
 
         header: {
-            minHeight: 92,
+            minHeight: 82,
             paddingHorizontal: 18,
-            paddingTop:
-                Platform.OS === "android"
-                    ? 22
-                    : 16,
+            paddingTop: 10,
+            paddingBottom: 12,
             flexDirection: "row",
             alignItems: "center",
         },
@@ -602,39 +672,33 @@ const createStyles = (
             marginBottom: 8,
         },
 
-        reasonList: {
-            marginBottom: 18,
-        },
-
-        reasonRow: {
-            minHeight: 39,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingHorizontal: 12,
-            paddingVertical: 5,
-            borderRadius: 10,
+        reasonDropdown: {
+            minHeight: 52,
+            borderRadius: 14,
             borderWidth: 1,
             borderColor: theme.border,
-            marginBottom: 5,
-        },
-
-        reasonRowSelected: {
-            borderColor: theme.cyan,
             backgroundColor: theme.input,
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 14,
+            marginBottom: 20,
         },
 
-        reasonText: {
+        reasonDropdownSelected: {
+            borderColor: theme.cyan,
+        },
+
+        reasonDropdownText: {
             flex: 1,
             color: theme.text,
-            fontSize: 13,
-            lineHeight: 16,
+            fontSize: 14,
+            lineHeight: 18,
             fontFamily: "Rajdhani_600SemiBold",
-            paddingRight: 8,
+            paddingRight: 10,
         },
 
-        reasonTextSelected: {
-            color: theme.cyan,
+        reasonDropdownPlaceholder: {
+            color: theme.muted,
         },
 
         inputLabel: {
@@ -710,5 +774,73 @@ const createStyles = (
             color: theme.cyan,
             fontSize: 16,
             fontFamily: "Rajdhani_700Bold",
+        },
+
+        modalSafeArea: {
+            flex: 1,
+            backgroundColor: theme.bg,
+        },
+
+        modalHeader: {
+            minHeight: 58,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 18,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+        },
+
+        modalCancel: {
+            color: theme.cyan,
+            fontSize: 15,
+            fontFamily: "Rajdhani_700Bold",
+        },
+
+        modalTitle: {
+            color: theme.text,
+            fontSize: 18,
+            fontFamily: "Rajdhani_700Bold",
+        },
+
+        modalHeaderSpacer: {
+            width: 52,
+        },
+
+        modalListContent: {
+            paddingHorizontal: 18,
+            paddingTop: 12,
+            paddingBottom: 30,
+        },
+
+        modalReasonRow: {
+            minHeight: 56,
+            borderBottomWidth: 1,
+            borderBottomColor: theme.border,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 4,
+        },
+
+        modalReasonRowSelected: {
+            backgroundColor: theme.dangerSoft,
+            borderRadius: 12,
+            borderBottomColor: "transparent",
+            paddingHorizontal: 12,
+            marginVertical: 3,
+        },
+
+        modalReasonText: {
+            flex: 1,
+            color: theme.text,
+            fontSize: 15,
+            lineHeight: 20,
+            fontFamily: "Rajdhani_600SemiBold",
+            paddingRight: 12,
+        },
+
+        modalReasonTextSelected: {
+            color: theme.cyan,
         },
     });

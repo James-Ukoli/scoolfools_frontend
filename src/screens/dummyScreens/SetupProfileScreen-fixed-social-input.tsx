@@ -1743,568 +1743,482 @@ export default function SetupProfileScreen({
                     styles.screen
                 }
             >
-                <ScrollView
-                    ref={
-                        scrollViewRef
-                    }
-                    style={
-                        styles.scrollView
-                    }
-                    contentContainerStyle={[
-                        styles.scrollContent,
-                        {
-                            paddingBottom:
-                                130 +
-                                keyboardHeight,
-                        },
-                    ]}
-                    showsVerticalScrollIndicator={
-                        false
-                    }
-                    keyboardShouldPersistTaps="handled"
-                >
-                    <View
-                        style={
-                            styles.header
+                    <ScrollView
+                        ref={
+                            scrollViewRef
                         }
-                    >
-                        <Text
-                            style={
-                                styles.title
-                            }
-                        >
-                            Create your profile
-                        </Text>
-
-                        <Text
-                            style={
-                                styles.subtitle
-                            }
-                        >
-                            Choose how you will appear on ScoolFools.
-                        </Text>
-                    </View>
-
-                    <View
                         style={
-                            styles.formSection
+                            styles.scrollView
                         }
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            {
+                                paddingBottom:
+                                    130 +
+                                    keyboardHeight,
+                            },
+                        ]}
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+                        keyboardShouldPersistTaps="handled"
                     >
-                        <Text
-                            style={
-                                styles.label
-                            }
-                        >
-                            Choose an avatar
-                        </Text>
-
                         <View
                             style={
-                                styles.avatarGrid
+                                styles.header
                             }
-                        >
-                            {AVATARS.map(
-                                (
-                                    avatar
-                                ) => {
-                                    const isSelected =
-                                        selectedAvatar ===
-                                        avatar.id;
-
-                                    const isLocked =
-                                        Boolean(
-                                            avatar.subscriberOnly
-                                        ) &&
-                                        !isSubscribed;
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={
-                                                avatar.id
-                                            }
-                                            style={[
-                                                styles.avatarButton,
-                                                isLocked &&
-                                                styles.avatarButtonLocked,
-                                                isSelected &&
-                                                styles.avatarButtonSelected,
-                                            ]}
-                                            onPress={() => {
-                                                if (
-                                                    isLocked
-                                                ) {
-                                                    openSubscriberPaywall();
-
-                                                    return;
-                                                }
-
-                                                setSelectedAvatar(
-                                                    avatar.id
-                                                );
-                                            }}
-                                            activeOpacity={
-                                                0.85
-                                            }
-                                            accessibilityRole="button"
-                                            accessibilityLabel={
-                                                isLocked
-                                                    ? "Locked subscriber avatar. Opens subscription options."
-                                                    : "Available profile avatar"
-                                            }
-                                            accessibilityState={{
-                                                selected:
-                                                    isSelected,
-                                            }}
-                                        >
-                                            <Image
-                                                source={
-                                                    avatar.source
-                                                }
-                                                style={[
-                                                    styles.avatarImage,
-                                                    isLocked &&
-                                                    styles.avatarImageLocked,
-                                                ]}
-                                                resizeMode="cover"
-                                            />
-
-                                            {isLocked && (
-                                                <View
-                                                    style={
-                                                        styles.avatarLockBadge
-                                                    }
-                                                >
-                                                    <FontAwesome6
-                                                        name="lock"
-                                                        size={
-                                                            11
-                                                        }
-                                                        color={
-                                                            theme.white
-                                                        }
-                                                    />
-                                                </View>
-                                            )}
-
-                                            {isSelected && (
-                                                <View
-                                                    style={
-                                                        styles.avatarCheck
-                                                    }
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.avatarCheckText
-                                                        }
-                                                    >
-                                                        ✓
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                }
-                            )}
-                        </View>
-                    </View>
-
-                    <View
-                        style={
-                            styles.formSection
-                        }
-                    >
-                        <Text
-                            style={
-                                styles.label
-                            }
-                        >
-                            Username
-                        </Text>
-
-                        <View
-                            style={[
-                                styles.usernameContainer,
-                                usernameError
-                                    ? styles.inputErrorBorder
-                                    : null,
-                            ]}
                         >
                             <Text
                                 style={
-                                    styles.usernameAt
+                                    styles.title
                                 }
                             >
-                                @
+                                Create your profile
                             </Text>
 
-                            <TextInput
+                            <Text
                                 style={
-                                    styles.usernameInput
+                                    styles.subtitle
                                 }
-                                value={
-                                    username
-                                }
-                                onChangeText={
-                                    handleUsernameChange
-                                }
-                                placeholder="username"
-                                placeholderTextColor={
-                                    theme.placeholder
-                                }
-                                autoCapitalize="none"
-                                autoCorrect={
-                                    false
-                                }
-                                maxLength={
-                                    20
-                                }
-                                returnKeyType="done"
-                            />
+                            >
+                                Choose how you will appear on ScoolFools.
+                            </Text>
                         </View>
-
-                        {usernameError ? (
-                            <Text
-                                style={
-                                    styles.errorText
-                                }
-                            >
-                                {
-                                    usernameError
-                                }
-                            </Text>
-                        ) : (
-                            <Text
-                                style={
-                                    styles.helperText
-                                }
-                            >
-                                3 to 20 characters. Letters, numbers, periods, and underscores only.
-                            </Text>
-                        )}
-                    </View>
-
-                    <View
-                        style={
-                            styles.formSection
-                        }
-                    >
-                        <Text
-                            style={
-                                styles.label
-                            }
-                        >
-                            School level
-                        </Text>
 
                         <View
                             style={
-                                styles.optionRow
+                                styles.formSection
                             }
                         >
-                            <TouchableOpacity
-                                style={[
-                                    styles.optionButton,
-                                    schoolLevel ===
-                                    "college" &&
-                                    styles.optionButtonSelected,
-                                ]}
-                                onPress={() =>
-                                    handleSchoolLevelChange(
-                                        "college"
-                                    )
-                                }
-                                activeOpacity={
-                                    0.85
+                            <Text
+                                style={
+                                    styles.label
                                 }
                             >
-                                <Text
-                                    style={
-                                        styles.optionEmoji
-                                    }
-                                >
-                                    🎓
-                                </Text>
+                                Choose an avatar
+                            </Text>
 
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        schoolLevel ===
-                                        "college" &&
-                                        styles.optionTextSelected,
-                                    ]}
-                                >
-                                    College
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    styles.optionButton,
-                                    schoolLevel ===
-                                    "highSchool" &&
-                                    styles.optionButtonSelected,
-                                ]}
-                                onPress={() =>
-                                    handleSchoolLevelChange(
-                                        "highSchool"
-                                    )
-                                }
-                                activeOpacity={
-                                    0.85
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.optionEmoji
-                                    }
-                                >
-                                    🎒
-                                </Text>
-
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        schoolLevel ===
-                                        "highSchool" &&
-                                        styles.optionTextSelected,
-                                    ]}
-                                >
-                                    High School
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {schoolLevel ===
-                        "college" && (
                             <View
                                 style={
-                                    styles.formSection
+                                    styles.avatarGrid
                                 }
+                            >
+                                {AVATARS.map(
+                                    (
+                                        avatar
+                                    ) => {
+                                        const isSelected =
+                                            selectedAvatar ===
+                                            avatar.id;
+
+                                        const isLocked =
+                                            Boolean(
+                                                avatar.subscriberOnly
+                                            ) &&
+                                            !isSubscribed;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={
+                                                    avatar.id
+                                                }
+                                                style={[
+                                                    styles.avatarButton,
+                                                    isLocked &&
+                                                    styles.avatarButtonLocked,
+                                                    isSelected &&
+                                                    styles.avatarButtonSelected,
+                                                ]}
+                                                onPress={() => {
+                                                    if (
+                                                        isLocked
+                                                    ) {
+                                                        openSubscriberPaywall();
+
+                                                        return;
+                                                    }
+
+                                                    setSelectedAvatar(
+                                                        avatar.id
+                                                    );
+                                                }}
+                                                activeOpacity={
+                                                    0.85
+                                                }
+                                                accessibilityRole="button"
+                                                accessibilityLabel={
+                                                    isLocked
+                                                        ? "Locked subscriber avatar. Opens subscription options."
+                                                        : "Available profile avatar"
+                                                }
+                                                accessibilityState={{
+                                                    selected:
+                                                        isSelected,
+                                                }}
+                                            >
+                                                <Image
+                                                    source={
+                                                        avatar.source
+                                                    }
+                                                    style={[
+                                                        styles.avatarImage,
+                                                        isLocked &&
+                                                        styles.avatarImageLocked,
+                                                    ]}
+                                                    resizeMode="cover"
+                                                />
+
+                                                {isLocked && (
+                                                    <View
+                                                        style={
+                                                            styles.avatarLockBadge
+                                                        }
+                                                    >
+                                                        <FontAwesome6
+                                                            name="lock"
+                                                            size={
+                                                                11
+                                                            }
+                                                            color={
+                                                                theme.white
+                                                            }
+                                                        />
+                                                    </View>
+                                                )}
+
+                                                {isSelected && (
+                                                    <View
+                                                        style={
+                                                            styles.avatarCheck
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.avatarCheckText
+                                                            }
+                                                        >
+                                                            ✓
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    }
+                                )}
+                            </View>
+                        </View>
+
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                Username
+                            </Text>
+
+                            <View
+                                style={[
+                                    styles.usernameContainer,
+                                    usernameError
+                                        ? styles.inputErrorBorder
+                                        : null,
+                                ]}
                             >
                                 <Text
                                     style={
-                                        styles.label
+                                        styles.usernameAt
                                     }
                                 >
-                                    College
+                                    @
                                 </Text>
 
-                                <TouchableOpacity
+                                <TextInput
                                     style={
-                                        styles.dropdownButton
+                                        styles.usernameInput
                                     }
-                                    onPress={
-                                        openCollegePicker
+                                    value={
+                                        username
+                                    }
+                                    onChangeText={
+                                        handleUsernameChange
+                                    }
+                                    placeholder="username"
+                                    placeholderTextColor={
+                                        theme.placeholder
+                                    }
+                                    autoCapitalize="none"
+                                    autoCorrect={
+                                        false
+                                    }
+                                    maxLength={
+                                        20
+                                    }
+                                    returnKeyType="done"
+                                />
+                            </View>
+
+                            {usernameError ? (
+                                <Text
+                                    style={
+                                        styles.errorText
+                                    }
+                                >
+                                    {
+                                        usernameError
+                                    }
+                                </Text>
+                            ) : (
+                                <Text
+                                    style={
+                                        styles.helperText
+                                    }
+                                >
+                                    3 to 20 characters. Letters, numbers, periods, and underscores only.
+                                </Text>
+                            )}
+                        </View>
+
+                        <View
+                            style={
+                                styles.formSection
+                            }
+                        >
+                            <Text
+                                style={
+                                    styles.label
+                                }
+                            >
+                                School level
+                            </Text>
+
+                            <View
+                                style={
+                                    styles.optionRow
+                                }
+                            >
+                                <TouchableOpacity
+                                    style={[
+                                        styles.optionButton,
+                                        schoolLevel ===
+                                        "college" &&
+                                        styles.optionButtonSelected,
+                                    ]}
+                                    onPress={() =>
+                                        handleSchoolLevelChange(
+                                            "college"
+                                        )
                                     }
                                     activeOpacity={
                                         0.85
                                     }
                                 >
                                     <Text
-                                        numberOfLines={
-                                            1
+                                        style={
+                                            styles.optionEmoji
                                         }
-                                        style={[
-                                            styles.dropdownText,
-                                            !collegeName &&
-                                            styles.dropdownPlaceholder,
-                                        ]}
                                     >
-                                        {collegeName ||
-                                            "Search for your college"}
+                                        🎓
                                     </Text>
 
                                     <Text
+                                        style={[
+                                            styles.optionText,
+                                            schoolLevel ===
+                                            "college" &&
+                                            styles.optionTextSelected,
+                                        ]}
+                                    >
+                                        College
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.optionButton,
+                                        schoolLevel ===
+                                        "highSchool" &&
+                                        styles.optionButtonSelected,
+                                    ]}
+                                    onPress={() =>
+                                        handleSchoolLevelChange(
+                                            "highSchool"
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
+                                >
+                                    <Text
                                         style={
-                                            styles.dropdownArrow
+                                            styles.optionEmoji
                                         }
                                     >
-                                        ›
+                                        🎒
+                                    </Text>
+
+                                    <Text
+                                        style={[
+                                            styles.optionText,
+                                            schoolLevel ===
+                                            "highSchool" &&
+                                            styles.optionTextSelected,
+                                        ]}
+                                    >
+                                        High School
                                     </Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
+                        </View>
 
-                    {schoolLevel ===
-                        "highSchool" && (
-                            <View
-                                style={
-                                    styles.formSection
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.label
-                                    }
-                                >
-                                    Classification
-                                </Text>
-
+                        {schoolLevel ===
+                            "college" && (
                                 <View
                                     style={
-                                        styles.classificationGrid
+                                        styles.formSection
                                     }
                                 >
-                                    {HIGH_SCHOOL_CLASSIFICATIONS.map(
-                                        (
-                                            classification
-                                        ) => {
-                                            const isSelected =
-                                                highSchoolClassification ===
-                                                classification.value;
-
-                                            return (
-                                                <TouchableOpacity
-                                                    key={
-                                                        classification.value
-                                                    }
-                                                    style={[
-                                                        styles.classificationButton,
-                                                        isSelected &&
-                                                        styles.optionButtonSelected,
-                                                    ]}
-                                                    onPress={() =>
-                                                        setHighSchoolClassification(
-                                                            classification.value
-                                                        )
-                                                    }
-                                                    activeOpacity={
-                                                        0.85
-                                                    }
-                                                >
-                                                    <Text
-                                                        style={[
-                                                            styles.optionText,
-                                                            isSelected &&
-                                                            styles.optionTextSelected,
-                                                        ]}
-                                                    >
-                                                        {
-                                                            classification.label
-                                                        }
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            );
+                                    <Text
+                                        style={
+                                            styles.label
                                         }
-                                    )}
-                                </View>
-                            </View>
-                        )}
+                                    >
+                                        College
+                                    </Text>
 
-                    <View
-                        style={
-                            styles.formSection
-                        }
-                    >
-                        <Text
-                            style={
-                                styles.label
-                            }
-                        >
-                            Are you a student athlete?
-                        </Text>
+                                    <TouchableOpacity
+                                        style={
+                                            styles.dropdownButton
+                                        }
+                                        onPress={
+                                            openCollegePicker
+                                        }
+                                        activeOpacity={
+                                            0.85
+                                        }
+                                    >
+                                        <Text
+                                            numberOfLines={
+                                                1
+                                            }
+                                            style={[
+                                                styles.dropdownText,
+                                                !collegeName &&
+                                                styles.dropdownPlaceholder,
+                                            ]}
+                                        >
+                                            {collegeName ||
+                                                "Search for your college"}
+                                        </Text>
+
+                                        <Text
+                                            style={
+                                                styles.dropdownArrow
+                                            }
+                                        >
+                                            ›
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                        {schoolLevel ===
+                            "highSchool" && (
+                                <View
+                                    style={
+                                        styles.formSection
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.label
+                                        }
+                                    >
+                                        Classification
+                                    </Text>
+
+                                    <View
+                                        style={
+                                            styles.classificationGrid
+                                        }
+                                    >
+                                        {HIGH_SCHOOL_CLASSIFICATIONS.map(
+                                            (
+                                                classification
+                                            ) => {
+                                                const isSelected =
+                                                    highSchoolClassification ===
+                                                    classification.value;
+
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={
+                                                            classification.value
+                                                        }
+                                                        style={[
+                                                            styles.classificationButton,
+                                                            isSelected &&
+                                                            styles.optionButtonSelected,
+                                                        ]}
+                                                        onPress={() =>
+                                                            setHighSchoolClassification(
+                                                                classification.value
+                                                            )
+                                                        }
+                                                        activeOpacity={
+                                                            0.85
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                styles.optionText,
+                                                                isSelected &&
+                                                                styles.optionTextSelected,
+                                                            ]}
+                                                        >
+                                                            {
+                                                                classification.label
+                                                            }
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                );
+                                            }
+                                        )}
+                                    </View>
+                                </View>
+                            )}
 
                         <View
                             style={
-                                styles.optionRow
+                                styles.formSection
                             }
                         >
-                            <TouchableOpacity
-                                style={[
-                                    styles.optionButton,
-                                    isStudentAthlete ===
-                                    true &&
-                                    styles.optionButtonSelected,
-                                ]}
-                                onPress={() =>
-                                    handleAthleteChoice(
-                                        true
-                                    )
-                                }
-                                activeOpacity={
-                                    0.85
+                            <Text
+                                style={
+                                    styles.label
                                 }
                             >
-                                <Text
-                                    style={
-                                        styles.optionEmoji
-                                    }
-                                >
-                                    🏆
-                                </Text>
+                                Are you a student athlete?
+                            </Text>
 
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        isStudentAthlete ===
-                                        true &&
-                                        styles.optionTextSelected,
-                                    ]}
-                                >
-                                    Yes
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    styles.optionButton,
-                                    isStudentAthlete ===
-                                    false &&
-                                    styles.optionButtonSelected,
-                                ]}
-                                onPress={() =>
-                                    handleAthleteChoice(
-                                        false
-                                    )
-                                }
-                                activeOpacity={
-                                    0.85
-                                }
-                            >
-                                <Text
-                                    style={
-                                        styles.optionEmoji
-                                    }
-                                >
-                                    🙌
-                                </Text>
-
-                                <Text
-                                    style={[
-                                        styles.optionText,
-                                        isStudentAthlete ===
-                                        false &&
-                                        styles.optionTextSelected,
-                                    ]}
-                                >
-                                    No
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {isStudentAthlete ===
-                        true && (
                             <View
                                 style={
-                                    styles.formSection
+                                    styles.optionRow
                                 }
                             >
-                                <Text
-                                    style={
-                                        styles.label
-                                    }
-                                >
-                                    Sport
-                                </Text>
-
                                 <TouchableOpacity
-                                    style={
-                                        styles.dropdownButton
-                                    }
+                                    style={[
+                                        styles.optionButton,
+                                        isStudentAthlete ===
+                                        true &&
+                                        styles.optionButtonSelected,
+                                    ]}
                                     onPress={() =>
-                                        setSportModalVisible(
+                                        handleAthleteChoice(
                                             true
                                         )
                                     }
@@ -2313,292 +2227,378 @@ export default function SetupProfileScreen({
                                     }
                                 >
                                     <Text
-                                        numberOfLines={
-                                            1
+                                        style={
+                                            styles.optionEmoji
                                         }
-                                        style={[
-                                            styles.dropdownText,
-                                            !selectedSport &&
-                                            styles.dropdownPlaceholder,
-                                        ]}
                                     >
-                                        {selectedSport ||
-                                            "Select your sport"}
+                                        🏆
                                     </Text>
 
                                     <Text
+                                        style={[
+                                            styles.optionText,
+                                            isStudentAthlete ===
+                                            true &&
+                                            styles.optionTextSelected,
+                                        ]}
+                                    >
+                                        Yes
+                                    </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={[
+                                        styles.optionButton,
+                                        isStudentAthlete ===
+                                        false &&
+                                        styles.optionButtonSelected,
+                                    ]}
+                                    onPress={() =>
+                                        handleAthleteChoice(
+                                            false
+                                        )
+                                    }
+                                    activeOpacity={
+                                        0.85
+                                    }
+                                >
+                                    <Text
                                         style={
-                                            styles.dropdownArrow
+                                            styles.optionEmoji
                                         }
                                     >
-                                        ›
+                                        🙌
+                                    </Text>
+
+                                    <Text
+                                        style={[
+                                            styles.optionText,
+                                            isStudentAthlete ===
+                                            false &&
+                                            styles.optionTextSelected,
+                                        ]}
+                                    >
+                                        No
                                     </Text>
                                 </TouchableOpacity>
                             </View>
-                        )}
+                        </View>
 
-                    <View
-                        style={
-                            styles.formSection
-                        }
-                    >
-                        <Text
-                            style={
-                                styles.label
-                            }
-                        >
-                            Promote your social media with your Dumps
-                        </Text>
+                        {isStudentAthlete ===
+                            true && (
+                                <View
+                                    style={
+                                        styles.formSection
+                                    }
+                                >
+                                    <Text
+                                        style={
+                                            styles.label
+                                        }
+                                    >
+                                        Sport
+                                    </Text>
 
-                        <Text
-                            style={
-                                styles.socialOptionalText
-                            }
-                        >
-                            Optional. Choose one platform to attach to your posts.
-                        </Text>
+                                    <TouchableOpacity
+                                        style={
+                                            styles.dropdownButton
+                                        }
+                                        onPress={() =>
+                                            setSportModalVisible(
+                                                true
+                                            )
+                                        }
+                                        activeOpacity={
+                                            0.85
+                                        }
+                                    >
+                                        <Text
+                                            numberOfLines={
+                                                1
+                                            }
+                                            style={[
+                                                styles.dropdownText,
+                                                !selectedSport &&
+                                                styles.dropdownPlaceholder,
+                                            ]}
+                                        >
+                                            {selectedSport ||
+                                                "Select your sport"}
+                                        </Text>
+
+                                        <Text
+                                            style={
+                                                styles.dropdownArrow
+                                            }
+                                        >
+                                            ›
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
 
                         <View
                             style={
-                                styles.socialPlatformGrid
+                                styles.formSection
                             }
                         >
-                            {SOCIAL_PLATFORMS.map(
-                                (
-                                    platform
-                                ) => {
-                                    const isSelected =
-                                        socialPlatform ===
-                                        platform.value;
-
-                                    return (
-                                        <TouchableOpacity
-                                            key={
-                                                platform.value
-                                            }
-                                            style={[
-                                                styles.socialPlatformButton,
-                                                {
-                                                    backgroundColor:
-                                                        theme.surface,
-                                                },
-                                                isSelected &&
-                                                styles.socialPlatformButtonSelected,
-                                            ]}
-                                            onPress={() =>
-                                                handleSocialPlatformPress(
-                                                    platform.value
-                                                )
-                                            }
-                                            activeOpacity={
-                                                0.85
-                                            }
-                                            accessibilityRole="button"
-                                            accessibilityLabel={
-                                                platform.label
-                                            }
-                                            accessibilityState={{
-                                                selected:
-                                                    isSelected,
-                                            }}
-                                        >
-                                            <FontAwesome6
-                                                name={
-                                                    platform.icon
-                                                }
-                                                size={
-                                                    15
-                                                }
-                                                color={
-                                                    platform.value ===
-                                                        "x" &&
-                                                        themeMode ===
-                                                        "night"
-                                                        ? theme.white
-                                                        : platform.iconColor
-                                                }
-                                            />
-
-                                            {isSelected && (
-                                                <View
-                                                    style={
-                                                        styles.socialSelectedCheck
-                                                    }
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.socialSelectedCheckText
-                                                        }
-                                                    >
-                                                        ✓
-                                                    </Text>
-                                                </View>
-                                            )}
-                                        </TouchableOpacity>
-                                    );
-                                }
-                            )}
-                        </View>
-
-                        {socialPlatform && (
-                            <View
+                            <Text
                                 style={
-                                    styles.socialLinkSection
+                                    styles.label
                                 }
                             >
-                                <Text
+                                Promote your social media with your Dumps
+                            </Text>
+
+                            <Text
+                                style={
+                                    styles.socialOptionalText
+                                }
+                            >
+                                Optional. Choose one platform to attach to your posts.
+                            </Text>
+
+                            <View
+                                style={
+                                    styles.socialPlatformGrid
+                                }
+                            >
+                                {SOCIAL_PLATFORMS.map(
+                                    (
+                                        platform
+                                    ) => {
+                                        const isSelected =
+                                            socialPlatform ===
+                                            platform.value;
+
+                                        return (
+                                            <TouchableOpacity
+                                                key={
+                                                    platform.value
+                                                }
+                                                style={[
+                                                    styles.socialPlatformButton,
+                                                    {
+                                                        backgroundColor:
+                                                            theme.surface,
+                                                    },
+                                                    isSelected &&
+                                                    styles.socialPlatformButtonSelected,
+                                                ]}
+                                                onPress={() =>
+                                                    handleSocialPlatformPress(
+                                                        platform.value
+                                                    )
+                                                }
+                                                activeOpacity={
+                                                    0.85
+                                                }
+                                                accessibilityRole="button"
+                                                accessibilityLabel={
+                                                    platform.label
+                                                }
+                                                accessibilityState={{
+                                                    selected:
+                                                        isSelected,
+                                                }}
+                                            >
+                                                <FontAwesome6
+                                                    name={
+                                                        platform.icon
+                                                    }
+                                                    size={
+                                                        15
+                                                    }
+                                                    color={
+                                                        platform.value ===
+                                                            "x" &&
+                                                            themeMode ===
+                                                            "night"
+                                                            ? theme.white
+                                                            : platform.iconColor
+                                                    }
+                                                />
+
+                                                {isSelected && (
+                                                    <View
+                                                        style={
+                                                            styles.socialSelectedCheck
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.socialSelectedCheckText
+                                                            }
+                                                        >
+                                                            ✓
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </TouchableOpacity>
+                                        );
+                                    }
+                                )}
+                            </View>
+
+                            {socialPlatform && (
+                                <View
                                     style={
-                                        styles.socialLinkLabel
+                                        styles.socialLinkSection
                                     }
                                 >
-                                    {
-                                        SOCIAL_PLATFORMS.find(
-                                            (
-                                                platform
-                                            ) =>
-                                                platform.value ===
-                                                socialPlatform
-                                        )
-                                            ?.label
-                                    }{" "}
-                                    profile link
-                                </Text>
-
-                                <TextInput
-                                    style={[
-                                        styles.socialLinkInput,
-                                        socialMediaError
-                                            ? styles.inputErrorBorder
-                                            : null,
-                                    ]}
-                                    value={
-                                        socialMediaUrl
-                                    }
-                                    onChangeText={(
-                                        value
-                                    ) => {
-                                        setSocialMediaUrl(
-                                            value
-                                        );
-
-                                        setSocialMediaError(
-                                            ""
-                                        );
-                                    }}
-                                    onBlur={
-                                        validateSocialMediaLink
-                                    }
-                                    placeholder={
-                                        SOCIAL_PLATFORMS.find(
-                                            (
-                                                platform
-                                            ) =>
-                                                platform.value ===
-                                                socialPlatform
-                                        )
-                                            ?.placeholder
-                                    }
-                                    placeholderTextColor={
-                                        theme.placeholder
-                                    }
-                                    keyboardType="url"
-                                    onFocus={() => {
-                                        setTimeout(() => {
-                                            scrollViewRef.current?.scrollToEnd({
-                                                animated: true,
-                                            });
-                                        }, 250);
-                                    }}
-                                    autoCapitalize="none"
-                                    autoCorrect={
-                                        false
-                                    }
-                                    returnKeyType="done"
-                                />
-
-                                {socialMediaError ? (
                                     <Text
                                         style={
-                                            styles.errorText
+                                            styles.socialLinkLabel
                                         }
                                     >
                                         {
+                                            SOCIAL_PLATFORMS.find(
+                                                (
+                                                    platform
+                                                ) =>
+                                                    platform.value ===
+                                                    socialPlatform
+                                            )
+                                                ?.label
+                                        }{" "}
+                                        profile link
+                                    </Text>
+
+                                    <TextInput
+                                        style={[
+                                            styles.socialLinkInput,
                                             socialMediaError
+                                                ? styles.inputErrorBorder
+                                                : null,
+                                        ]}
+                                        value={
+                                            socialMediaUrl
                                         }
-                                    </Text>
-                                ) : (
-                                    <Text
-                                        style={
-                                            styles.helperText
+                                        onChangeText={(
+                                            value
+                                        ) => {
+                                            setSocialMediaUrl(
+                                                value
+                                            );
+
+                                            setSocialMediaError(
+                                                ""
+                                            );
+                                        }}
+                                        onBlur={
+                                            validateSocialMediaLink
                                         }
-                                    >
-                                        Paste the full link to your profile or channel.
-                                    </Text>
-                                )}
-                            </View>
-                        )}
-                    </View>
+                                        placeholder={
+                                            SOCIAL_PLATFORMS.find(
+                                                (
+                                                    platform
+                                                ) =>
+                                                    platform.value ===
+                                                    socialPlatform
+                                            )
+                                                ?.placeholder
+                                        }
+                                        placeholderTextColor={
+                                            theme.placeholder
+                                        }
+                                        keyboardType="url"
+                                        onFocus={() => {
+                                            setTimeout(() => {
+                                                scrollViewRef.current?.scrollToEnd({
+                                                    animated: true,
+                                                });
+                                            }, 250);
+                                        }}
+                                        autoCapitalize="none"
+                                        autoCorrect={
+                                            false
+                                        }
+                                        returnKeyType="done"
+                                    />
 
-                    <Text
-                        style={
-                            styles.footerText
-                        }
-                    >
-                        You can update these details later in Account Settings.
-                    </Text>
-                </ScrollView>
+                                    {socialMediaError ? (
+                                        <Text
+                                            style={
+                                                styles.errorText
+                                            }
+                                        >
+                                            {
+                                                socialMediaError
+                                            }
+                                        </Text>
+                                    ) : (
+                                        <Text
+                                            style={
+                                                styles.helperText
+                                            }
+                                        >
+                                            Paste the full link to your profile or channel.
+                                        </Text>
+                                    )}
+                                </View>
+                            )}
+                        </View>
 
-                <View
-                    style={[
-                        styles.bottomContainer,
-                        {
-                            paddingBottom:
-                                Math.max(
-                                    insets.bottom +
-                                    10,
-                                    Platform.OS ===
-                                        "android"
-                                        ? 24
-                                        : 18
-                                ),
-                        },
-                    ]}
-                >
-                    <TouchableOpacity
+                        <Text
+                            style={
+                                styles.footerText
+                            }
+                        >
+                            You can update these details later in Account Settings.
+                        </Text>
+                    </ScrollView>
+
+                    <View
                         style={[
-                            styles.continueButton,
-                            (!canContinue ||
-                                loading) &&
-                            styles.continueButtonDisabled,
+                            styles.bottomContainer,
+                            {
+                                paddingBottom:
+                                    Math.max(
+                                        insets.bottom +
+                                        10,
+                                        Platform.OS ===
+                                            "android"
+                                            ? 24
+                                            : 18
+                                    ),
+                            },
                         ]}
-                        onPress={
-                            handleContinue
-                        }
-                        disabled={
-                            !canContinue ||
-                            loading
-                        }
-                        activeOpacity={
-                            0.88
-                        }
                     >
-                        {loading ? (
-                            <ActivityIndicator
-                                color={
-                                    theme.darkText
-                                }
-                            />
-                        ) : (
-                            <Text
-                                style={
-                                    styles.continueButtonText
-                                }
-                            >
-                                Continue
-                            </Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                        <TouchableOpacity
+                            style={[
+                                styles.continueButton,
+                                (!canContinue ||
+                                    loading) &&
+                                styles.continueButtonDisabled,
+                            ]}
+                            onPress={
+                                handleContinue
+                            }
+                            disabled={
+                                !canContinue ||
+                                loading
+                            }
+                            activeOpacity={
+                                0.88
+                            }
+                        >
+                            {loading ? (
+                                <ActivityIndicator
+                                    color={
+                                        theme.darkText
+                                    }
+                                />
+                            ) : (
+                                <Text
+                                    style={
+                                        styles.continueButtonText
+                                    }
+                                >
+                                    Continue
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    </View>
                 <Modal
                     visible={
                         collegeModalVisible
@@ -2957,12 +2957,18 @@ export default function SetupProfileScreen({
                                 styles.savingTitle
                             }
                         >
-                            {/* {username ||
-                                "ScoolFools user"} */}
-                            Creating Your Profile...
+                            {username ||
+                                "ScoolFools user"}
+                            , your profile is being created
                         </Text>
 
-
+                        <Text
+                            style={
+                                styles.savingSubtitle
+                            }
+                        >
+                            Getting everything ready for you...
+                        </Text>
 
                         <View
                             style={

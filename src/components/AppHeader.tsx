@@ -95,33 +95,48 @@ const getHeaderTheme = (
 ) => {
     const isDay = mode === "day";
 
+    const avatarAccent =
+        selectedAvatar &&
+            AVATAR_BACKGROUND_COLORS[selectedAvatar]
+            ? AVATAR_BACKGROUND_COLORS[selectedAvatar]
+            : HEADER_CYAN;
+
     if (!isDay) {
         return {
             mode,
             background: "#020617",
+
+            // Keep the night header card dark.
             card: "#07111F",
             surface: "#0B1728",
+
+            // The selected avatar only affects the glow and border.
+            glow: avatarAccent,
+            glowOpacity: 0.16,
+            cardBorder: avatarAccent,
+
             icon: "#FFFFFF",
-            cyan: HEADER_CYAN,
+            cyan: "#22D3EE",
             yellow: "#FACC15",
-            border: "rgba(255,255,255,0.09)",
+            border: "rgba(255,255,255,0.08)",
             buttonBorder: "rgba(255,255,255,0.12)",
             activeBackground: "rgba(34,211,238,0.12)",
             activeBorder: "rgba(34,211,238,0.35)",
         };
     }
 
-    const avatarBackground =
-        selectedAvatar &&
-            AVATAR_BACKGROUND_COLORS[selectedAvatar]
-            ? AVATAR_BACKGROUND_COLORS[selectedAvatar]
-            : HEADER_CYAN;
-
     return {
         mode,
         background: "#FFFFFF",
-        card: avatarBackground,
+
+        // Day mode keeps the avatar-colored card.
+        card: avatarAccent,
         surface: "#FFFFFF",
+
+        glow: avatarAccent,
+        glowOpacity: 0,
+        cardBorder: "rgba(7,17,31,0.10)",
+
         icon: "#07111F",
         cyan: HEADER_CYAN,
         yellow: "#FACC15",
@@ -358,6 +373,11 @@ export default function AppHeader() {
                     styles.headerBackground
                 }
             >
+                <View
+                    pointerEvents="none"
+                    style={styles.cardGlow}
+                />
+
                 <View style={styles.card}>
                     <View
                         style={styles.sideLeft}
@@ -535,8 +555,56 @@ const createStyles = (
                 theme.background,
 
             paddingHorizontal: 14,
-            paddingTop: 5,
-            paddingBottom: 5,
+            paddingTop: 8,
+            paddingBottom: 8,
+
+            position: "relative",
+        },
+
+        cardGlow: {
+            position: "absolute",
+
+            left: 18,
+            right: 18,
+            top: 12,
+            bottom: 12,
+
+            borderRadius: 24,
+
+            backgroundColor:
+                theme.glow,
+
+            opacity:
+                theme.glowOpacity,
+
+            transform: [
+                {
+                    scaleX: 1.015,
+                },
+                {
+                    scaleY: 1.08,
+                },
+            ],
+
+            shadowColor:
+                theme.glow,
+
+            shadowOffset: {
+                width: 0,
+                height: 0,
+            },
+
+            shadowOpacity:
+                theme.mode === "night"
+                    ? 0.62
+                    : 0,
+
+            shadowRadius: 18,
+
+            elevation:
+                theme.mode === "night"
+                    ? 5
+                    : 0,
         },
 
         card: {
@@ -556,23 +624,38 @@ const createStyles = (
 
             position: "relative",
 
-            borderWidth: 1,
-            borderColor:
-                theme.border,
+            borderWidth:
+                theme.mode === "night"
+                    ? 0.15
+                    : 1,
 
-            shadowColor: "#000",
+            borderColor:
+                theme.mode === "night"
+                    ? theme.cardBorder
+                    : theme.border,
+
+            shadowColor:
+                theme.mode === "night"
+                    ? theme.glow
+                    : "#000",
 
             shadowOffset: {
                 width: 0,
-                height: 8,
+                height:
+                    theme.mode === "night"
+                        ? 0
+                        : 8,
             },
 
             shadowOpacity:
                 theme.mode === "day"
                     ? 0.12
-                    : 0.14,
+                    : 0.28,
 
-            shadowRadius: 9,
+            shadowRadius:
+                theme.mode === "day"
+                    ? 9
+                    : 14,
 
             elevation: 6,
         },

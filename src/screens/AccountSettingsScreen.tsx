@@ -69,7 +69,7 @@ type HighSchoolClassification =
 type AthleteChoice = boolean | null;
 type SocialPlatform = "instagram" | "x" | "youtube" | "snapchat";
 
-
+const SOCIAL_INPUT_SCROLL_OFFSET = 140;
 
 
 const getAccountSettingsTheme = (mode: TimeTheme) => {
@@ -263,6 +263,10 @@ const normalizeUsername = (value: string) => {
 
 export default function AccountSettingsScreen({ navigation }: any) {
     const insets = useSafeAreaInsets();
+
+    const scrollViewRef = useRef<ScrollView | null>(null);
+    const [keyboardHeight, setKeyboardHeight] = useState(0);
+
     const { mode: themeMode } = useTimeTheme();
     const theme = useMemo(
         () => getAccountSettingsTheme(themeMode),
@@ -273,6 +277,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const [selectedAvatar, setSelectedAvatar] = useState("");
     const [username, setUsername] = useState("");
     const [usernameError, setUsernameError] = useState("");
+    const [avatarError, setAvatarError] = useState("");
+    const [schoolError, setSchoolError] = useState("");
+    const [athleteError, setAthleteError] = useState("");
+    const [sportError, setSportError] = useState("");
+    const [screenError, setScreenError] = useState("");
+    const [loadError, setLoadError] = useState("");
 
     const [schoolLevel, setSchoolLevel] = useState<SchoolLevel | null>(null);
 
@@ -300,7 +310,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const [socialMediaUrl, setSocialMediaUrl] = useState("");
     const [socialMediaError, setSocialMediaError] = useState("");
 
-    const [loading, setLoading] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
     const [initialLoading, setInitialLoading] = useState(true);
     const savingProgress = useRef(new Animated.Value(0)).current;
     const avatarRotation = useRef(new Animated.Value(0)).current;
@@ -319,7 +330,32 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
 
     useEffect(() => {
-        if (!loading) {
+        const showSubscription = Keyboard.addListener(
+            Platform.OS === "ios"
+                ? "keyboardWillShow"
+                : "keyboardDidShow",
+            (event) => {
+                setKeyboardHeight(event.endCoordinates.height);
+            },
+        );
+
+        const hideSubscription = Keyboard.addListener(
+            Platform.OS === "ios"
+                ? "keyboardWillHide"
+                : "keyboardDidHide",
+            () => {
+                setKeyboardHeight(0);
+            },
+        );
+
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!showSuccessAnimation) {
             savingProgress.setValue(0);
             avatarRotation.setValue(0);
             return;
@@ -351,7 +387,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             progressAnimation.stop();
             spinAnimation.stop();
         };
-    }, [avatarRotation, loading, savingProgress]);
+    }, [avatarRotation, savingProgress, showSuccessAnimation]);
 
     const updateStoredSubscriptionState = useCallback(
         async (subscribed: boolean) => {
@@ -675,15 +711,9 @@ export default function AccountSettingsScreen({ navigation }: any) {
             } catch (error: any) {
                 console.log("Account settings load error:", error);
 
-                Alert.alert(
-                    "Unable to Load Profile",
-                    error?.message || "Something went wrong while loading your profile.",
-                    [
-                        {
-                            text: "Go Back",
-                            onPress: () => navigation.goBack(),
-                        },
-                    ],
+                setLoadError(
+                    error?.message ||
+                    "Something went wrong while loading your profile.",
                 );
             } finally {
                 if (isMounted) {
@@ -735,7 +765,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const isUsernameValid = useMemo(() => {
         return (
-            username.length >= 3 &&
+            username.length >= 6 &&
             username.length <= 20 &&
             /^[a-z0-9._]+$/.test(username)
         );
@@ -802,10 +832,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
         setUsername(cleaned);
         setUsernameError("");
+        setScreenError("");
     };
 
     const handleSchoolLevelChange = (level: SchoolLevel) => {
         setSchoolLevel(level);
+        setSchoolError("");
+        setScreenError("");
 
         if (level === "highSchool") {
             setCollegeName("");
@@ -819,6 +852,9 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const handleAthleteChoice = (choice: boolean) => {
         setIsStudentAthlete(choice);
+        setAthleteError("");
+        setSportError("");
+        setScreenError("");
 
         if (!choice) {
             setSelectedSport("");
@@ -836,6 +872,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         setSocialPlatform(platform);
         setSocialMediaUrl("");
         setSocialMediaError("");
+        setScreenError("");
     };
 
     const validateSocialMediaLink = () => {
@@ -872,83 +909,93 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
     const selectCollege = (college: string) => {
         setCollegeName(college);
+        setSchoolError("");
+        setScreenError("");
         setCollegeSearch(college);
         setCollegeModalVisible(false);
         Keyboard.dismiss();
     };
 
     const validateForm = () => {
+        setAvatarError("");
+        setUsernameError("");
+        setSchoolError("");
+        setAthleteError("");
+        setSportError("");
+        setScreenError("");
+
+        let valid = true;
+
         if (!selectedAvatar) {
-            Alert.alert(
-                "Choose an avatar",
-                "Select a ScoolFools avatar to continue.",
-            );
-            return false;
+            setAvatarError("Select a ScoolFools avatar to continue.");
+            valid = false;
         }
 
         if (!username.trim()) {
             setUsernameError("Create a username to continue.");
-            return false;
-        }
-
-        if (username.length < 3) {
-            setUsernameError("Your username must contain at least 3 characters.");
-            return false;
-        }
-
-        if (username.length > 20) {
-            setUsernameError("Your username cannot exceed 20 characters.");
-            return false;
-        }
-
-        if (!/^[a-z0-9._]+$/.test(username)) {
-            setUsernameError("Use only letters, numbers, periods, and underscores.");
-            return false;
+            valid = false;
+        } else if (username.length < 6) {
+            setUsernameError(
+                "Your username must contain at least 6 characters.",
+            );
+            valid = false;
+        } else if (username.length > 20) {
+            setUsernameError(
+                "Your username cannot exceed 20 characters.",
+            );
+            valid = false;
+        } else if (!/^[a-z0-9._]+$/.test(username)) {
+            setUsernameError(
+                "Use only letters, numbers, periods, and underscores.",
+            );
+            valid = false;
         }
 
         if (!schoolLevel) {
-            Alert.alert("Choose your school level", "Select College or High School.");
-            return false;
-        }
-
-        if (schoolLevel === "college" && !COLLEGES.includes(collegeName)) {
-            Alert.alert(
-                "Choose your college",
+            setSchoolError("Select College or High School.");
+            valid = false;
+        } else if (
+            schoolLevel === "college" &&
+            !COLLEGES.includes(collegeName)
+        ) {
+            setSchoolError(
                 "Please select an option from the college list.",
             );
-            return false;
-        }
-
-        if (
+            valid = false;
+        } else if (
             schoolLevel === "highSchool" &&
             !highSchoolClassification
         ) {
-            Alert.alert(
-                "Choose your classification",
+            setSchoolError(
                 "Select Freshman, Sophomore, Junior, or Senior.",
             );
-            return false;
+            valid = false;
         }
 
         if (isStudentAthlete === null) {
-            Alert.alert("Student athlete", "Choose Yes or No to continue.");
-            return false;
+            setAthleteError("Choose Yes or No to continue.");
+            valid = false;
         }
 
         if (isStudentAthlete && !selectedSport) {
-            Alert.alert("Choose your sport", "Select the sport you play.");
-            return false;
+            setSportError("Select the sport you play.");
+            valid = false;
         }
 
         if (!validateSocialMediaLink()) {
-            return false;
+            valid = false;
         }
 
-        return true;
+        return valid;
     };
 
     const handleSaveChanges = async () => {
+        setAvatarError("");
         setUsernameError("");
+        setSchoolError("");
+        setAthleteError("");
+        setSportError("");
+        setScreenError("");
 
         if (!validateForm()) {
             return;
@@ -957,7 +1004,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
         const loadingStartedAt = Date.now();
 
         try {
-            setLoading(true);
+            setSubmitting(true);
 
             if (!API_BASE_URL) {
                 throw new Error("EXPO_PUBLIC_API_BASE_URL is missing.");
@@ -1009,25 +1056,61 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
             if (!response.ok) {
                 const backendMessage =
-                    data?.message || data?.error || "Unable to save your profile.";
+                    data?.message ||
+                    data?.error ||
+                    "Unable to save your profile.";
 
-                const usernameHasError =
+                const usernameErrorCodes = new Set([
+                    "USERNAME_TAKEN",
+                    "USERNAME_REQUIRED",
+                    "USERNAME_TOO_SHORT",
+                    "USERNAME_TOO_LONG",
+                    "USERNAME_INVALID_FORMAT",
+                    "USERNAME_NOT_ALLOWED",
+                    "USERNAME_RESERVED",
+                    "USERNAME_CHANGE_COOLDOWN",
+                ]);
+
+                const schoolErrorCodes = new Set([
+                    "SCHOOL_CHANGE_COOLDOWN",
+                    "SCHOOL_LEVEL_REQUIRED",
+                    "COLLEGE_NAME_REQUIRED",
+                    "HIGH_SCHOOL_CLASSIFICATION_REQUIRED",
+                ]);
+
+                if (
                     response.status === 409 ||
-                    data?.code === "USERNAME_TAKEN" ||
-                    data?.code === "USERNAME_REQUIRED" ||
-                    data?.code === "USERNAME_TOO_SHORT" ||
-                    data?.code === "USERNAME_TOO_LONG" ||
-                    data?.code === "USERNAME_INVALID_FORMAT" ||
-                    data?.code === "USERNAME_NOT_ALLOWED" ||
-                    data?.code === "USERNAME_RESERVED";
-
-                if (usernameHasError) {
-                    setUsernameError(backendMessage || "Please choose another username.");
-
-                    throw new Error("USERNAME_ERROR");
+                    usernameErrorCodes.has(data?.code)
+                ) {
+                    setUsernameError(
+                        backendMessage ||
+                        "Please choose another username.",
+                    );
+                    throw new Error("INLINE_FORM_ERROR");
                 }
 
-                throw new Error(backendMessage);
+                if (schoolErrorCodes.has(data?.code)) {
+                    setSchoolError(backendMessage);
+                    throw new Error("INLINE_FORM_ERROR");
+                }
+
+                if (data?.code === "SPORT_REQUIRED") {
+                    setSportError(backendMessage);
+                    throw new Error("INLINE_FORM_ERROR");
+                }
+
+                if (data?.code === "AVATAR_REQUIRED") {
+                    setAvatarError(backendMessage);
+                    throw new Error("INLINE_FORM_ERROR");
+                }
+
+                if (data?.code === "INVALID_SOCIAL_MEDIA") {
+                    setSocialMediaError(backendMessage);
+                    throw new Error("INLINE_FORM_ERROR");
+                }
+
+                setScreenError(backendMessage);
+                throw new Error("INLINE_FORM_ERROR");
             }
 
             const returnedUser = data?.user || data?.updatedUser || data;
@@ -1068,23 +1151,28 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
             await AsyncStorage.setItem("user", JSON.stringify(userToStore));
 
-            await waitForMinimumLoadingDuration(loadingStartedAt);
-            navigation.goBack();
-        } catch (error: any) {
+            setSubmitting(false);
+            setShowSuccessAnimation(true);
+
             await waitForMinimumLoadingDuration(loadingStartedAt);
 
-            if (error?.message === "USERNAME_ERROR") {
+            setShowSuccessAnimation(false);
+            navigation.goBack();
+        } catch (error: any) {
+            setShowSuccessAnimation(false);
+
+            if (error?.message === "INLINE_FORM_ERROR") {
                 return;
             }
 
             console.log("Account settings update error:", error);
 
-            Alert.alert(
-                "Update Failed",
-                error?.message || "Something went wrong while updating your profile.",
+            setScreenError(
+                error?.message ||
+                "Something went wrong while updating your profile.",
             );
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
@@ -1093,7 +1181,29 @@ export default function AccountSettingsScreen({ navigation }: any) {
             <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
                 <View style={styles.initialLoadingContainer}>
                     <ActivityIndicator size="large" color={theme.cyan} />
-                    <Text style={styles.initialLoadingText}>Loading your profile...</Text>
+                    <Text style={styles.initialLoadingText}>
+                        Loading your profile...
+                    </Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loadError) {
+        return (
+            <SafeAreaView style={styles.safeArea} edges={["left", "right"]}>
+                <View style={styles.initialLoadingContainer}>
+                    <Text style={styles.loadErrorTitle}>
+                        Unable to Load Profile
+                    </Text>
+                    <Text style={styles.loadErrorText}>{loadError}</Text>
+                    <TouchableOpacity
+                        style={styles.loadErrorButton}
+                        onPress={() => navigation.goBack()}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.loadErrorButtonText}>Go Back</Text>
+                    </TouchableOpacity>
                 </View>
             </SafeAreaView>
         );
@@ -1108,8 +1218,14 @@ export default function AccountSettingsScreen({ navigation }: any) {
             >
                 <View style={styles.screen}>
                     <ScrollView
+                        ref={scrollViewRef}
                         style={styles.scrollView}
-                        contentContainerStyle={styles.scrollContent}
+                        contentContainerStyle={[
+                            styles.scrollContent,
+                            {
+                                paddingBottom: 130 + keyboardHeight,
+                            },
+                        ]}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
                     >
@@ -1153,6 +1269,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                                 }
 
                                                 setSelectedAvatar(avatar.id);
+                                                setAvatarError("");
+                                                setScreenError("");
                                             }}
                                             activeOpacity={0.85}
                                             accessibilityRole="button"
@@ -1189,6 +1307,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                     );
                                 })}
                             </View>
+
+                            {avatarError ? (
+                                <Text style={styles.errorText}>
+                                    {avatarError}
+                                </Text>
+                            ) : null}
                         </View>
 
                         <View style={styles.formSection}>
@@ -1219,7 +1343,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 <Text style={styles.errorText}>{usernameError}</Text>
                             ) : (
                                 <Text style={styles.helperText}>
-                                    3 to 20 characters. Letters, numbers, periods, and underscores
+                                    6 to 20 characters. Letters, numbers, periods, and underscores
                                     only.
                                 </Text>
                             )}
@@ -1269,6 +1393,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                     </Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {schoolError && !schoolLevel ? (
+                                <Text style={styles.errorText}>
+                                    {schoolError}
+                                </Text>
+                            ) : null}
                         </View>
 
                         {schoolLevel === "college" && (
@@ -1292,6 +1422,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
                                     <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
+
+                                {schoolError ? (
+                                    <Text style={styles.errorText}>
+                                        {schoolError}
+                                    </Text>
+                                ) : null}
                             </View>
                         )}
 
@@ -1314,11 +1450,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                                         isSelected &&
                                                         styles.optionButtonSelected,
                                                     ]}
-                                                    onPress={() =>
+                                                    onPress={() => {
                                                         setHighSchoolClassification(
                                                             classification.value,
-                                                        )
-                                                    }
+                                                        );
+                                                        setSchoolError("");
+                                                        setScreenError("");
+                                                    }}
                                                     activeOpacity={0.85}
                                                 >
                                                     <Text
@@ -1335,6 +1473,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                         },
                                     )}
                                 </View>
+
+                                {schoolError ? (
+                                    <Text style={styles.errorText}>
+                                        {schoolError}
+                                    </Text>
+                                ) : null}
                             </View>
                         )}
 
@@ -1382,6 +1526,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                     </Text>
                                 </TouchableOpacity>
                             </View>
+
+                            {athleteError ? (
+                                <Text style={styles.errorText}>
+                                    {athleteError}
+                                </Text>
+                            ) : null}
                         </View>
 
                         {isStudentAthlete === true && (
@@ -1405,6 +1555,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
                                     <Text style={styles.dropdownArrow}>›</Text>
                                 </TouchableOpacity>
+
+                                {sportError ? (
+                                    <Text style={styles.errorText}>
+                                        {sportError}
+                                    </Text>
+                                ) : null}
                             </View>
                         )}
 
@@ -1486,6 +1642,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                         }
                                         placeholderTextColor={theme.placeholder}
                                         keyboardType="url"
+                                        onFocus={() => {
+                                            setTimeout(() => {
+                                                scrollViewRef.current?.scrollToEnd({
+                                                    animated: true,
+                                                });
+                                            }, 150);
+                                        }}
                                         autoCapitalize="none"
                                         autoCorrect={false}
                                         returnKeyType="done"
@@ -1501,6 +1664,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 </View>
                             )}
                         </View>
+
+                        {screenError ? (
+                            <Text style={styles.screenErrorText}>
+                                {screenError}
+                            </Text>
+                        ) : null}
 
                         <Text style={styles.footerText}>
                             Your changes will appear across ScoolFools.
@@ -1521,13 +1690,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         <TouchableOpacity
                             style={[
                                 styles.continueButton,
-                                (!canContinue || loading) && styles.continueButtonDisabled,
+                                (!canContinue || submitting) && styles.continueButtonDisabled,
                             ]}
                             onPress={handleSaveChanges}
-                            disabled={!canContinue || loading}
+                            disabled={!canContinue || submitting}
                             activeOpacity={0.88}
                         >
-                            {loading ? (
+                            {submitting ? (
                                 <ActivityIndicator color={theme.darkText} />
                             ) : (
                                 <Text style={styles.continueButtonText}>Save Changes</Text>
@@ -1641,6 +1810,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                     style={styles.modalListItem}
                                     onPress={() => {
                                         setSelectedSport(item);
+                                        setSportError("");
+                                        setScreenError("");
                                         setSportModalVisible(false);
                                     }}
                                     activeOpacity={0.8}
@@ -1658,7 +1829,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
             </KeyboardAvoidingView>
 
             <Modal
-                visible={loading}
+                visible={showSuccessAnimation}
                 transparent
                 animationType="fade"
                 statusBarTranslucent
@@ -1686,12 +1857,9 @@ export default function AccountSettingsScreen({ navigation }: any) {
                         </Animated.View>
 
                         <Text style={styles.savingTitle}>
-                            {username || "ScoolFools user"}, your profile is updating
+                            Profile updating...
                         </Text>
 
-                        <Text style={styles.savingSubtitle}>
-                            Saving your latest profile changes...
-                        </Text>
 
                         <View style={styles.progressTrack}>
                             <Animated.View
@@ -1750,6 +1918,40 @@ const createStyles = (theme: ReturnType<typeof getAccountSettingsTheme>) =>
             fontSize: 15,
             fontWeight: "700",
             marginTop: 12,
+        },
+
+        loadErrorTitle: {
+            color: theme.text,
+            fontSize: 22,
+            lineHeight: 28,
+            fontWeight: "900",
+            textAlign: "center",
+        },
+
+        loadErrorText: {
+            color: theme.error,
+            fontSize: 14,
+            lineHeight: 20,
+            fontWeight: "700",
+            textAlign: "center",
+            marginTop: 10,
+        },
+
+        loadErrorButton: {
+            minWidth: 150,
+            height: 50,
+            borderRadius: 15,
+            backgroundColor: theme.yellow,
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 22,
+            paddingHorizontal: 20,
+        },
+
+        loadErrorButtonText: {
+            color: theme.darkText,
+            fontSize: 15,
+            fontWeight: "900",
         },
 
         safeArea: {
@@ -2092,6 +2294,16 @@ const createStyles = (theme: ReturnType<typeof getAccountSettingsTheme>) =>
             fontSize: 27,
             lineHeight: 27,
             fontWeight: "500",
+        },
+
+        screenErrorText: {
+            color: theme.error,
+            fontSize: 12,
+            lineHeight: 18,
+            fontWeight: "800",
+            textAlign: "center",
+            marginBottom: 10,
+            paddingHorizontal: 12,
         },
 
         footerText: {
