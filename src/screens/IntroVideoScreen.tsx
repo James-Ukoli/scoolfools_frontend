@@ -25,7 +25,7 @@ const API_BASE_URL =
     process.env.EXPO_PUBLIC_API_BASE_URL;
 
 const INTRO_VIDEO_SOURCE: VideoSource = {
-    uri: "https://res.cloudinary.com/djmlovfia/video/upload/v1783975658/v12044gd0000d326l8nog65h5hb8cft0_djyjqa.mp4",
+    uri: "https://res.cloudinary.com/djmlovfia/video/upload/v1785975915/ScoolFoolsPromo2_rxbhbr.mp4",
 
     // Turn this back on later after playback is stable.
     useCaching: false,
@@ -38,6 +38,8 @@ export default function IntroVideoScreen({
     const [loading, setLoading] = useState(false);
     const [videoReady, setVideoReady] = useState(false);
     const [videoError, setVideoError] = useState(false);
+    const [videoEnded, setVideoEnded] = useState(false);
+    const [replaying, setReplaying] = useState(false);
 
     const completionStartedRef = useRef(false);
     const playbackStartedRef = useRef(false);
@@ -93,6 +95,7 @@ export default function IntroVideoScreen({
 
                 setVideoReady(false);
                 setVideoError(true);
+                setVideoEnded(false);
                 setShowSkip(true);
             }
         }
@@ -245,10 +248,55 @@ export default function IntroVideoScreen({
         }
     }, [navigation, player]);
 
+    const handleVideoEnded = useCallback(() => {
+        setVideoEnded(true);
+        setShowSkip(false);
+        setReplaying(false);
+
+        try {
+            player.pause();
+        } catch {
+            // Video has already stopped.
+        }
+    }, [player]);
+
+    const replayVideo = useCallback(async () => {
+        if (replaying || loading) {
+            return;
+        }
+
+        try {
+            setReplaying(true);
+            setVideoEnded(false);
+            setShowSkip(false);
+
+            player.currentTime = 0;
+            player.play();
+
+            setTimeout(() => {
+                setShowSkip(true);
+            }, 5000);
+        } catch (error) {
+            console.log(
+                "Replay video error:",
+                error
+            );
+
+            setVideoEnded(true);
+
+            Alert.alert(
+                "Unable to Replay",
+                "The video could not be replayed. You can still continue."
+            );
+        } finally {
+            setReplaying(false);
+        }
+    }, [loading, player, replaying]);
+
     useEventListener(
         player,
         "playToEnd",
-        completeOnboarding
+        handleVideoEnded
     );
 
     return (
@@ -268,26 +316,28 @@ export default function IntroVideoScreen({
                     allowsPictureInPicture={false}
                 />
 
-                {!videoReady && !videoError && (
-                    <View
-                        style={
-                            styles.loadingOverlay
-                        }
-                    >
-                        <ActivityIndicator
-                            size="large"
-                            color="#FACC15"
-                        />
-
-                        <Text
+                {!videoReady &&
+                    !videoError &&
+                    !videoEnded && (
+                        <View
                             style={
-                                styles.loadingText
+                                styles.loadingOverlay
                             }
                         >
-                            Loading...
-                        </Text>
-                    </View>
-                )}
+                            <ActivityIndicator
+                                size="large"
+                                color="#FACC15"
+                            />
+
+                            <Text
+                                style={
+                                    styles.loadingText
+                                }
+                            >
+                                Loading...
+                            </Text>
+                        </View>
+                    )}
 
                 {videoError && (
                     <View
@@ -301,35 +351,136 @@ export default function IntroVideoScreen({
                             The intro video could not be
                             loaded. You can still continue.
                         </Text>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.continueButton,
+                                loading &&
+                                styles.buttonDisabled,
+                            ]}
+                            onPress={completeOnboarding}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                        >
+                            {loading ? (
+                                <ActivityIndicator
+                                    color="#07111F"
+                                />
+                            ) : (
+                                <Text
+                                    style={
+                                        styles.continueButtonText
+                                    }
+                                >
+                                    Continue
+                                </Text>
+                            )}
+                        </TouchableOpacity>
                     </View>
                 )}
 
-                {showSkip && (
-                    <TouchableOpacity
-                        style={[
-                            styles.skipButton,
-                            loading &&
-                            styles.buttonDisabled,
-                        ]}
-                        onPress={completeOnboarding}
-                        disabled={loading}
-                        activeOpacity={0.85}
-                    >
-                        {loading ? (
-                            <ActivityIndicator
-                                color="#07111F"
-                            />
-                        ) : (
-                            <Text
-                                style={
-                                    styles.skipButtonText
-                                }
-                            >
-                                Skip
+                {videoEnded && !videoError && (
+                    <View style={styles.endedOverlay}>
+                        <View style={styles.endedCard}>
+                            <Text style={styles.endedEmoji}>
+                                🎓
                             </Text>
-                        )}
-                    </TouchableOpacity>
+
+                            <Text style={styles.endedTitle}>
+                                Welcome to ScoolFools
+                            </Text>
+
+                            <Text style={styles.endedText}>
+                                Ready to see what everyone
+                                is talking about?
+                            </Text>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.continueButton,
+                                    loading &&
+                                    styles.buttonDisabled,
+                                ]}
+                                onPress={completeOnboarding}
+                                disabled={
+                                    loading || replaying
+                                }
+                                activeOpacity={0.85}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator
+                                        color="#07111F"
+                                    />
+                                ) : (
+                                    <Text
+                                        style={
+                                            styles.continueButtonText
+                                        }
+                                    >
+                                        Continue
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.replayButton,
+                                    (loading ||
+                                        replaying) &&
+                                    styles.buttonDisabled,
+                                ]}
+                                onPress={replayVideo}
+                                disabled={
+                                    loading || replaying
+                                }
+                                activeOpacity={0.85}
+                            >
+                                {replaying ? (
+                                    <ActivityIndicator
+                                        color="#FFFFFF"
+                                    />
+                                ) : (
+                                    <Text
+                                        style={
+                                            styles.replayButtonText
+                                        }
+                                    >
+                                        Replay Video
+                                    </Text>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 )}
+
+                {showSkip &&
+                    !videoEnded &&
+                    !videoError && (
+                        <TouchableOpacity
+                            style={[
+                                styles.skipButton,
+                                loading &&
+                                styles.buttonDisabled,
+                            ]}
+                            onPress={completeOnboarding}
+                            disabled={loading}
+                            activeOpacity={0.85}
+                        >
+                            {loading ? (
+                                <ActivityIndicator
+                                    color="#07111F"
+                                />
+                            ) : (
+                                <Text
+                                    style={
+                                        styles.skipButtonText
+                                    }
+                                >
+                                    Skip
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    )}
             </View>
         </SafeAreaView>
     );
@@ -389,6 +540,79 @@ const styles = StyleSheet.create({
         fontWeight: "700",
         textAlign: "center",
         marginTop: 10,
+        marginBottom: 28,
+    },
+
+    endedOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(7, 17, 31, 0.94)",
+        paddingHorizontal: 24,
+    },
+
+    endedCard: {
+        width: "100%",
+        maxWidth: 380,
+        alignItems: "center",
+        paddingHorizontal: 24,
+        paddingVertical: 32,
+    },
+
+    endedEmoji: {
+        fontSize: 52,
+        marginBottom: 12,
+    },
+
+    endedTitle: {
+        color: "#FFFFFF",
+        fontSize: 28,
+        fontWeight: "900",
+        textAlign: "center",
+    },
+
+    endedText: {
+        color: "#CBD5E1",
+        fontSize: 15,
+        lineHeight: 22,
+        fontWeight: "700",
+        textAlign: "center",
+        marginTop: 10,
+        marginBottom: 28,
+    },
+
+    continueButton: {
+        width: "100%",
+        height: 54,
+        borderRadius: 27,
+        backgroundColor: "#FACC15",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+    },
+
+    continueButtonText: {
+        color: "#07111F",
+        fontSize: 17,
+        fontWeight: "900",
+    },
+
+    replayButton: {
+        width: "100%",
+        height: 54,
+        borderRadius: 27,
+        borderWidth: 2,
+        borderColor: "#FFFFFF",
+        alignItems: "center",
+        justifyContent: "center",
+        paddingHorizontal: 24,
+        marginTop: 14,
+    },
+
+    replayButtonText: {
+        color: "#FFFFFF",
+        fontSize: 16,
+        fontWeight: "900",
     },
 
     skipButton: {

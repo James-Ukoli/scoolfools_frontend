@@ -13,6 +13,7 @@ import {
     Image,
     Keyboard,
     KeyboardAvoidingView,
+    Linking,
     Modal,
     Platform,
     Pressable,
@@ -23,7 +24,6 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
@@ -31,6 +31,7 @@ import {
 } from "react-native-safe-area-context";
 
 import Ionicons from "@expo/vector-icons/Ionicons";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 
 import {
     s,
@@ -268,6 +269,10 @@ const getCommentsTheme = (
             highlight:
                 "rgba(6,182,212,0.16)",
             blueCheck: "#1D9BF0",
+            freshman: "#16A34A",
+            sophomore: "#DC2626",
+            junior: "#EA580C",
+            senior: "#2563EB",
             danger: "#DC2626",
             backdrop:
                 "rgba(2,6,23,0.45)",
@@ -287,6 +292,10 @@ const getCommentsTheme = (
         highlight:
             "rgba(34,211,238,0.18)",
         blueCheck: "#1D9BF0",
+        freshman: "#4ADE80",
+        sophomore: "#F87171",
+        junior: "#FB923C",
+        senior: "#60A5FA",
         danger: "#F87171",
         backdrop:
             "rgba(0,0,0,0.72)",
@@ -392,6 +401,104 @@ const getTimeAgo = (
         );
 
     return `${weeks}w`;
+};
+
+/*
+|--------------------------------------------------------------------------
+| Student Context and Social Helpers
+|--------------------------------------------------------------------------
+*/
+
+const getClassificationColor = (
+    classification: string | null | undefined,
+    theme: ReturnType<typeof getCommentsTheme>
+) => {
+    switch (
+    classification
+        ?.trim()
+        .toLowerCase()
+    ) {
+        case "freshman":
+            return theme.freshman;
+
+        case "sophomore":
+            return theme.sophomore;
+
+        case "junior":
+            return theme.junior;
+
+        case "senior":
+            return theme.senior;
+
+        default:
+            return theme.muted;
+    }
+};
+
+const getClassificationLabel = (
+    classification?: string | null
+) => {
+    if (!classification) {
+        return "High School Student";
+    }
+
+    const normalized =
+        classification
+            .trim()
+            .toLowerCase();
+
+    return (
+        normalized
+            .charAt(0)
+            .toUpperCase() +
+        normalized.slice(1)
+    );
+};
+
+const getSocialIcon = (
+    platform?: string | null
+):
+    | "instagram"
+    | "x-twitter"
+    | "youtube"
+    | "snapchat" => {
+    if (platform === "x") {
+        return "x-twitter";
+    }
+
+    if (
+        platform === "instagram" ||
+        platform === "youtube" ||
+        platform === "snapchat"
+    ) {
+        return platform;
+    }
+
+    return "instagram";
+};
+
+const getSocialIconColor = (
+    platform: string | null | undefined,
+    isNight: boolean
+) => {
+    switch (platform) {
+        case "instagram":
+            return "#E4405F";
+
+        case "youtube":
+            return "#FF0000";
+
+        case "snapchat":
+            return "#F2DE00";
+
+        case "x":
+            return isNight
+                ? "#FFFFFF"
+                : "#000000";
+
+        default:
+            return "#64748B";
+    }
 };
 
 /*
@@ -1502,6 +1609,39 @@ export default function DumpCommentsModal({
                 )
                 : null;
 
+        const isCollegeAuthor =
+            author?.schoolLevel ===
+            "college";
+
+        const isHighSchoolAuthor =
+            author?.schoolLevel ===
+            "highSchool";
+
+        const studentContext =
+            isCollegeAuthor
+                ? author?.collegeName ||
+                "College Student"
+                : isHighSchoolAuthor
+                    ? getClassificationLabel(
+                        author?.highSchoolClassification
+                    )
+                    : null;
+
+        const studentContextColor =
+            isHighSchoolAuthor
+                ? getClassificationColor(
+                    author?.highSchoolClassification,
+                    theme
+                )
+                : theme.muted;
+
+        const showSocialMedia =
+            Boolean(
+                author?.isSubscribed &&
+                author?.socialMediaPlatform &&
+                author?.socialMediaUrl
+            );
+
         const heartCount =
             item.reactions
                 ?.heart?.length ||
@@ -1543,6 +1683,46 @@ export default function DumpCommentsModal({
         const isHighlighted =
             highlightedCommentId ===
             String(item._id);
+
+        const handleOpenCommentSocial =
+            async () => {
+                const socialUrl =
+                    author?.socialMediaUrl;
+
+                if (!socialUrl) {
+                    return;
+                }
+
+                try {
+                    const supported =
+                        await Linking.canOpenURL(
+                            socialUrl
+                        );
+
+                    if (!supported) {
+                        Alert.alert(
+                            "Unable to Open Link",
+                            "This social media link could not be opened."
+                        );
+
+                        return;
+                    }
+
+                    await Linking.openURL(
+                        socialUrl
+                    );
+                } catch (error) {
+                    console.log(
+                        "Open comment social link error:",
+                        error
+                    );
+
+                    Alert.alert(
+                        "Unable to Open Link",
+                        "Something went wrong while opening this profile."
+                    );
+                }
+            };
 
         return (
             <View
@@ -1598,52 +1778,109 @@ export default function DumpCommentsModal({
                     >
                         <View
                             style={
-                                styles.commentUsernameRow
+                                styles.commentIdentityBlock
                             }
                         >
-                            <Text
-                                numberOfLines={
-                                    1
+                            <View
+                                style={
+                                    styles.commentUsernameRow
                                 }
-                                style={[
-                                    styles.commentUsername,
-                                    {
-                                        color:
-                                            theme.text,
-                                    },
-                                ]}
                             >
-                                @
-                                {author
-                                    ?.username ||
-                                    author
-                                        ?.display_name ||
-                                    "student"}
-                            </Text>
-
-                            {author?.isSubscribed && (
-                                <Ionicons
-                                    name="checkmark-circle"
-                                    size={
-                                        13
-                                    }
-                                    color={
-                                        theme.blueCheck
-                                    }
-                                />
-                            )}
-
-                            {athleteEmoji && (
                                 <Text
-                                    style={
-                                        styles.athleteEmoji
-                                    }
+                                    numberOfLines={1}
+                                    style={[
+                                        styles.commentUsername,
+                                        {
+                                            color:
+                                                theme.text,
+                                        },
+                                    ]}
                                 >
-                                    {
-                                        athleteEmoji
-                                    }
+                                    @
+                                    {author
+                                        ?.username ||
+                                        author
+                                            ?.display_name ||
+                                        "student"}
                                 </Text>
-                            )}
+
+                                {author?.isSubscribed && (
+                                    <Text
+                                        accessibilityLabel="Subscriber"
+                                        style={
+                                            styles.subscriberDiamond
+                                        }
+                                    >
+                                        💎
+                                    </Text>
+                                )}
+
+                                {athleteEmoji && (
+                                    <Text
+                                        style={
+                                            styles.athleteEmoji
+                                        }
+                                    >
+                                        {athleteEmoji}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {(studentContext ||
+                                showSocialMedia) && (
+                                    <View
+                                        style={
+                                            styles.commentContextRow
+                                        }
+                                    >
+                                        {studentContext && (
+                                            <Text
+                                                numberOfLines={1}
+                                                style={[
+                                                    styles.commentStudentContext,
+                                                    {
+                                                        color:
+                                                            studentContextColor,
+                                                    },
+                                                ]}
+                                            >
+                                                {studentContext}
+                                            </Text>
+                                        )}
+
+                                        {showSocialMedia && (
+                                            <TouchableOpacity
+                                                activeOpacity={0.68}
+                                                onPress={
+                                                    handleOpenCommentSocial
+                                                }
+                                                style={
+                                                    styles.commentSocialButton
+                                                }
+                                            >
+                                                <FontAwesome6
+                                                    name={getSocialIcon(
+                                                        author?.socialMediaPlatform
+                                                    )}
+                                                    size={11}
+                                                    color={getSocialIconColor(
+                                                        author?.socialMediaPlatform,
+                                                        mode ===
+                                                        "night"
+                                                    )}
+                                                />
+
+                                                <Ionicons
+                                                    name="open-outline"
+                                                    size={10}
+                                                    color={
+                                                        theme.muted
+                                                    }
+                                                />
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )}
                         </View>
 
                         <View
@@ -2529,6 +2766,12 @@ const styles =
             minHeight: 20,
         },
 
+        commentIdentityBlock: {
+            flex: 1,
+            minWidth: 0,
+            flexShrink: 1,
+        },
+
         commentUsernameRow: {
             flexDirection: "row",
             alignItems: "center",
@@ -2544,10 +2787,41 @@ const styles =
                 "Rajdhani_700Bold",
         },
 
+        subscriberDiamond: {
+            marginLeft: s(1),
+            fontSize: ms(10.5),
+            lineHeight: ms(14),
+        },
+
         athleteEmoji: {
             marginLeft: s(1),
             fontSize: ms(12),
             lineHeight: ms(15),
+        },
+
+        commentContextRow: {
+            minWidth: 0,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: s(7),
+            marginTop: 1,
+        },
+
+        commentStudentContext: {
+            flexShrink: 1,
+            fontSize: ms(9.5),
+            lineHeight: ms(12),
+            fontWeight: "800",
+        },
+
+        commentSocialButton: {
+            minWidth: s(28),
+            minHeight: vs(20),
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: s(3),
+            paddingHorizontal: s(3),
         },
 
         commentTopRight: {

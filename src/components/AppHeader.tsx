@@ -8,6 +8,7 @@ import React, {
 import {
     Image,
     ImageSourcePropType,
+    Platform,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -42,6 +43,11 @@ import {
 } from "../context/TimeThemeContext";
 
 const HEADER_CYAN = "#06B6D4";
+
+const API_BASE_URL =
+    Platform.OS === "android"
+        ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
+        : process.env.EXPO_PUBLIC_API_BASE_URL;
 
 type StoredUser = {
     selectedAvatar?: string | null;
@@ -127,7 +133,7 @@ const getHeaderTheme = (
 
     return {
         mode,
-        background: "#FFFFFF",
+        background: "#F8FAFC",
 
         // Day mode keeps the avatar-colored card.
         card: avatarAccent,
@@ -176,6 +182,12 @@ export default function AppHeader() {
     const [userLoaded, setUserLoaded] =
         useState(false);
 
+    const [isSubscribed, setIsSubscribed] =
+        useState(false);
+
+    const [entitlementsLoaded, setEntitlementsLoaded] =
+        useState(false);
+
     /*
     |--------------------------------------------------------------------------
     | Selected Avatar
@@ -183,19 +195,35 @@ export default function AppHeader() {
     */
 
     const selectedAvatarId = useMemo(() => {
-        if (user?.selectedAvatar) {
+        if (!entitlementsLoaded) {
+            return null;
+        }
+
+        if (!isSubscribed) {
+            return "basicBlue";
+        }
+
+        if (
+            user?.selectedAvatar &&
+            AVATAR_IMAGES[user.selectedAvatar]
+        ) {
             return user.selectedAvatar;
         }
 
         if (
             user?.avatar &&
-            !user.avatar.startsWith("http")
+            !user.avatar.startsWith("http") &&
+            AVATAR_IMAGES[user.avatar]
         ) {
             return user.avatar;
         }
 
-        return null;
-    }, [user]);
+        return "basicBlue";
+    }, [
+        entitlementsLoaded,
+        isSubscribed,
+        user,
+    ]);
 
     /*
     |--------------------------------------------------------------------------
@@ -257,6 +285,63 @@ export default function AppHeader() {
         []
     );
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Load Subscription Entitlement
+    |--------------------------------------------------------------------------
+    */
+
+    const loadSubscriptionEntitlement = useCallback(
+        async () => {
+            try {
+                const token =
+                    await AsyncStorage.getItem(
+                        "token"
+                    );
+
+                if (!token || !API_BASE_URL) {
+                    setIsSubscribed(false);
+                    return;
+                }
+
+                const response = await fetch(
+                    `${API_BASE_URL}/api/auth/me/entitlements`,
+                    {
+                        method: "GET",
+                        headers: {
+                            Authorization:
+                                `Bearer ${token}`,
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    setIsSubscribed(false);
+                    return;
+                }
+
+                const data =
+                    await response.json();
+
+                setIsSubscribed(
+                    data?.success === true &&
+                    data?.entitlements?.isSubscribed === true
+                );
+            } catch (error) {
+                console.log(
+                    "Header entitlement load error:",
+                    error
+                );
+
+                setIsSubscribed(false);
+            } finally {
+                setEntitlementsLoaded(true);
+            }
+        },
+        []
+    );
+
     /*
     |--------------------------------------------------------------------------
     | Initial Load
@@ -265,7 +350,11 @@ export default function AppHeader() {
 
     useEffect(() => {
         loadStoredUser();
-    }, [loadStoredUser]);
+        loadSubscriptionEntitlement();
+    }, [
+        loadStoredUser,
+        loadSubscriptionEntitlement,
+    ]);
 
     /*
     |--------------------------------------------------------------------------
@@ -279,6 +368,7 @@ export default function AppHeader() {
                 "state",
                 () => {
                     loadStoredUser();
+                    loadSubscriptionEntitlement();
                 }
             );
 
@@ -286,6 +376,7 @@ export default function AppHeader() {
     }, [
         navigation,
         loadStoredUser,
+        loadSubscriptionEntitlement,
     ]);
 
     /*
@@ -296,8 +387,14 @@ export default function AppHeader() {
 
     useFocusEffect(
         useCallback(() => {
+            loadStoredUser();
+            loadSubscriptionEntitlement();
             refreshUnreadCount();
-        }, [refreshUnreadCount])
+        }, [
+            loadStoredUser,
+            loadSubscriptionEntitlement,
+            refreshUnreadCount,
+        ])
     );
 
     /*
@@ -312,12 +409,16 @@ export default function AppHeader() {
             : null;
 
     const remoteAvatarUrl =
-        user?.providerAvatar ||
-        (
-            user?.avatar?.startsWith("http")
-                ? user.avatar
-                : null
-        );
+        isSubscribed
+            ? (
+                user?.providerAvatar ||
+                (
+                    user?.avatar?.startsWith("http")
+                        ? user.avatar
+                        : null
+                )
+            )
+            : null;
 
     /*
     |--------------------------------------------------------------------------
@@ -396,7 +497,7 @@ export default function AppHeader() {
                                 )
                             }
                         >
-                            {!userLoaded ? (
+                            {!userLoaded || !entitlementsLoaded ? (
                                 <View
                                     style={
                                         styles.avatarPlaceholder
@@ -546,13 +647,11 @@ const createStyles = (
 ) =>
     StyleSheet.create({
         safeArea: {
-            backgroundColor:
-                theme.background,
+            backgroundColor: theme.background,
         },
 
         headerBackground: {
-            backgroundColor:
-                theme.background,
+            backgroundColor: theme.background,
 
             paddingHorizontal: 14,
             paddingTop: 8,
@@ -571,11 +670,9 @@ const createStyles = (
 
             borderRadius: 24,
 
-            backgroundColor:
-                theme.glow,
+            backgroundColor: theme.glow,
 
-            opacity:
-                theme.glowOpacity,
+            opacity: theme.glowOpacity,
 
             transform: [
                 {
@@ -586,8 +683,7 @@ const createStyles = (
                 },
             ],
 
-            shadowColor:
-                theme.glow,
+            shadowColor: theme.glow,
 
             shadowOffset: {
                 width: 0,
@@ -610,15 +706,13 @@ const createStyles = (
         card: {
             height: 68,
 
-            backgroundColor:
-                theme.card,
+            backgroundColor: theme.card,
 
             borderRadius: 20,
 
             flexDirection: "row",
             alignItems: "center",
-            justifyContent:
-                "space-between",
+            justifyContent: "space-between",
 
             paddingHorizontal: 16,
 
@@ -632,32 +726,33 @@ const createStyles = (
             borderColor:
                 theme.mode === "night"
                     ? theme.cardBorder
-                    : theme.border,
+                    : "rgba(7,17,31,0.06)",
 
+            // No shadow during the day.
             shadowColor:
                 theme.mode === "night"
                     ? theme.glow
-                    : "#000",
+                    : "transparent",
 
             shadowOffset: {
                 width: 0,
-                height:
-                    theme.mode === "night"
-                        ? 0
-                        : 8,
+                height: 0,
             },
 
             shadowOpacity:
-                theme.mode === "day"
-                    ? 0.12
-                    : 0.28,
+                theme.mode === "night"
+                    ? 0.28
+                    : 0,
 
             shadowRadius:
-                theme.mode === "day"
-                    ? 9
-                    : 14,
+                theme.mode === "night"
+                    ? 14
+                    : 0,
 
-            elevation: 6,
+            elevation:
+                theme.mode === "night"
+                    ? 6
+                    : 0,
         },
 
         sideLeft: {
@@ -688,18 +783,15 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor:
-                theme.surface,
+            backgroundColor: theme.surface,
 
             borderWidth: 1.5,
 
-            borderColor:
-                theme.buttonBorder,
+            borderColor: theme.buttonBorder,
 
             overflow: "hidden",
 
-            shadowColor:
-                theme.cyan,
+            shadowColor: theme.cyan,
 
             shadowOffset: {
                 width: 0,
@@ -774,16 +866,13 @@ const createStyles = (
             alignItems: "center",
             justifyContent: "center",
 
-            backgroundColor:
-                theme.surface,
+            backgroundColor: theme.surface,
 
             borderWidth: 1,
 
-            borderColor:
-                theme.buttonBorder,
+            borderColor: theme.buttonBorder,
 
-            shadowColor:
-                theme.cyan,
+            shadowColor: theme.cyan,
 
             shadowOffset: {
                 width: 0,
@@ -797,19 +886,15 @@ const createStyles = (
         },
 
         iconButtonActive: {
-            backgroundColor:
-                theme.activeBackground,
+            backgroundColor: theme.activeBackground,
 
-            borderColor:
-                theme.activeBorder,
+            borderColor: theme.activeBorder,
         },
 
         iconButtonFullyActive: {
-            backgroundColor:
-                theme.yellow,
+            backgroundColor: theme.yellow,
 
-            borderColor:
-                theme.yellow,
+            borderColor: theme.yellow,
         },
 
         unreadBadge: {
@@ -831,8 +916,7 @@ const createStyles = (
             backgroundColor: "#EF4444",
 
             borderWidth: 2,
-            borderColor:
-                theme.card,
+            borderColor: theme.card,
 
             zIndex: 20,
 

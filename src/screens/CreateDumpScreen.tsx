@@ -174,8 +174,8 @@ export default function CreateDumpScreen() {
         useState<DailyLimitState>({
             allowed: true,
             used: 0,
-            remaining: 2,
-            dailyLimit: 2,
+            remaining: 1,
+            dailyLimit: 1,
         });
 
     const [loadingLimit, setLoadingLimit] =
@@ -425,7 +425,12 @@ export default function CreateDumpScreen() {
                 0
             );
 
-        return `🗑️ ${remaining} of ${dailyLimit.dailyLimit} dumps remaining today`;
+        const dumpWord =
+            remaining === 1
+                ? "dump"
+                : "dumps";
+
+        return `🗑️ ${remaining} of ${dailyLimit.dailyLimit} ${dumpWord} remaining today`;
     };
 
     /*
@@ -560,7 +565,7 @@ export default function CreateDumpScreen() {
                             editable={
                                 submissionStage === "idle"
                             }
-                            placeholder="What’s going on at school?"
+                            placeholder="Dump it.."
                             placeholderTextColor={theme.muted}
                             multiline
                             maxLength={MAX_CHARACTERS}
@@ -693,7 +698,7 @@ export default function CreateDumpScreen() {
                         </Text>
                     </TouchableOpacity>
 
-                    {dailyLimit.dailyLimit === 2 && (
+                    {dailyLimit.dailyLimit === 1 && (
                         <Text style={styles.subscribeText}>
                             Subscribers can post 5 dumps each day.
                         </Text>

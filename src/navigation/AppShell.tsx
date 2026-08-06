@@ -16,31 +16,37 @@ const AppStack = createNativeStackNavigator();
 
 export default function AppShell() {
     const { isDark } = useTimeTheme();
+
     const shellBackground = isDark
         ? "#020617"
-        : "#FFFFFF";
+        : "#F8FAFC";
 
     return (
         <View
             style={[
                 styles.container,
                 {
-                    backgroundColor:
-                        shellBackground,
+                    backgroundColor: shellBackground,
                 },
             ]}
         >
             <AppHeader />
 
-            <View style={styles.content}>
+            <View
+                style={[
+                    styles.content,
+                    {
+                        backgroundColor: shellBackground,
+                    },
+                ]}
+            >
                 <AppStack.Navigator
                     initialRouteName="BottomTabs"
                     screenOptions={{
                         headerShown: false,
                         animation: "none",
                         contentStyle: {
-                            backgroundColor:
-                                shellBackground,
+                            backgroundColor: shellBackground,
                         },
                     }}
                 >
@@ -56,9 +62,7 @@ export default function AppShell() {
 
                     <AppStack.Screen
                         name="AccountSettings"
-                        component={
-                            AccountSettingsScreen
-                        }
+                        component={AccountSettingsScreen}
                     />
 
                     <AppStack.Screen
@@ -68,9 +72,7 @@ export default function AppShell() {
 
                     <AppStack.Screen
                         name="Notifications"
-                        component={
-                            NotificationsScreen
-                        }
+                        component={NotificationsScreen}
                     />
 
                     <AppStack.Screen
@@ -87,6 +89,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
     },
+
     content: {
         flex: 1,
     },

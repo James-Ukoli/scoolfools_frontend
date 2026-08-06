@@ -2,6 +2,7 @@ import React, {
     useEffect,
     useMemo,
     useRef,
+    useState,
 } from "react";
 
 import {
@@ -52,6 +53,40 @@ const ACTIVE_ICON_SCALE = 1.12;
 
 /*
 |--------------------------------------------------------------------------
+| Student Dump Release Date
+|--------------------------------------------------------------------------
+|
+| JavaScript months begin at zero:
+| 7 = August
+|
+| The Student Dump will unlock at midnight on August 24, 2026,
+| based on the user's local device time.
+|
+*/
+
+const STUDENT_DUMP_RELEASE_DATE =
+    new Date(
+        2026,
+        7,
+        24,
+        0,
+        0,
+        0,
+    );
+
+/*
+|--------------------------------------------------------------------------
+| Professor Fools Image
+|--------------------------------------------------------------------------
+|
+| Update this require path only if your Professor Fools image is stored
+| somewhere else in your project.
+|
+*/
+
+
+/*
+|--------------------------------------------------------------------------
 | Theme
 |--------------------------------------------------------------------------
 */
@@ -84,6 +119,18 @@ const getTabTheme = (
 
             shadow:
                 "rgba(15,23,42,0.16)",
+
+            toastBackground:
+                "rgba(7,17,31,0.97)",
+
+            toastBorder:
+                "rgba(6,182,212,0.65)",
+
+            toastText:
+                "#FFFFFF",
+
+            toastMuted:
+                "#CBD5E1",
         };
     }
 
@@ -111,6 +158,18 @@ const getTabTheme = (
 
         shadow:
             "rgba(0,0,0,0.40)",
+
+        toastBackground:
+            "rgba(9,13,20,0.98)",
+
+        toastBorder:
+            "rgba(34,211,238,0.70)",
+
+        toastText:
+            "#FFFFFF",
+
+        toastMuted:
+            "#CBD5E1",
     };
 };
 
@@ -233,6 +292,7 @@ function AnimatedTabItem({
     focused,
     navigation,
     theme,
+    onLockedDumpPress,
 }: {
     route: any;
     focused: boolean;
@@ -242,6 +302,9 @@ function AnimatedTabItem({
     ReturnType<
         typeof getTabTheme
     >;
+
+    onLockedDumpPress:
+    () => void;
 }) {
     const scale =
         useRef(
@@ -315,6 +378,31 @@ function AnimatedTabItem({
 
     const onPress =
         () => {
+            /*
+            |--------------------------------------------------------------------------
+            | Block Student Dump Before Release Date
+            |--------------------------------------------------------------------------
+            */
+
+            const dumpIsLocked =
+                isDump &&
+                new Date() <
+                STUDENT_DUMP_RELEASE_DATE;
+
+            if (
+                dumpIsLocked
+            ) {
+                onLockedDumpPress();
+
+                return;
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Normal Tab Navigation
+            |--------------------------------------------------------------------------
+            */
+
             const event =
                 navigation.emit({
                     type:
@@ -447,6 +535,7 @@ function AnimatedTabItem({
 function AnimatedTabBar({
     state,
     navigation,
+    onLockedDumpPress,
 }: any) {
     const insets =
         useSafeAreaInsets();
@@ -605,6 +694,9 @@ function AnimatedTabBar({
                             theme={
                                 theme
                             }
+                            onLockedDumpPress={
+                                onLockedDumpPress
+                            }
                         />
                     );
                 }
@@ -620,9 +712,143 @@ function AnimatedTabBar({
 */
 
 export default function BottomTabs() {
+    const insets =
+        useSafeAreaInsets();
+
     const {
         isDark,
+        mode,
     } = useTimeTheme();
+
+    const theme =
+        useMemo(
+            () =>
+                getTabTheme(
+                    mode
+                ),
+            [
+                mode,
+            ]
+        );
+
+    const toastAnim =
+        useRef(
+            new Animated.Value(
+                0
+            )
+        ).current;
+
+    const toastTimeoutRef =
+        useRef<
+            ReturnType<
+                typeof setTimeout
+            > |
+            null
+        >(null);
+
+    const [
+        toastVisible,
+        setToastVisible,
+    ] =
+        useState(false);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clean Up Toast Timer
+    |--------------------------------------------------------------------------
+    */
+
+    useEffect(() => {
+        return () => {
+            if (
+                toastTimeoutRef.current
+            ) {
+                clearTimeout(
+                    toastTimeoutRef.current
+                );
+            }
+
+            toastAnim.stopAnimation();
+        };
+    }, [
+        toastAnim,
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Show Student Dump Release Toast
+    |--------------------------------------------------------------------------
+    */
+
+    const showDumpReleaseToast =
+        () => {
+            if (
+                toastTimeoutRef.current
+            ) {
+                clearTimeout(
+                    toastTimeoutRef.current
+                );
+
+                toastTimeoutRef.current =
+                    null;
+            }
+
+            toastAnim.stopAnimation();
+
+            toastAnim.setValue(
+                0
+            );
+
+            setToastVisible(
+                true
+            );
+
+            Animated.timing(
+                toastAnim,
+                {
+                    toValue:
+                        1,
+
+                    duration:
+                        260,
+
+                    useNativeDriver:
+                        true,
+                }
+            ).start();
+
+            toastTimeoutRef.current =
+                setTimeout(
+                    () => {
+                        Animated.timing(
+                            toastAnim,
+                            {
+                                toValue:
+                                    0,
+
+                                duration:
+                                    260,
+
+                                useNativeDriver:
+                                    true,
+                            }
+                        ).start(
+                            ({
+                                finished,
+                            }) => {
+                                if (
+                                    finished
+                                ) {
+                                    setToastVisible(
+                                        false
+                                    );
+                                }
+                            }
+                        );
+                    },
+                    2800
+                );
+        };
 
     return (
         <View
@@ -640,6 +866,9 @@ export default function BottomTabs() {
                 ) => (
                     <AnimatedTabBar
                         {...props}
+                        onLockedDumpPress={
+                            showDumpReleaseToast
+                        }
                     />
                 )}
                 screenOptions={{
@@ -695,6 +924,107 @@ export default function BottomTabs() {
                     }
                 />
             </Tab.Navigator>
+
+            {toastVisible && (
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.releaseToast,
+                        {
+                            bottom:
+                                Platform.OS ===
+                                    "android"
+                                    ? 92 +
+                                    Math.max(
+                                        insets.bottom,
+                                        10
+                                    )
+                                    : 84 +
+                                    Math.max(
+                                        insets.bottom,
+                                        8
+                                    ),
+
+                            opacity:
+                                toastAnim,
+
+                            backgroundColor:
+                                theme.toastBackground,
+
+                            borderColor:
+                                theme.toastBorder,
+
+                            transform: [
+                                {
+                                    translateY:
+                                        toastAnim.interpolate({
+                                            inputRange: [
+                                                0,
+                                                1,
+                                            ],
+
+                                            outputRange: [
+                                                34,
+                                                0,
+                                            ],
+                                        }),
+                                },
+
+                                {
+                                    scale:
+                                        toastAnim.interpolate({
+                                            inputRange: [
+                                                0,
+                                                1,
+                                            ],
+
+                                            outputRange: [
+                                                0.97,
+                                                1,
+                                            ],
+                                        }),
+                                },
+                            ],
+                        },
+                    ]}
+                >
+                    <View
+                        style={
+                            styles.toastTextContainer
+                        }
+                    >
+                        <Text
+                            style={[
+                                styles.toastTitle,
+                                {
+                                    color:
+                                        theme.toastText,
+                                },
+                            ]}
+                        >
+                            It's almost here!
+                        </Text>
+
+                        <Text
+                            style={[
+                                styles.toastMessage,
+                                {
+                                    color:
+                                        theme.toastMuted,
+                                },
+                            ]}
+                        >
+                            The Student Dump opens on August 24th.
+                        </Text>
+                    </View>
+
+                    <Text
+                        style={styles.toastEmoji}
+                    >
+                        🗑️
+                    </Text>
+                </Animated.View>
+            )}
         </View>
     );
 }
@@ -851,5 +1181,114 @@ const styles =
 
             letterSpacing:
                 0.1,
+        },
+
+        /*
+        |--------------------------------------------------------------------------
+        | Student Dump Release Toast
+        |--------------------------------------------------------------------------
+        */
+
+        releaseToast: {
+            position:
+                "absolute",
+
+            left:
+                16,
+
+            right:
+                16,
+
+            minHeight:
+                88,
+
+            borderRadius:
+                20,
+
+            borderWidth:
+                1.25,
+
+            paddingLeft:
+                16,
+
+            paddingRight:
+                92,
+
+            paddingTop:
+                13,
+
+            paddingBottom:
+                13,
+
+            justifyContent:
+                "center",
+
+            overflow:
+                "hidden",
+
+            shadowColor:
+                "#000000",
+
+            shadowOpacity:
+                0.30,
+
+            shadowRadius:
+                14,
+
+            shadowOffset: {
+                width:
+                    0,
+
+                height:
+                    7,
+            },
+
+            elevation:
+                20,
+
+            zIndex:
+                9999,
+        },
+
+        toastTextContainer: {
+            flex:
+                1,
+
+            justifyContent:
+                "center",
+        },
+
+        toastTitle: {
+            fontSize:
+                16,
+
+            lineHeight:
+                19,
+
+            fontFamily:
+                "Rajdhani_700Bold",
+        },
+
+        toastMessage: {
+            marginTop:
+                3,
+
+            fontSize:
+                12.5,
+
+            lineHeight:
+                17,
+
+            fontWeight:
+                "700",
+        },
+
+        toastEmoji: {
+            position: "absolute",
+            right: 18,
+            top: "50%",
+            marginTop: -18,
+
+            fontSize: 34,
         },
     });

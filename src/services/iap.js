@@ -459,10 +459,10 @@ export const getBlogsSubscriptionProduct =
         type: "subs",
       });
 
-      console.log(
-        "✅ Blog subscription fetched:",
-        products
-      );
+      // console.log(
+      //   "✅ Blog subscription fetched:",
+      //   products
+      // );
 
       return products?.[0] || null;
     } catch (error) {

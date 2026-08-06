@@ -42,14 +42,25 @@ export type ReportReason =
 
 export type UserPreview = {
   _id: string;
+
   username?: string | null;
   display_name?: string | null;
+
   providerAvatar?: string | null;
   avatar?: string | null;
   selectedAvatar?: string | null;
+
   isSubscribed?: boolean;
+
   isStudentAthlete?: boolean;
   sport?: string | null;
+
+  // NEW
+  schoolLevel?: SchoolLevel | null;
+  collegeName?: string | null;
+  highSchoolClassification?: string | null;
+
+  // Existing social media
   socialMediaPlatform?: string | null;
   socialMediaUrl?: string | null;
 };

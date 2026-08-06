@@ -1239,7 +1239,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                                 <Text style={styles.backText}>Back</Text>
                             </TouchableOpacity>
 
-                            <Text style={styles.title}>Account Settings</Text>
+                            <Text style={styles.title}>Profile Settings</Text>
 
                             <Text style={styles.subtitle}>
                                 Update how you appear on ScoolFools.

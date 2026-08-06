@@ -316,7 +316,7 @@ export default function MenuScreen() {
                         <MenuItem
                             icon="game-controller-outline"
                             color={theme.yellow}
-                            title="Party Games! 🎉"
+                            title="Study Break Party Games 🎉"
                             onPress={() =>
                                 navigation.navigate(
                                     "GameHome"

@@ -1,8 +1,8 @@
 export const collegeLogos = {
     "saint-louis": require("../college-logos/saint-louis.png"),
     "ut-dallas": require("../college-logos/ut-dallas.png"),
-    webster: require("../college-logos/webster.png"),
-    missouri: require("../college-logos/missouri.png"),
+    "webster": require("../college-logos/webster.png"),
+    "missouri": require("../college-logos/missouri.png"),
     "texas-tech": require("../college-logos/texas-tech.png"),
     "houston": require("../college-logos/houston.png"),
     "arizona": require("../college-logos/arizona.png"),

@@ -219,16 +219,16 @@ export const verifyScoolFoolsSubscription =
         const data =
             await parseResponseBody(response);
 
-        console.log(
-            "SUBSCRIPTION VERIFY RESPONSE:",
-            {
-                status: response.status,
-                ok: response.ok,
-                code: data?.code,
-                isSubscribed:
-                    data?.isSubscribed,
-            }
-        );
+        // console.log(
+        //     "SUBSCRIPTION VERIFY RESPONSE:",
+        //     {
+        //         status: response.status,
+        //         ok: response.ok,
+        //         code: data?.code,
+        //         isSubscribed:
+        //             data?.isSubscribed,
+        //     }
+        // );
 
         if (!response.ok) {
             throw new SubscriptionVerificationError({

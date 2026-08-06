@@ -1249,7 +1249,7 @@ function SupporterBenefitsBanner({
                     ]}
                     numberOfLines={1}
                 >
-                    Subscribe NOW 💎
+                    Unlock Premium 💎
                 </Text>
 
                 <Text
@@ -1300,7 +1300,7 @@ function PartyGamesPromo({ navigation, gamesPackagePurchased, theme }: any) {
                     <Ionicons name="game-controller" size={20} color={theme.purple} />
 
                     <Text style={[styles.partyGamesTitle, { color: theme.text }]}>
-                        Party Games 🎉
+                        Study Break Games 🎉
                     </Text>
                 </View>
 
@@ -1315,7 +1315,7 @@ function PartyGamesPromo({ navigation, gamesPackagePurchased, theme }: any) {
             <Text style={[styles.partyGamesSubtitle, { color: theme.textSoft }]}>
                 {gamesPackagePurchased
                     ? "Share videos of your group playing ScoolFools Party Games ♟️🔥"
-                    : "Fun social games for chess friends, clubs, and tournaments."}
+                    : "Fun social games for dormmates, classmates, study buddies, clubs, and friends."}
             </Text>
         </TouchableOpacity>
     );

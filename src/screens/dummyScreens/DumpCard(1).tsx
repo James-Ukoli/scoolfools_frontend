@@ -326,7 +326,7 @@ const getClassificationColor = (
     >
 ) => {
     switch (
-    classification?.toLowerCase()
+        classification?.toLowerCase()
     ) {
         case "freshman":
             return theme.freshman;
@@ -1789,7 +1789,7 @@ export default function DumpCard({
                                 },
 
                                 !isCollegeDump &&
-                                styles.classificationText,
+                                    styles.classificationText,
                             ]}
                             numberOfLines={1}
                         >

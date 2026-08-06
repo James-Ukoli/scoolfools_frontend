@@ -239,6 +239,7 @@ export default function TrendingScreen({ navigation }: any) {
 
     const slideAnim = useRef(new Animated.Value(0)).current;
     const feedFadeAnim = useRef(new Animated.Value(1)).current;
+    const subscriptionCelebrationShownRef = useRef(false);
 
     const activeColor = activeTab === "news" ? theme.yellow : theme.cyan;
     const categories = activeTab === "news" ? NEWS_CATEGORIES : BLOG_CATEGORIES;
@@ -322,7 +323,15 @@ export default function TrendingScreen({ navigation }: any) {
     };
 
     const verifyBlogSubscriptionOnBackend = useCallback(
-        async (purchase: any) => {
+        async (
+            purchase: any,
+            options?: {
+                celebrateNewPurchase?: boolean;
+            },
+        ) => {
+            const celebrateNewPurchase =
+                options?.celebrateNewPurchase === true;
+
             try {
                 const result =
                     await verifyScoolFoolsSubscription(
@@ -338,12 +347,18 @@ export default function TrendingScreen({ navigation }: any) {
                 await fetchEntitlements();
 
                 if (subscribed) {
-                    setShowConfetti(true);
+                    if (
+                        celebrateNewPurchase &&
+                        !subscriptionCelebrationShownRef.current
+                    ) {
+                        subscriptionCelebrationShownRef.current = true;
+                        setShowConfetti(true);
 
-                    Alert.alert(
-                        "Subscribed 🎉",
-                        "Welcome to ScoolFools Blogs!"
-                    );
+                        Alert.alert(
+                            "Subscribed 🎉",
+                            "You are now a ScoolFools Diamond Member 💎!"
+                        );
+                    }
 
                     return;
                 }
@@ -439,9 +454,17 @@ export default function TrendingScreen({ navigation }: any) {
 
     const handleSubscribePress = async () => {
         setLoadingSubscription(true);
+        subscriptionCelebrationShownRef.current = false;
 
         await buyBlogsSubscription({
-            onSuccess: verifyBlogSubscriptionOnBackend,
+            onSuccess: async (purchase: any) => {
+                await verifyBlogSubscriptionOnBackend(
+                    purchase,
+                    {
+                        celebrateNewPurchase: true,
+                    },
+                );
+            },
             onError: (error: any) => {
                 setLoadingSubscription(false);
                 console.log("Subscription purchase error:", error);
@@ -470,7 +493,12 @@ export default function TrendingScreen({ navigation }: any) {
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
             onBlogsSubscriptionSuccess: async (purchase: any) => {
-                await verifyBlogSubscriptionOnBackend(purchase);
+                await verifyBlogSubscriptionOnBackend(
+                    purchase,
+                    {
+                        celebrateNewPurchase: false,
+                    },
+                );
             },
             onPurchaseError: (error: any) => {
                 setLoadingSubscription(false);
@@ -484,7 +512,6 @@ export default function TrendingScreen({ navigation }: any) {
     }, [
         fetchEntitlements,
         fetchPosts,
-        verifyBlogSubscriptionOnBackend,
     ]);
 
     useEffect(() => {
