@@ -344,7 +344,7 @@ export default function IntroVideoScreen({
                         style={styles.errorOverlay}
                     >
                         <Text style={styles.errorTitle}>
-                            Welcome to ScoolFools
+                            Welcome to Season 1 of ScoolFools
                         </Text>
 
                         <Text style={styles.errorText}>
@@ -387,12 +387,11 @@ export default function IntroVideoScreen({
                             </Text>
 
                             <Text style={styles.endedTitle}>
-                                Welcome to ScoolFools
+                                2026-2027
                             </Text>
 
                             <Text style={styles.endedText}>
-                                Ready to see what everyone
-                                is talking about?
+                                Welcome to Season 1 of ScoolFools! 😊 You can now enter the app to connect with students from around the nation, or replay the intro video.
                             </Text>
 
                             <TouchableOpacity

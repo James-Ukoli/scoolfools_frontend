@@ -2,7 +2,7 @@
   "expo": {
     "name": "ScoolFools",
     "slug": "scoolfools",
-    "version": "3.0.1",
+    "version": "3.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/iconandroid.png",
     "scheme": "scoolfools",
