@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291837785915",
+    "project_id": "scoolfools-ad5ae",
+    "storage_bucket": "scoolfools-ad5ae.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291837785915:android:abd4f97b01b38c4b55a91e",
+        "android_client_info": {
+          "package_name": "com.scoolfools"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCbFU5Q531iDuXtowWdyhcJLQAlT6l6BzY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

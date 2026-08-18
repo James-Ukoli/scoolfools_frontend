@@ -219,7 +219,7 @@ export default function GoogleSignInScreen({ navigation }: any) {
 
     return (
         <ImageBackground
-            source={require("../../assets/images/signupbackground5.png")}
+            source={require("../../assets/images/spashscreen1.png")}
             style={styles.background}
             resizeMode="cover"
         >
