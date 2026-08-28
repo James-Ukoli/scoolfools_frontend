@@ -11,6 +11,8 @@ import {
     View,
 } from "react-native";
 import SportsArticleList from "../components/SportsArticleList";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import DraggableFlatList, { RenderItemParams } from "react-native-draggable-flatlist";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
     Rajdhani_600SemiBold,
@@ -128,16 +130,20 @@ const API_SPORT_MAP: Record<Sport, ApiSport> = {
     volleyball: "volleyball",
 };
 
-const SPORT_OPTIONS: {
+type SportOption = {
     label: string;
     value: Sport;
     icon: string;
-}[] = [
-        { label: "Chess", value: "college-chess", icon: "♟" },
-        { label: "Basketball", value: "basketball", icon: "🏀" },
-        { label: "Football", value: "football", icon: "🏈" },
-        { label: "Volleyball", value: "volleyball", icon: "🏐" },
-    ];
+};
+
+const DEFAULT_SPORT_OPTIONS: SportOption[] = [
+    { label: "Chess", value: "college-chess", icon: "♟" },
+    { label: "Basketball", value: "basketball", icon: "🏀" },
+    { label: "Football", value: "football", icon: "🏈" },
+    { label: "Volleyball", value: "volleyball", icon: "🏐" },
+];
+
+const SPORT_ORDER_STORAGE_KEY = "@scoolfools_rankings_sport_order_v1";
 
 const LIGHT_THEME: Theme = {
     page: "#F7F9FC",
@@ -240,7 +246,7 @@ function getPeriodLabel(ranking: SportsRanking | null): string {
 }
 
 function getSportTitle(sport: Sport): string {
-    return SPORT_OPTIONS.find((item) => item.value === sport)?.label ?? "Rankings";
+    return DEFAULT_SPORT_OPTIONS.find((item) => item.value === sport)?.label ?? "Rankings";
 }
 
 function getRankColor(rank: number, isDark: boolean): string {
@@ -407,6 +413,9 @@ export default function RankingsScreen({ navigation }: any) {
     const [selectedSport, setSelectedSport] =
         useState<Sport>("college-chess");
 
+    const [sportOptions, setSportOptions] =
+        useState<SportOption[]>(DEFAULT_SPORT_OPTIONS);
+
     const [ranking, setRanking] = useState<SportsRanking | null>(null);
     const [latestPeriod, setLatestPeriod] = useState<number | null>(null);
 
@@ -425,6 +434,81 @@ export default function RankingsScreen({ navigation }: any) {
 
     const leader = sortedEntries[0] ?? null;
     const remainingEntries = sortedEntries.slice(1);
+
+    useEffect(() => {
+        let mounted = true;
+
+        const loadSportOrder = async () => {
+            try {
+                const saved = await AsyncStorage.getItem(
+                    SPORT_ORDER_STORAGE_KEY
+                );
+
+                if (!saved) return;
+
+                const order = JSON.parse(saved);
+
+                if (!Array.isArray(order)) return;
+
+                const validSports = DEFAULT_SPORT_OPTIONS.map(
+                    (item) => item.value
+                );
+
+                const isValid =
+                    order.length === validSports.length &&
+                    order.every((value) =>
+                        validSports.includes(value as Sport)
+                    ) &&
+                    new Set(order).size === validSports.length;
+
+                if (!isValid) return;
+
+                const nextOrder = order
+                    .map((value) =>
+                        DEFAULT_SPORT_OPTIONS.find(
+                            (item) => item.value === value
+                        )
+                    )
+                    .filter(Boolean) as SportOption[];
+
+                if (mounted) {
+                    setSportOptions(nextOrder);
+                }
+            } catch (storageError) {
+                console.warn(
+                    "Could not load rankings sport order:",
+                    storageError
+                );
+            }
+        };
+
+        loadSportOrder();
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const saveSportOrder = useCallback(
+        async (nextOrder: SportOption[]) => {
+            setSportOptions(nextOrder);
+
+            try {
+                await AsyncStorage.setItem(
+                    SPORT_ORDER_STORAGE_KEY,
+                    JSON.stringify(
+                        nextOrder.map((item) => item.value)
+                    )
+                );
+            } catch (storageError) {
+                console.warn(
+                    "Could not save rankings sport order:",
+                    storageError
+                );
+            }
+        },
+        []
+    );
 
     const fetchJson = useCallback(
         async (url: string): Promise<RankingApiResponse> => {
@@ -736,52 +820,94 @@ export default function RankingsScreen({ navigation }: any) {
                     />
                 }
             >
-                <ScrollView
-                    horizontal
-                    nestedScrollEnabled
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.sportTabs}
-                >
-                    {SPORT_OPTIONS.map((sport) => {
-                        const active = selectedSport === sport.value;
+                <View style={styles.sportPrioritySection}>
+                    <Text
+                        style={[
+                            styles.priorityHint,
+                            { color: theme.muted },
+                        ]}
+                    >
+                        Hold and drag a sport to change your order
+                    </Text>
 
-                        return (
-                            <TouchableOpacity
-                                key={sport.value}
-                                activeOpacity={0.85}
-                                style={[
-                                    styles.sportTab,
-                                    {
-                                        backgroundColor: active
-                                            ? theme.activeTab
-                                            : theme.tab,
-                                        borderColor: active
-                                            ? theme.activeTab
-                                            : theme.tabBorder,
-                                    },
-                                ]}
-                                onPress={() => handleSportChange(sport.value)}
-                            >
-                                <Text style={styles.sportTabIcon}>
-                                    {sport.icon}
-                                </Text>
+                    <DraggableFlatList
+                        horizontal
+                        data={sportOptions}
+                        keyExtractor={(item) => item.value}
+                        showsHorizontalScrollIndicator={false}
+                        activationDistance={8}
+                        contentContainerStyle={styles.sportTabs}
+                        onDragEnd={({ data }) => {
+                            saveSportOrder(data);
+                        }}
+                        renderItem={({
+                            item: sport,
+                            drag,
+                            isActive,
+                        }: RenderItemParams<SportOption>) => {
+                            const active =
+                                selectedSport === sport.value;
 
-                                <Text
+                            return (
+                                <TouchableOpacity
+                                    activeOpacity={0.85}
+                                    onPress={() =>
+                                        handleSportChange(sport.value)
+                                    }
+                                    onLongPress={drag}
+                                    delayLongPress={180}
+                                    disabled={isActive}
                                     style={[
-                                        styles.sportTabText,
+                                        styles.sportTab,
                                         {
-                                            color: active
-                                                ? theme.activeTabText
-                                                : theme.text,
+                                            backgroundColor: active
+                                                ? theme.activeTab
+                                                : theme.tab,
+                                            borderColor: active
+                                                ? theme.activeTab
+                                                : theme.tabBorder,
+                                            opacity: isActive
+                                                ? 0.9
+                                                : 1,
                                         },
+                                        isActive &&
+                                        styles.sportTabDragging,
                                     ]}
                                 >
-                                    {sport.label}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
-                </ScrollView>
+                                    <Text style={styles.sportTabIcon}>
+                                        {sport.icon}
+                                    </Text>
+
+                                    <Text
+                                        style={[
+                                            styles.sportTabText,
+                                            {
+                                                color: active
+                                                    ? theme.activeTabText
+                                                    : theme.text,
+                                            },
+                                        ]}
+                                    >
+                                        {sport.label}
+                                    </Text>
+
+                                    <Text
+                                        style={[
+                                            styles.dragHandle,
+                                            {
+                                                color: active
+                                                    ? theme.activeTabText
+                                                    : theme.subtle,
+                                            },
+                                        ]}
+                                    >
+                                        ⋮⋮
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                </View>
 
                 <View
                     style={[
@@ -891,9 +1017,23 @@ const styles = StyleSheet.create({
         justifyContent: "center",
     },
 
+    sportPrioritySection: {
+        marginBottom: 8,
+    },
+
+    priorityHint: {
+        fontSize: 10.5,
+        lineHeight: 13,
+        fontFamily: "Rajdhani_600SemiBold",
+        letterSpacing: 0.15,
+        marginBottom: 5,
+        paddingHorizontal: 2,
+    },
+
     sportTabs: {
         gap: 7,
-        paddingBottom: 8,
+        paddingBottom: 2,
+        paddingRight: 12,
     },
 
     sportTab: {
@@ -915,6 +1055,18 @@ const styles = StyleSheet.create({
         fontSize: 14.5,
         fontFamily: "Rajdhani_700Bold",
         letterSpacing: 0.1,
+    },
+
+    dragHandle: {
+        fontSize: 13,
+        lineHeight: 15,
+        fontFamily: "Rajdhani_700Bold",
+        marginLeft: 1,
+        opacity: 0.75,
+    },
+
+    sportTabDragging: {
+        transform: [{ scale: 1.04 }],
     },
 
     periodCard: {

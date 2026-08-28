@@ -167,6 +167,7 @@ export default function SportsArticleList({
 }: SportsArticleListProps) {
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState("");
     const [visibleCount, setVisibleCount] = useState(
         INITIAL_VISIBLE_ARTICLES
@@ -176,16 +177,23 @@ export default function SportsArticleList({
     const sportTitle = SPORT_TITLE_MAP[selectedSport];
     const sportEmoji = SPORT_EMOJI_MAP[selectedSport];
 
-    const fetchSportsPosts = useCallback(async () => {
+    const fetchSportsPosts = useCallback(async (isRefresh = false) => {
         if (!API_BASE_URL) {
-            setPosts([]);
+            if (!isRefresh) {
+                setPosts([]);
+            }
             setError("API URL is missing.");
             setLoading(false);
+            setRefreshing(false);
             return;
         }
 
         try {
-            setLoading(true);
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
             setError("");
 
             const response = await fetch(`${API_BASE_URL}/api/posts`);
@@ -232,14 +240,20 @@ export default function SportsArticleList({
 
             setPosts(sportsPosts);
         } catch (requestError) {
-            setPosts([]);
+            if (!isRefresh) {
+                setPosts([]);
+            }
             setError(
                 requestError instanceof Error
                     ? requestError.message
                     : "Could not load sports articles."
             );
         } finally {
-            setLoading(false);
+            if (isRefresh) {
+                setRefreshing(false);
+            } else {
+                setLoading(false);
+            }
         }
     }, []);
 
@@ -336,7 +350,7 @@ export default function SportsArticleList({
                 <TouchableOpacity
                     activeOpacity={0.85}
                     style={styles.retryButton}
-                    onPress={fetchSportsPosts}
+                    onPress={() => fetchSportsPosts()}
                 >
                     <Text style={styles.retryButtonText}>
                         Try Again
@@ -369,18 +383,44 @@ export default function SportsArticleList({
                     </Text>
                 </View>
 
-                <Text
-                    style={[
-                        styles.articleCount,
-                        {
-                            color: theme.muted,
-                            backgroundColor: theme.cardAlt,
-                            borderColor: theme.border,
-                        },
-                    ]}
-                >
-                    {filteredPosts.length}
-                </Text>
+                <View style={styles.headerActions}>
+                    <Text
+                        style={[
+                            styles.articleCount,
+                            {
+                                color: theme.muted,
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                    >
+                        {filteredPosts.length}
+                    </Text>
+
+                    <TouchableOpacity
+                        activeOpacity={0.8}
+                        disabled={refreshing}
+                        onPress={() => fetchSportsPosts(true)}
+                        style={[
+                            styles.refreshButton,
+                            {
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Refresh ${sportTitle} stories`}
+                    >
+                        {refreshing ? (
+                            <ActivityIndicator
+                                size="small"
+                                color={ACCENT}
+                            />
+                        ) : (
+                            <Text style={styles.refreshIcon}>↻</Text>
+                        )}
+                    </TouchableOpacity>
+                </View>
             </View>
 
             {!featuredPost ? (
@@ -726,6 +766,29 @@ const styles = StyleSheet.create({
         lineHeight: 25,
         fontFamily: "Rajdhani_700Bold",
         overflow: "hidden",
+    },
+
+    headerActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+    },
+
+    refreshButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+
+    refreshIcon: {
+        color: ACCENT,
+        fontSize: 22,
+        lineHeight: 24,
+        fontFamily: "Rajdhani_700Bold",
+        textAlign: "center",
     },
 
     featuredCard: {

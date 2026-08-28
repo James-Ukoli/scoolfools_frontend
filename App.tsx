@@ -33,6 +33,7 @@ import {
     Rajdhani_700Bold,
     useFonts,
 } from "@expo-google-fonts/rajdhani";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import AppShell from "./src/navigation/AppShell";
 import ArticleScreen from "./src/screens/ArticleScreen";
@@ -564,19 +565,21 @@ export default function App() {
     }
 
     return (
-        <SafeAreaProvider>
-            <TimeThemeProvider>
-                {/*
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                <TimeThemeProvider>
+                    {/*
                 <TimeThemeProvider
                     forcedMode="night"
                 >
                 */}
-                <ThemedNavigation
-                    initialRoute={
-                        initialRoute
-                    }
-                />
-            </TimeThemeProvider>
-        </SafeAreaProvider>
+                    <ThemedNavigation
+                        initialRoute={
+                            initialRoute
+                        }
+                    />
+                </TimeThemeProvider>
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }
