@@ -195,14 +195,11 @@ export default function AppHeader() {
     */
 
     const selectedAvatarId = useMemo(() => {
-        if (!entitlementsLoaded) {
+        if (!userLoaded) {
             return null;
         }
 
-        if (!isSubscribed) {
-            return "basicBlue";
-        }
-
+        // First choice: explicitly selected built-in avatar
         if (
             user?.selectedAvatar &&
             AVATAR_IMAGES[user.selectedAvatar]
@@ -210,6 +207,7 @@ export default function AppHeader() {
             return user.selectedAvatar;
         }
 
+        // Second choice: built-in avatar stored in avatar
         if (
             user?.avatar &&
             !user.avatar.startsWith("http") &&
@@ -218,10 +216,10 @@ export default function AppHeader() {
             return user.avatar;
         }
 
+        // Default fallback
         return "basicBlue";
     }, [
-        entitlementsLoaded,
-        isSubscribed,
+        userLoaded,
         user,
     ]);
 
@@ -409,16 +407,12 @@ export default function AppHeader() {
             : null;
 
     const remoteAvatarUrl =
-        isSubscribed
-            ? (
-                user?.providerAvatar ||
-                (
-                    user?.avatar?.startsWith("http")
-                        ? user.avatar
-                        : null
-                )
-            )
-            : null;
+        user?.providerAvatar ||
+        (
+            user?.avatar?.startsWith("http")
+                ? user.avatar
+                : null
+        );
 
     /*
     |--------------------------------------------------------------------------
