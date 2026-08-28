@@ -17,6 +17,7 @@ import {
     Share,
     StyleSheet,
     Text,
+    useWindowDimensions,
     View,
 } from "react-native";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
@@ -203,7 +204,11 @@ export default function ArticleScreen() {
 
     const player = useAudioPlayer(null);
     const playerStatus = useAudioPlayerStatus(player);
+    const { width: screenWidth } = useWindowDimensions();
 
+    const articleHorizontalPadding = s(17);
+    const videoWidth = screenWidth - articleHorizontalPadding * 2;
+    const videoHeight = videoWidth * (9 / 16);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const rippleAnim1 = useRef(new Animated.Value(0)).current;
     const rippleAnim2 = useRef(new Animated.Value(0)).current;
@@ -848,7 +853,6 @@ export default function ArticleScreen() {
                         style={[
                             styles.mediaBlock,
                             {
-                                backgroundColor: theme.cardAlt,
                                 borderColor: theme.borderStrong,
                             },
                         ]}
@@ -856,9 +860,11 @@ export default function ArticleScreen() {
                     >
                         <Image
                             source={{ uri: block.input }}
-                            style={[styles.blockImage, { backgroundColor: theme.cardAlt }]}
-                            resizeMode="contain"
-                            onError={() => console.log("Block image failed:", block.input)}
+                            style={styles.blockImage}
+                            resizeMode="cover"
+                            onError={() =>
+                                console.log("Block image failed:", block.input)
+                            }
                         />
                     </Pressable>
                 );
@@ -978,14 +984,15 @@ export default function ArticleScreen() {
                         style={[
                             styles.articleVideoCard,
                             {
-                                backgroundColor: "#000000",
+                                width: videoWidth,
+                                height: videoHeight,
                                 borderColor: theme.borderStrong,
                             },
                         ]}
                     >
                         <YoutubePlayer
-                            height={vs(210)}
-                            width={s(340)}
+                            height={videoHeight}
+                            width={videoWidth}
                             videoId={youtubeId}
                             play={false}
                             webViewStyle={styles.youtubeWebView}
@@ -1142,14 +1149,8 @@ export default function ArticleScreen() {
                         >
                             <Image
                                 source={{ uri: post.cover_image_url }}
-                                style={[
-                                    styles.heroImage,
-                                    {
-                                        backgroundColor: theme.cardAlt,
-                                        borderColor: theme.borderStrong,
-                                    },
-                                ]}
-                                resizeMode="contain"
+                                style={styles.heroImage}
+                                resizeMode="cover"
                             />
                             <View
                                 pointerEvents="none"
@@ -1527,15 +1528,13 @@ const styles = StyleSheet.create({
     },
     heroShell: {
         width: "100%",
-        paddingHorizontal: s(12),
         marginTop: vs(2),
         marginBottom: vs(4),
+        overflow: "hidden",
     },
     heroImage: {
         width: "100%",
-        height: vs(255),
-        borderRadius: s(22),
-        borderWidth: 1,
+        aspectRatio: 16 / 9,
     },
     heroGlow: {
         position: "absolute",
@@ -1625,16 +1624,17 @@ const styles = StyleSheet.create({
         letterSpacing: 0.1,
     },
     mediaBlock: {
+        width: "100%",
         marginTop: vs(14),
         marginBottom: vs(10),
-        borderRadius: s(20),
+        borderRadius: s(18),
         overflow: "hidden",
         borderWidth: 1,
     },
+
     blockImage: {
         width: "100%",
-        height: vs(250),
-        borderRadius: s(20),
+        aspectRatio: 16 / 9,
     },
     caption: {
         fontSize: ms(12.5),
@@ -1796,13 +1796,13 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }],
     },
     articleVideoCard: {
-        width: "100%",
-        height: vs(210),
+        alignSelf: "center",
         borderRadius: s(18),
         overflow: "hidden",
         marginVertical: vs(13),
         borderWidth: 1,
     },
+
     youtubeWebView: {
         backgroundColor: "#000000",
     },
