@@ -19,6 +19,9 @@ import {
     createBottomTabNavigator,
 } from "@react-navigation/bottom-tabs";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as StoreReview from "expo-store-review";
+
 import {
     Ionicons,
 } from "@expo/vector-icons";
@@ -50,6 +53,7 @@ const {
 
 const ACTIVE_INDICATOR_WIDTH = 30;
 const ACTIVE_ICON_SCALE = 1.12;
+const TV_REVIEW_REQUESTED_KEY = "scoolfools_tv_review_requested";
 
 /*
 |--------------------------------------------------------------------------
@@ -293,6 +297,7 @@ function AnimatedTabItem({
     navigation,
     theme,
     onLockedDumpPress,
+    onTVPress,
 }: {
     route: any;
     focused: boolean;
@@ -304,6 +309,9 @@ function AnimatedTabItem({
     >;
 
     onLockedDumpPress:
+    () => void;
+
+    onTVPress:
     () => void;
 }) {
     const scale =
@@ -394,6 +402,19 @@ function AnimatedTabItem({
             ) {
                 onLockedDumpPress();
 
+                return;
+            }
+
+            if (
+                route.name === "TV"
+            ) {
+                if (!focused) {
+                    navigation.navigate(
+                        route.name
+                    );
+                }
+
+                onTVPress();
                 return;
             }
 
@@ -536,6 +557,7 @@ function AnimatedTabBar({
     state,
     navigation,
     onLockedDumpPress,
+    onTVPress,
 }: any) {
     const insets =
         useSafeAreaInsets();
@@ -697,6 +719,9 @@ function AnimatedTabBar({
                             onLockedDumpPress={
                                 onLockedDumpPress
                             }
+                            onTVPress={
+                                onTVPress
+                            }
                         />
                     );
                 }
@@ -850,6 +875,50 @@ export default function BottomTabs() {
                 );
         };
 
+    const handleTVPress =
+        async () => {
+            try {
+                const alreadyRequested =
+                    await AsyncStorage.getItem(
+                        TV_REVIEW_REQUESTED_KEY
+                    );
+
+                if (alreadyRequested === "true") {
+                    return;
+                }
+
+                const reviewAvailable =
+                    await StoreReview.isAvailableAsync();
+
+                if (!reviewAvailable) {
+                    return;
+                }
+
+                // Mark it before requesting so repeated TV taps do not spam the user.
+                await AsyncStorage.setItem(
+                    TV_REVIEW_REQUESTED_KEY,
+                    "true"
+                );
+
+                // Give TV a moment to finish navigating before showing the native review card.
+                setTimeout(() => {
+                    StoreReview.requestReview().catch(
+                        (error) => {
+                            console.log(
+                                "Store review request error:",
+                                error
+                            );
+                        }
+                    );
+                }, 650);
+            } catch (error) {
+                console.log(
+                    "TV review check error:",
+                    error
+                );
+            }
+        };
+
     return (
         <View
             style={
@@ -868,6 +937,9 @@ export default function BottomTabs() {
                         {...props}
                         onLockedDumpPress={
                             showDumpReleaseToast
+                        }
+                        onTVPress={
+                            handleTVPress
                         }
                     />
                 )}
