@@ -861,7 +861,7 @@ export default function ArticleScreen() {
                         <Image
                             source={{ uri: block.input }}
                             style={styles.blockImage}
-                            resizeMode="cover"
+                            resizeMode="contain"
                             onError={() =>
                                 console.log("Block image failed:", block.input)
                             }
@@ -1630,11 +1630,12 @@ const styles = StyleSheet.create({
         borderRadius: s(18),
         overflow: "hidden",
         borderWidth: 1,
+        backgroundColor: "#000000",
     },
 
     blockImage: {
         width: "100%",
-        aspectRatio: 16 / 9,
+        height: vs(240),
     },
     caption: {
         fontSize: ms(12.5),
