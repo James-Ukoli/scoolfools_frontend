@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
+import { StatusBar } from "expo-status-bar";
 
 import {
     useTimeTheme,
@@ -261,9 +262,14 @@ export default function EventDetailScreen() {
 
     return (
         <SafeAreaView
-            edges={["left", "right"]}
+            edges={["top", "left", "right"]}
             style={[styles.safeArea, { backgroundColor: theme.background }]}
         >
+            <StatusBar
+                style={themeMode === "day" ? "dark" : "light"}
+                backgroundColor={theme.background}
+            />
+
             <ScrollView
                 style={[
                     styles.container,
@@ -307,11 +313,17 @@ export default function EventDetailScreen() {
                                 borderColor: theme.border,
                             },
                         ]}
+                        hitSlop={{
+                            top: 14,
+                            bottom: 14,
+                            left: 14,
+                            right: 14,
+                        }}
                         onPress={() => navigation.goBack()}
                     >
                         <Ionicons
                             name="arrow-back"
-                            size={22}
+                            size={25}
                             color={theme.text}
                         />
                     </Pressable>
@@ -777,14 +789,16 @@ const styles = StyleSheet.create({
     },
     backButton: {
         position: "absolute",
-        top: 14,
+        top: 16,
         left: 16,
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: 50,
+        height: 50,
+        borderRadius: 25,
         borderWidth: 1,
         alignItems: "center",
         justifyContent: "center",
+        zIndex: 20,
+        elevation: 20,
     },
     heroBadges: {
         position: "absolute",

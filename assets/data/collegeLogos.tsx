@@ -32,6 +32,8 @@ export const collegeLogos = {
     "louisville": require("../college-logos/louisville.png"),
     "creighton": require("../college-logos/creighton.png"),
     "utrgv": require("../college-logos/utrgv.png"),
+    "smu": require("../college-logos/smu.png"),
+    "arizona-state": require("../college-logos/asu.png"),
 };
 
 export function getCollegeLogo(key?: string | null) {
