@@ -224,7 +224,7 @@ export default function BlogsPaywallModal({
                                 ]}
                             >
                                 {localizedPrice ||
-                                    "$3.99"}
+                                    "0.99"}
                             </Text>
 
                             <Text

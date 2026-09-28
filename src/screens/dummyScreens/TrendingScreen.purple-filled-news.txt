@@ -1391,7 +1391,7 @@ export default function TrendingScreen({ navigation }: any) {
 
                                 activeTab === "news" && {
 
-                                    color: "#ffffff",
+                                    color: "#07111F",
 
                                     textShadowColor: "transparent",
 

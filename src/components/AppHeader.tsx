@@ -4,7 +4,6 @@ import React, {
     useMemo,
     useState,
 } from "react";
-
 import {
     Image,
     ImageSourcePropType,
@@ -14,47 +13,36 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-
 import {
     SafeAreaView,
 } from "react-native-safe-area-context";
-
 import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
 import Feather from "@expo/vector-icons/Feather";
-
 import {
     useFocusEffect,
     useNavigation,
 } from "@react-navigation/native";
-
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import {
     useNotifications,
 } from "../context/NotificationsContext";
-
 import {
     useNotificationFeed,
 } from "../context/NotificationFeedContext";
-
 import {
     useTimeTheme,
     type TimeTheme,
 } from "../context/TimeThemeContext";
-
 const HEADER_CYAN = "#06B6D4";
-
 const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
-
 type StoredUser = {
     selectedAvatar?: string | null;
     providerAvatar?: string | null;
     avatar?: string | null;
 };
-
 const AVATAR_IMAGES: Record<
     string,
     ImageSourcePropType
@@ -68,13 +56,11 @@ const AVATAR_IMAGES: Record<
     diamondBoy: require("../../assets/images/profileimages/diamondBoy.png"),
     diamondGirl: require("../../assets/images/profileimages/diamondGirl.png"),
 };
-
 /*
 |--------------------------------------------------------------------------
 | Avatar Background Colors
 |--------------------------------------------------------------------------
 */
-
 const AVATAR_BACKGROUND_COLORS: Record<
     string,
     string
@@ -88,39 +74,32 @@ const AVATAR_BACKGROUND_COLORS: Record<
     diamondBoy: "#0891B2",
     diamondGirl: "#DB2777",
 };
-
 /*
 |--------------------------------------------------------------------------
 | Header Theme
 |--------------------------------------------------------------------------
 */
-
 const getHeaderTheme = (
     mode: TimeTheme,
     selectedAvatar?: string | null
 ) => {
     const isDay = mode === "day";
-
     const avatarAccent =
         selectedAvatar &&
             AVATAR_BACKGROUND_COLORS[selectedAvatar]
             ? AVATAR_BACKGROUND_COLORS[selectedAvatar]
             : HEADER_CYAN;
-
     if (!isDay) {
         return {
             mode,
             background: "#020617",
-
             // Keep the night header card dark.
             card: "#07111F",
             surface: "#0B1728",
-
             // The selected avatar only affects the glow and border.
             glow: avatarAccent,
             glowOpacity: 0.16,
             cardBorder: avatarAccent,
-
             icon: "#FFFFFF",
             cyan: "#22D3EE",
             yellow: "#FACC15",
@@ -130,19 +109,15 @@ const getHeaderTheme = (
             activeBorder: "rgba(34,211,238,0.35)",
         };
     }
-
     return {
         mode,
         background: "#F8FAFC",
-
-        // Day mode keeps the avatar-colored card.
-        card: avatarAccent,
+        // Day mode uses a clean white header with no colored card.
+        card: "#FFFFFF",
         surface: "#FFFFFF",
-
         glow: avatarAccent,
         glowOpacity: 0,
-        cardBorder: "rgba(7,17,31,0.10)",
-
+        cardBorder: "transparent",
         icon: "#07111F",
         cyan: HEADER_CYAN,
         yellow: "#FACC15",
@@ -152,53 +127,41 @@ const getHeaderTheme = (
         activeBorder: "rgba(7,17,31,0.15)",
     };
 };
-
 /*
 |--------------------------------------------------------------------------
 | Header
 |--------------------------------------------------------------------------
 */
-
 export default function AppHeader() {
     const navigation = useNavigation<any>();
-
     const {
         mode: themeMode,
     } = useTimeTheme();
-
     const {
         featuredEnabled,
         alertsEnabled,
     } = useNotifications();
-
     const {
         unreadCount,
         refreshUnreadCount,
     } = useNotificationFeed();
-
     const [user, setUser] =
         useState<StoredUser | null>(null);
-
     const [userLoaded, setUserLoaded] =
         useState(false);
-
     const [isSubscribed, setIsSubscribed] =
         useState(false);
-
     const [entitlementsLoaded, setEntitlementsLoaded] =
         useState(false);
-
     /*
     |--------------------------------------------------------------------------
     | Selected Avatar
     |--------------------------------------------------------------------------
     */
-
     const selectedAvatarId = useMemo(() => {
         if (!userLoaded) {
             return null;
         }
-
         // First choice: explicitly selected built-in avatar
         if (
             user?.selectedAvatar &&
@@ -206,7 +169,6 @@ export default function AppHeader() {
         ) {
             return user.selectedAvatar;
         }
-
         // Second choice: built-in avatar stored in avatar
         if (
             user?.avatar &&
@@ -215,20 +177,17 @@ export default function AppHeader() {
         ) {
             return user.avatar;
         }
-
         // Default fallback
         return "basicBlue";
     }, [
         userLoaded,
         user,
     ]);
-
     /*
     |--------------------------------------------------------------------------
     | Theme
     |--------------------------------------------------------------------------
     */
-
     const theme = useMemo(
         () =>
             getHeaderTheme(
@@ -240,18 +199,15 @@ export default function AppHeader() {
             selectedAvatarId,
         ]
     );
-
     const styles = useMemo(
         () => createStyles(theme),
         [theme]
     );
-
     /*
     |--------------------------------------------------------------------------
     | Load Stored User
     |--------------------------------------------------------------------------
     */
-
     const loadStoredUser = useCallback(
         async () => {
             try {
@@ -259,22 +215,18 @@ export default function AppHeader() {
                     await AsyncStorage.getItem(
                         "user"
                     );
-
                 if (!storedUser) {
                     setUser(null);
                     return;
                 }
-
                 const parsedUser: StoredUser =
                     JSON.parse(storedUser);
-
                 setUser(parsedUser);
             } catch (error) {
                 console.log(
                     "Header user load error:",
                     error
                 );
-
                 setUser(null);
             } finally {
                 setUserLoaded(true);
@@ -282,14 +234,11 @@ export default function AppHeader() {
         },
         []
     );
-
-
     /*
     |--------------------------------------------------------------------------
     | Load Subscription Entitlement
     |--------------------------------------------------------------------------
     */
-
     const loadSubscriptionEntitlement = useCallback(
         async () => {
             try {
@@ -297,12 +246,10 @@ export default function AppHeader() {
                     await AsyncStorage.getItem(
                         "token"
                     );
-
                 if (!token || !API_BASE_URL) {
                     setIsSubscribed(false);
                     return;
                 }
-
                 const response = await fetch(
                     `${API_BASE_URL}/api/auth/me/entitlements`,
                     {
@@ -313,15 +260,12 @@ export default function AppHeader() {
                         },
                     }
                 );
-
                 if (!response.ok) {
                     setIsSubscribed(false);
                     return;
                 }
-
                 const data =
                     await response.json();
-
                 setIsSubscribed(
                     data?.success === true &&
                     data?.entitlements?.isSubscribed === true
@@ -331,7 +275,6 @@ export default function AppHeader() {
                     "Header entitlement load error:",
                     error
                 );
-
                 setIsSubscribed(false);
             } finally {
                 setEntitlementsLoaded(true);
@@ -339,13 +282,11 @@ export default function AppHeader() {
         },
         []
     );
-
     /*
     |--------------------------------------------------------------------------
     | Initial Load
     |--------------------------------------------------------------------------
     */
-
     useEffect(() => {
         loadStoredUser();
         loadSubscriptionEntitlement();
@@ -353,13 +294,11 @@ export default function AppHeader() {
         loadStoredUser,
         loadSubscriptionEntitlement,
     ]);
-
     /*
     |--------------------------------------------------------------------------
     | Reload User After Navigation Changes
     |--------------------------------------------------------------------------
     */
-
     useEffect(() => {
         const unsubscribe =
             navigation.addListener(
@@ -369,20 +308,17 @@ export default function AppHeader() {
                     loadSubscriptionEntitlement();
                 }
             );
-
         return unsubscribe;
     }, [
         navigation,
         loadStoredUser,
         loadSubscriptionEntitlement,
     ]);
-
     /*
     |--------------------------------------------------------------------------
     | Refresh Badge Whenever Header Becomes Focused
     |--------------------------------------------------------------------------
     */
-
     useFocusEffect(
         useCallback(() => {
             loadStoredUser();
@@ -394,18 +330,15 @@ export default function AppHeader() {
             refreshUnreadCount,
         ])
     );
-
     /*
     |--------------------------------------------------------------------------
     | Avatar Source
     |--------------------------------------------------------------------------
     */
-
     const selectedAvatarSource =
         selectedAvatarId
             ? AVATAR_IMAGES[selectedAvatarId]
             : null;
-
     const remoteAvatarUrl =
         user?.providerAvatar ||
         (
@@ -413,40 +346,32 @@ export default function AppHeader() {
                 ? user.avatar
                 : null
         );
-
     /*
     |--------------------------------------------------------------------------
     | Notification Bell State
     |--------------------------------------------------------------------------
     */
-
     const isOneEnabled =
         featuredEnabled ||
         alertsEnabled;
-
     const isBothEnabled =
         featuredEnabled &&
         alertsEnabled;
-
     const bellColor =
         isBothEnabled
             ? theme.icon
             : theme.cyan;
-
     const hasUnreadNotifications =
         unreadCount > 0;
-
     const unreadBadgeText =
         unreadCount > 99
             ? "99+"
             : String(unreadCount);
-
     /*
     |--------------------------------------------------------------------------
     | Open Notifications
     |--------------------------------------------------------------------------
     */
-
     const handleOpenNotifications =
         useCallback(() => {
             navigation.navigate(
@@ -457,7 +382,6 @@ export default function AppHeader() {
                 }
             );
         }, [navigation]);
-
     return (
         <SafeAreaView
             edges={["top"]}
@@ -472,7 +396,6 @@ export default function AppHeader() {
                     pointerEvents="none"
                     style={styles.cardGlow}
                 />
-
                 <View style={styles.card}>
                     <View
                         style={styles.sideLeft}
@@ -530,12 +453,9 @@ export default function AppHeader() {
                             )}
                         </TouchableOpacity>
                     </View>
-
                     <View
                         pointerEvents="box-none"
-                        style={
-                            styles.logoWrapper
-                        }
+                        style={styles.logoWrapper}
                     >
                         <TouchableOpacity
                             activeOpacity={0.8}
@@ -543,29 +463,31 @@ export default function AppHeader() {
                                 navigation.navigate(
                                     "MainTabs",
                                     {
-                                        screen:
-                                            "MainTabs",
-
+                                        screen: "MainTabs",
                                         params: {
-                                            screen:
-                                                "Home",
+                                            screen: "Home",
                                         },
                                     }
                                 )
                             }
-                            style={
-                                styles.logoPressable
-                            }
+                            style={styles.logoPressable}
                         >
-                            <Image
-                                source={require("../../assets/images/scoolfoolsheader.png")}
-                                style={styles.logo}
-                                resizeMode="contain"
-                                fadeDuration={0}
-                            />
+                            <View style={styles.monogramWrap}>
+                                <View style={styles.letterWrap}>
+                                    {themeMode === "night" && (
+                                        <Text style={styles.monogramOutline}>S</Text>
+                                    )}
+                                    <Text style={styles.monogramS}>S</Text>
+                                </View>
+                                <View style={[styles.letterWrap, { marginLeft: -2 }]}>
+                                    {themeMode === "night" && (
+                                        <Text style={styles.monogramOutline}>F</Text>
+                                    )}
+                                    <Text style={styles.monogramF}>F</Text>
+                                </View>
+                            </View>
                         </TouchableOpacity>
                     </View>
-
                     <View
                         style={styles.sideRight}
                     >
@@ -577,10 +499,8 @@ export default function AppHeader() {
                             <TouchableOpacity
                                 style={[
                                     styles.iconButton,
-
                                     isOneEnabled &&
                                     styles.iconButtonActive,
-
                                     isBothEnabled &&
                                     styles.iconButtonFullyActive,
                                 ]}
@@ -597,13 +517,11 @@ export default function AppHeader() {
                                     }
                                 />
                             </TouchableOpacity>
-
                             {hasUnreadNotifications && (
                                 <View
                                     pointerEvents="none"
                                     style={[
                                         styles.unreadBadge,
-
                                         unreadCount > 99 &&
                                         styles.unreadBadgeWide,
                                     ]}
@@ -627,13 +545,11 @@ export default function AppHeader() {
         </SafeAreaView>
     );
 }
-
 /*
 |--------------------------------------------------------------------------
 | Styles
 |--------------------------------------------------------------------------
 */
-
 const createStyles = (
     theme: ReturnType<
         typeof getHeaderTheme
@@ -643,31 +559,22 @@ const createStyles = (
         safeArea: {
             backgroundColor: theme.background,
         },
-
         headerBackground: {
             backgroundColor: theme.background,
-
-            paddingHorizontal: 14,
-            paddingTop: 8,
-            paddingBottom: 8,
-
+            paddingHorizontal: theme.mode === "night" ? 14 : 16,
+            paddingTop: theme.mode === "night" ? 8 : 7,
+            paddingBottom: theme.mode === "night" ? 8 : 7,
             position: "relative",
         },
-
         cardGlow: {
             position: "absolute",
-
             left: 18,
             right: 18,
             top: 12,
             bottom: 12,
-
             borderRadius: 24,
-
             backgroundColor: theme.glow,
-
             opacity: theme.glowOpacity,
-
             transform: [
                 {
                     scaleX: 1.015,
@@ -676,261 +583,249 @@ const createStyles = (
                     scaleY: 1.08,
                 },
             ],
-
             shadowColor: theme.glow,
-
             shadowOffset: {
                 width: 0,
                 height: 0,
             },
-
             shadowOpacity:
                 theme.mode === "night"
                     ? 0.62
                     : 0,
-
             shadowRadius: 18,
-
             elevation:
                 theme.mode === "night"
                     ? 5
                     : 0,
         },
-
         card: {
-            height: 68,
-
+            height: theme.mode === "night" ? 68 : 58,
             backgroundColor: theme.card,
-
-            borderRadius: 20,
-
+            borderRadius: theme.mode === "night" ? 20 : 0,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-
-            paddingHorizontal: 16,
-
+            paddingHorizontal: theme.mode === "night" ? 16 : 4,
             position: "relative",
-
-            borderWidth:
-                theme.mode === "night"
-                    ? 0.15
-                    : 1,
-
+            borderWidth: theme.mode === "night" ? 0.15 : 0,
             borderColor:
                 theme.mode === "night"
                     ? theme.cardBorder
-                    : "rgba(7,17,31,0.06)",
-
-            // No shadow during the day.
+                    : "transparent",
             shadowColor:
                 theme.mode === "night"
                     ? theme.glow
                     : "transparent",
-
             shadowOffset: {
                 width: 0,
                 height: 0,
             },
-
-            shadowOpacity:
-                theme.mode === "night"
-                    ? 0.28
-                    : 0,
-
-            shadowRadius:
-                theme.mode === "night"
-                    ? 14
-                    : 0,
-
-            elevation:
-                theme.mode === "night"
-                    ? 6
-                    : 0,
+            shadowOpacity: theme.mode === "night" ? 0.28 : 0,
+            shadowRadius: theme.mode === "night" ? 14 : 0,
+            elevation: theme.mode === "night" ? 6 : 0,
         },
-
         sideLeft: {
-            width: 72,
+            width: theme.mode === "night" ? 72 : 58,
             height: "100%",
-
             justifyContent: "center",
             alignItems: "flex-start",
-
             zIndex: 5,
         },
-
         sideRight: {
-            width: 72,
+            width: theme.mode === "night" ? 72 : 58,
             height: "100%",
-
             justifyContent: "center",
             alignItems: "flex-end",
-
             zIndex: 5,
         },
-
         avatarButton: {
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-
+            width: theme.mode === "night" ? 44 : 42,
+            height: theme.mode === "night" ? 44 : 42,
+            borderRadius: theme.mode === "night" ? 22 : 21,
             alignItems: "center",
             justifyContent: "center",
-
             backgroundColor: theme.surface,
-
-            borderWidth: 1.5,
-
-            borderColor: theme.buttonBorder,
-
+            borderWidth: theme.mode === "night" ? 1.5 : 1.5,
+            borderColor:
+                theme.mode === "night"
+                    ? theme.buttonBorder
+                    : "rgba(7,17,31,0.10)",
             overflow: "hidden",
-
-            shadowColor: theme.cyan,
-
+            shadowColor:
+                theme.mode === "night"
+                    ? theme.cyan
+                    : "transparent",
             shadowOffset: {
                 width: 0,
                 height: 3,
             },
-
-            shadowOpacity: 0.14,
-            shadowRadius: 7,
-
-            elevation: 4,
+            shadowOpacity: theme.mode === "night" ? 0.14 : 0,
+            shadowRadius: theme.mode === "night" ? 7 : 0,
+            elevation: theme.mode === "night" ? 4 : 0,
         },
-
         avatarPlaceholder: {
             width: "100%",
             height: "100%",
         },
-
         avatarImage: {
             width: "100%",
             height: "100%",
-            borderRadius: 22,
+            borderRadius: theme.mode === "night" ? 22 : 21,
         },
-
         logoWrapper: {
             position: "absolute",
-
-            left: 72,
-            right: 72,
+            left: theme.mode === "night" ? 72 : 58,
+            right: theme.mode === "night" ? 72 : 58,
             top: 0,
             bottom: 0,
-
             justifyContent: "center",
             alignItems: "center",
-
             zIndex: 1,
         },
-
         logoPressable: {
             justifyContent: "center",
             alignItems: "center",
+            minHeight: 42,
+            paddingHorizontal: 6,
         },
-
-        logo: {
-            width: 180,
-            height: 52,
-
-            transform: [
-                {
-                    scale: 1.98,
-                },
-                {
-                    translateX: -3,
-                },
-                {
-                    translateY: 3,
-                },
-                {
-                    rotate: "1deg",
-                },
-            ],
+        monogramWrap: {
+            minWidth: theme.mode === "night" ? 92 : 84,
+            height: theme.mode === "night" ? 42 : 38,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            transform:
+                theme.mode === "night"
+                    ? [{ translateY: 1 }]
+                    : [{ translateY: 0 }],
         },
-
         bellWrapper: {
             position: "relative",
         },
-
         iconButton: {
-            width: 44,
-            height: 44,
-            borderRadius: 14,
-
+            width: theme.mode === "night" ? 44 : 42,
+            height: theme.mode === "night" ? 44 : 42,
+            borderRadius: theme.mode === "night" ? 14 : 21,
             alignItems: "center",
             justifyContent: "center",
-
-            backgroundColor: theme.surface,
-
-            borderWidth: 1,
-
-            borderColor: theme.buttonBorder,
-
-            shadowColor: theme.cyan,
-
+            backgroundColor:
+                theme.mode === "night"
+                    ? theme.surface
+                    : "transparent",
+            borderWidth: theme.mode === "night" ? 1 : 0,
+            borderColor:
+                theme.mode === "night"
+                    ? theme.buttonBorder
+                    : "transparent",
+            shadowColor:
+                theme.mode === "night"
+                    ? theme.cyan
+                    : "transparent",
             shadowOffset: {
                 width: 0,
                 height: 3,
             },
-
-            shadowOpacity: 0.14,
-            shadowRadius: 7,
-
-            elevation: 4,
+            shadowOpacity: theme.mode === "night" ? 0.14 : 0,
+            shadowRadius: theme.mode === "night" ? 7 : 0,
+            elevation: theme.mode === "night" ? 4 : 0,
         },
-
         iconButtonActive: {
-            backgroundColor: theme.activeBackground,
-
-            borderColor: theme.activeBorder,
+            backgroundColor:
+                theme.mode === "night"
+                    ? theme.activeBackground
+                    : "transparent",
+            borderColor:
+                theme.mode === "night"
+                    ? theme.activeBorder
+                    : "transparent",
         },
-
         iconButtonFullyActive: {
-            backgroundColor: theme.yellow,
-
-            borderColor: theme.yellow,
+            backgroundColor:
+                theme.mode === "night"
+                    ? theme.yellow
+                    : "transparent",
+            borderColor:
+                theme.mode === "night"
+                    ? theme.yellow
+                    : "transparent",
         },
-
         unreadBadge: {
             position: "absolute",
-
             top: -7,
             right: -7,
-
             minWidth: 20,
             height: 20,
-
             paddingHorizontal: 5,
-
             borderRadius: 10,
-
             alignItems: "center",
             justifyContent: "center",
-
             backgroundColor: "#EF4444",
-
             borderWidth: 2,
             borderColor: theme.card,
-
             zIndex: 20,
-
             elevation: 10,
         },
-
         unreadBadgeWide: {
             minWidth: 30,
         },
-
         unreadBadgeText: {
             color: "#FFFFFF",
-
             fontSize: 10,
             lineHeight: 12,
-
             fontWeight: "800",
-
             textAlign: "center",
-
             includeFontPadding: false,
+        },
+        letterWrap: {
+            position: "relative",
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        monogramOutline: {
+            position: "absolute",
+            color: "#000000",
+            fontSize: theme.mode === "night" ? 39 : 35,
+            lineHeight: theme.mode === "night" ? 40 : 36,
+            fontWeight: "900",
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            includeFontPadding: false,
+            textShadowColor: "#000000",
+            textShadowOffset: { width: 0, height: 0 },
+            textShadowRadius: 1.5,
+            zIndex: 1,
+        },
+        monogramS: {
+            color: "#FACC15",
+            fontSize: theme.mode === "night" ? 35 : 34,
+            lineHeight: theme.mode === "night" ? 36 : 35,
+            fontWeight: "900",
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            includeFontPadding: false,
+            textShadowColor:
+                theme.mode === "night"
+                    ? "rgba(0,0,0,0.45)"
+                    : "transparent",
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: theme.mode === "night" ? 1 : 0,
+            zIndex: 2,
+            marginRight: 2,
+        },
+        monogramF: {
+            color: "#EF4444",
+            fontSize: theme.mode === "night" ? 35 : 34,
+            lineHeight: theme.mode === "night" ? 36 : 35,
+            fontWeight: "900",
+            letterSpacing: 1,
+            textTransform: "uppercase",
+            includeFontPadding: false,
+            textShadowColor:
+                theme.mode === "night"
+                    ? "rgba(0,0,0,0.45)"
+                    : "transparent",
+            textShadowOffset: { width: 0, height: 1 },
+            textShadowRadius: theme.mode === "night" ? 1 : 0,
+            zIndex: 2,
         },
     });

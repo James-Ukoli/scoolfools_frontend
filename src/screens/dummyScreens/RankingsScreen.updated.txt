@@ -1781,7 +1781,18 @@ export default function RankingsScreen({ navigation }: any) {
                         </Text>
                     </View>
 
-
+                    <Text
+                        style={[
+                            styles.articleCount,
+                            {
+                                color: theme.muted,
+                                backgroundColor: theme.cardAlt,
+                                borderColor: theme.border,
+                            },
+                        ]}
+                    >
+                        {recentArticles.length}
+                    </Text>
                 </View>
 
                 {!!articlesError && (

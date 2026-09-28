@@ -19,7 +19,7 @@ export default function AppShell() {
 
     const shellBackground = isDark
         ? "#020617"
-        : "#F8FAFC";
+        : "#FFFFFF";
 
     return (
         <View

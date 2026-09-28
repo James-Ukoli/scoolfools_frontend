@@ -616,7 +616,7 @@ export default function HomeScreen() {
                 localizedPrice={
                     subscriptionProduct?.displayPrice ||
                     subscriptionProduct?.localizedPrice ||
-                    "$3.99"
+                    "$0.99"
                 }
                 billingPeriodLabel="every 6 months"
                 buttonLabel="Unlock Premium Access"
