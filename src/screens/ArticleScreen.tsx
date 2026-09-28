@@ -43,9 +43,7 @@ import {
     SubscriptionVerificationError,
     verifyScoolFoolsSubscription,
 } from "../services/subscriptionVerification";
-
 type TimeTheme = "day" | "night";
-
 type PostBlock = {
     _id: string;
     post_id: string;
@@ -64,7 +62,6 @@ type PostBlock = {
     created_at?: string;
     updated_at?: string;
 };
-
 type Post = {
     _id: string;
     title: string;
@@ -78,23 +75,19 @@ type Post = {
     content_type?: string;
     blocks?: PostBlock[];
 };
-
 type ArticleRouteParams = {
     ArticleScreen: {
         slug: string;
     };
 };
-
 const API_BASE_URL =
     Platform.OS === "android"
         ? process.env.EXPO_PUBLIC_ANDROID_API_BASE_URL
         : process.env.EXPO_PUBLIC_API_BASE_URL;
-
 const getCurrentThemeMode = (): TimeTheme => {
     const hour = new Date().getHours();
     return hour >= 6 && hour < 19 ? "day" : "night";
 };
-
 const getArticleTheme = (mode: TimeTheme) => {
     if (mode === "day") {
         return {
@@ -114,7 +107,6 @@ const getArticleTheme = (mode: TimeTheme) => {
             previewBg: "#000000",
         };
     }
-
     return {
         bg: "#020617",
         card: "#090D14",
@@ -132,7 +124,6 @@ const getArticleTheme = (mode: TimeTheme) => {
         previewBg: "#000000",
     };
 };
-
 function FadeInBlock({
     index,
     children,
@@ -143,7 +134,6 @@ function FadeInBlock({
     const opacity = useRef(new Animated.Value(0)).current;
     const translateY = useRef(new Animated.Value(22)).current;
     const scale = useRef(new Animated.Value(0.985)).current;
-
     useEffect(() => {
         Animated.parallel([
             Animated.timing(opacity, {
@@ -169,7 +159,6 @@ function FadeInBlock({
             }),
         ]).start();
     }, [index, opacity, scale, translateY]);
-
     return (
         <Animated.View
             style={{
@@ -181,15 +170,12 @@ function FadeInBlock({
         </Animated.View>
     );
 }
-
 export default function ArticleScreen() {
     const route = useRoute<RouteProp<ArticleRouteParams, "ArticleScreen">>();
     const navigation = useNavigation<any>();
     const { slug } = route.params;
-
     const [themeMode, setThemeMode] = useState<TimeTheme>(getCurrentThemeMode());
     const theme = getArticleTheme(themeMode);
-
     const [post, setPost] = useState<Post | null>(null);
     const [blocks, setBlocks] = useState<PostBlock[]>([]);
     const [loading, setLoading] = useState(true);
@@ -201,14 +187,41 @@ export default function ArticleScreen() {
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
     const [showConfetti, setShowConfetti] = useState(false);
-
+    const [heroAspectRatio, setHeroAspectRatio] = useState(16 / 9);
+    const [blockImageRatios, setBlockImageRatios] = useState<Record<string, number>>({});
     const player = useAudioPlayer(null);
     const playerStatus = useAudioPlayerStatus(player);
     const { width: screenWidth } = useWindowDimensions();
-
     const articleHorizontalPadding = s(17);
     const videoWidth = screenWidth - articleHorizontalPadding * 2;
     const videoHeight = videoWidth * (9 / 16);
+
+    const handleHeroImageLoad = useCallback((event: any) => {
+        const width = event?.nativeEvent?.source?.width;
+        const height = event?.nativeEvent?.source?.height;
+
+        if (width > 0 && height > 0) {
+            setHeroAspectRatio(width / height);
+        }
+    }, []);
+
+    const handleBlockImageLoad = useCallback(
+        (blockId: string, event: any) => {
+            const width = event?.nativeEvent?.source?.width;
+            const height = event?.nativeEvent?.source?.height;
+
+            if (width > 0 && height > 0) {
+                const ratio = width / height;
+
+                setBlockImageRatios((current) => ({
+                    ...current,
+                    [blockId]: ratio,
+                }));
+            }
+        },
+        [],
+    );
+
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const rippleAnim1 = useRef(new Animated.Value(0)).current;
     const rippleAnim2 = useRef(new Animated.Value(0)).current;
@@ -219,21 +232,17 @@ export default function ArticleScreen() {
     const rippleDelayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
-
     const screenFade = useRef(new Animated.Value(0)).current;
     const heroFade = useRef(new Animated.Value(0)).current;
     const heroTranslate = useRef(new Animated.Value(18)).current;
     const headerFade = useRef(new Animated.Value(0)).current;
     const headerTranslate = useRef(new Animated.Value(18)).current;
-
     const updateStoredSubscriptionState = useCallback(
         async (subscribed: boolean) => {
             const storedUserRaw = await AsyncStorage.getItem("user");
             if (!storedUserRaw) return;
-
             try {
                 const storedUser = JSON.parse(storedUserRaw);
-
                 await AsyncStorage.setItem(
                     "user",
                     JSON.stringify({
@@ -247,21 +256,17 @@ export default function ArticleScreen() {
         },
         [],
     );
-
     const fetchEntitlements = useCallback(async () => {
         try {
             const token = await AsyncStorage.getItem("token");
             if (!token || !API_BASE_URL) return;
-
             const response = await fetch(`${API_BASE_URL}/api/auth/me/entitlements`, {
                 method: "GET",
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
-
             const data = await response.json();
-
             if (response.ok && data?.success) {
                 const subscribed = !!data?.entitlements?.isSubscribed;
                 setIsSubscribed(subscribed);
@@ -271,7 +276,6 @@ export default function ArticleScreen() {
             console.log("Article entitlement fetch error:", error);
         }
     }, [updateStoredSubscriptionState]);
-
     const loadSubscriptionProduct = async () => {
         try {
             await initializeIAP();
@@ -281,7 +285,6 @@ export default function ArticleScreen() {
             console.log("Article subscription load error:", error);
         }
     };
-
     const verifySubscriptionOnBackend = useCallback(
         async (purchase: any) => {
             try {
@@ -289,30 +292,22 @@ export default function ArticleScreen() {
                     await verifyScoolFoolsSubscription(
                         purchase
                     );
-
                 const subscribed =
                     result.isSubscribed === true;
-
                 setIsSubscribed(subscribed);
                 setPaywallVisible(false);
-
                 await updateStoredSubscriptionState(
                     subscribed
                 );
-
                 await fetchEntitlements();
-
                 if (subscribed) {
                     setShowConfetti(true);
-
                     Alert.alert(
                         "Narration Unlocked 🎉",
                         "AI narration is now available for every article."
                     );
-
                     return;
                 }
-
                 Alert.alert(
                     "Subscription Inactive",
                     "The store verified this subscription, but it is not currently active."
@@ -322,41 +317,32 @@ export default function ArticleScreen() {
                     "Article subscription verification error:",
                     error
                 );
-
                 if (
                     isPurchaseAlreadyLinkedError(
                         error
                     )
                 ) {
                     setIsSubscribed(false);
-
                     await updateStoredSubscriptionState(
                         false
                     );
-
                     await fetchEntitlements();
-
                     Alert.alert(
                         "Subscription Already Linked",
                         "This App Store or Google Play subscription is already connected to another ScoolFools account."
                     );
-
                     return;
                 }
-
                 if (
                     isOwnershipMismatchError(error)
                 ) {
                     await fetchEntitlements();
-
                     Alert.alert(
                         "Different Subscription Detected",
                         "This ScoolFools account is already connected to a different store subscription."
                     );
-
                     return;
                 }
-
                 if (
                     error instanceof
                     SubscriptionVerificationError
@@ -369,32 +355,25 @@ export default function ArticleScreen() {
                             "Sign In Required",
                             error.message
                         );
-
                         return;
                     }
-
                     if (
                         error.code ===
                         "FINISH_TRANSACTION_FAILED"
                     ) {
                         await fetchEntitlements();
-
                         Alert.alert(
                             "Subscription Verified",
                             "Your subscription was linked successfully, but the app store transaction still needs to finish. Please reopen the app and try restoring again."
                         );
-
                         return;
                     }
-
                     Alert.alert(
                         "Verification Failed",
                         error.message
                     );
-
                     return;
                 }
-
                 Alert.alert(
                     "Verification Failed",
                     "Your subscription could not be securely linked to your ScoolFools account."
@@ -408,22 +387,17 @@ export default function ArticleScreen() {
             updateStoredSubscriptionState,
         ]
     );
-
     const handleSubscribePress = async () => {
         setLoadingSubscription(true);
-
         await buyBlogsSubscription({
             onSuccess:
                 verifySubscriptionOnBackend,
-
             onError: (error: any) => {
                 setLoadingSubscription(false);
-
                 console.log(
                     "Article subscription purchase error:",
                     error
                 );
-
                 if (
                     error?.code ===
                     "user-cancelled" ||
@@ -432,7 +406,6 @@ export default function ArticleScreen() {
                 ) {
                     return;
                 }
-
                 Alert.alert(
                     "Subscription Failed",
                     error?.message ||
@@ -441,23 +414,18 @@ export default function ArticleScreen() {
             },
         });
     };
-
     const openNarrationPaywall = () => {
         setPaywallVisible(true);
         void loadSubscriptionProduct();
     };
-
     useEffect(() => {
         const interval = setInterval(() => {
             setThemeMode(getCurrentThemeMode());
         }, 60000);
-
         return () => clearInterval(interval);
     }, []);
-
     useEffect(() => {
         void fetchEntitlements();
-
         setupPurchaseListeners({
             onPurchaseSuccess: async () => { },
             onGamesPackSuccess: async () => { },
@@ -469,12 +437,10 @@ export default function ArticleScreen() {
                 console.log("Article subscription listener error:", error);
             },
         });
-
         return () => {
             void cleanupIAP();
         };
     }, [fetchEntitlements, verifySubscriptionOnBackend]);
-
     useEffect(() => {
         Animated.sequence([
             Animated.timing(screenFade, {
@@ -513,22 +479,18 @@ export default function ArticleScreen() {
             ]),
         ]).start();
     }, [headerFade, headerTranslate, heroFade, heroTranslate, screenFade]);
-
     useEffect(() => {
         const fetchArticle = async () => {
             try {
                 setLoading(true);
-
                 const postResponse = await fetch(
                     `${API_BASE_URL}/api/posts/slug/${slug}`,
                 );
                 const postJson = await postResponse.json();
-
                 const fetchedPost: Post = postJson;
                 const fetchedBlocks: PostBlock[] = (postJson.blocks || []).sort(
                     (a: PostBlock, b: PostBlock) => a.order_index - b.order_index,
                 );
-
                 setPost(fetchedPost);
                 setBlocks(fetchedBlocks);
             } catch (error) {
@@ -538,10 +500,8 @@ export default function ArticleScreen() {
                 setLoading(false);
             }
         };
-
         fetchArticle();
     }, [slug]);
-
     const displayDate = useMemo(() => {
         if (!post) return "";
         const sourceDate = post.published_at || post.created_at;
@@ -551,10 +511,8 @@ export default function ArticleScreen() {
             year: "numeric",
         });
     }, [post]);
-
     const articleSpeechText = useMemo(() => {
         if (!post) return "";
-
         const readableBlocks = blocks
             .filter((block) =>
                 ["header", "subheader", "paragraph", "caption", "quote"].includes(
@@ -563,15 +521,11 @@ export default function ArticleScreen() {
             )
             .map((block) => block.input?.trim())
             .filter(Boolean);
-
         return readableBlocks.join(". ");
     }, [post, blocks]);
-
     const isPlaying = !!playerStatus?.playing;
-
     const handleShare = async () => {
         if (!post) return;
-
         try {
             await Share.share({
                 title: post.title,
@@ -581,7 +535,6 @@ export default function ArticleScreen() {
             console.log("Share error:", error);
         }
     };
-
     const normalizeUrl = (rawUrl: string) => {
         const trimmed = rawUrl.trim();
 
@@ -606,67 +559,53 @@ export default function ArticleScreen() {
 
         return trimmed;
     };
-
     const openExternalLink = async (rawUrl: string) => {
         try {
             const url = normalizeUrl(rawUrl);
-
             if (!url) {
                 Alert.alert("Invalid link", "This link is empty.");
                 return;
             }
-
             await WebBrowser.openBrowserAsync(url);
         } catch (error) {
             console.log("Could not open link:", error);
             Alert.alert("Error", "Could not open link.");
         }
     };
-
     const getYoutubeId = (rawUrl: string) => {
         try {
             const url = normalizeUrl(rawUrl);
-
             if (url.includes("youtube.com/shorts/")) {
                 return url.split("shorts/")[1]?.split("?")[0] || null;
             }
-
             if (url.includes("youtube.com/watch?v=")) {
                 return url.split("v=")[1]?.split("&")[0] || null;
             }
-
             if (url.includes("youtu.be/")) {
                 return url.split("youtu.be/")[1]?.split("?")[0] || null;
             }
-
             return null;
         } catch {
             return null;
         }
     };
-
     const stopSpeakingAnimation = () => {
         pulseLoopRef.current?.stop();
         rippleLoop1Ref.current?.stop();
         rippleLoop2Ref.current?.stop();
-
         if (rippleDelayTimeoutRef.current) {
             clearTimeout(rippleDelayTimeoutRef.current);
             rippleDelayTimeoutRef.current = null;
         }
-
         pulseAnim.stopAnimation();
         rippleAnim1.stopAnimation();
         rippleAnim2.stopAnimation();
-
         pulseAnim.setValue(1);
         rippleAnim1.setValue(0);
         rippleAnim2.setValue(0);
     };
-
     const startSpeakingAnimation = () => {
         stopSpeakingAnimation();
-
         pulseLoopRef.current = Animated.loop(
             Animated.sequence([
                 Animated.timing(pulseAnim, {
@@ -683,7 +622,6 @@ export default function ArticleScreen() {
                 }),
             ]),
         );
-
         rippleLoop1Ref.current = Animated.loop(
             Animated.sequence([
                 Animated.timing(rippleAnim1, {
@@ -699,7 +637,6 @@ export default function ArticleScreen() {
                 }),
             ]),
         );
-
         rippleLoop2Ref.current = Animated.loop(
             Animated.sequence([
                 Animated.timing(rippleAnim2, {
@@ -715,15 +652,12 @@ export default function ArticleScreen() {
                 }),
             ]),
         );
-
         pulseLoopRef.current.start();
         rippleLoop1Ref.current.start();
-
         rippleDelayTimeoutRef.current = setTimeout(() => {
             rippleLoop2Ref.current?.start();
         }, 450);
     };
-
     useEffect(() => {
         if (isPlaying) {
             startSpeakingAnimation();
@@ -731,12 +665,15 @@ export default function ArticleScreen() {
             stopSpeakingAnimation();
         }
     }, [isPlaying]);
-
     useEffect(() => {
         return () => {
             stopSpeakingAnimation();
         };
     }, []);
+    useEffect(() => {
+        setHeroAspectRatio(16 / 9);
+        setBlockImageRatios({});
+    }, [slug]);
 
     useEffect(() => {
         try {
@@ -746,19 +683,15 @@ export default function ArticleScreen() {
         } catch (error) {
             console.log("Player slug cleanup pause skipped:", error);
         }
-
         setCurrentAudioUrl(null);
         stopSpeakingAnimation();
     }, [slug]);
-
     const handleToggleNarration = async () => {
         if (!post) return;
-
         if (!isSubscribed) {
             openNarrationPaywall();
             return;
         }
-
         if (isPlaying) {
             try {
                 player.pause();
@@ -767,16 +700,12 @@ export default function ArticleScreen() {
             }
             return;
         }
-
         try {
             setIsGeneratingNarration(true);
-
             const token = await AsyncStorage.getItem("token");
-
             if (!token) {
                 throw new Error("Your session has expired. Please sign in again.");
             }
-
             const response = await fetch(`${API_BASE_URL}/api/article-narration`, {
                 method: "POST",
                 headers: {
@@ -790,19 +719,14 @@ export default function ArticleScreen() {
                     text: articleSpeechText,
                 }),
             });
-
             const json = await response.json();
-
             if (!response.ok || !json.audioUrl) {
                 throw new Error(json?.error || "Narration generation failed.");
             }
-
             const fullAudioUrl = json.audioUrl.startsWith("http")
                 ? json.audioUrl
                 : `${API_BASE_URL}${json.audioUrl}`;
-
             setCurrentAudioUrl(fullAudioUrl);
-
             player.replace(fullAudioUrl);
             player.play();
         } catch (error) {
@@ -812,7 +736,6 @@ export default function ArticleScreen() {
             setIsGeneratingNarration(false);
         }
     };
-
     const renderBlock = (block: PostBlock) => {
         switch (block.block_type) {
             case "header":
@@ -832,21 +755,18 @@ export default function ArticleScreen() {
                         {block.input}
                     </Text>
                 );
-
             case "subheader":
                 return (
                     <Text style={[styles.subheader, { color: theme.text }]}>
                         {block.input}
                     </Text>
                 );
-
             case "paragraph":
                 return (
                     <Text style={[styles.paragraph, { color: theme.textSoft }]}>
                         {block.input}
                     </Text>
                 );
-
             case "image":
                 return (
                     <Pressable
@@ -854,28 +774,36 @@ export default function ArticleScreen() {
                             styles.mediaBlock,
                             {
                                 borderColor: theme.borderStrong,
+                                backgroundColor: theme.card,
                             },
                         ]}
                         onPress={() => setPreviewImage(block.input)}
                     >
                         <Image
                             source={{ uri: block.input }}
-                            style={styles.blockImage}
-                            resizeMode="contain"
+                            style={[
+                                styles.blockImage,
+                                {
+                                    aspectRatio:
+                                        blockImageRatios[block._id] ?? 16 / 9,
+                                },
+                            ]}
+                            resizeMode="cover"
+                            onLoad={(event) =>
+                                handleBlockImageLoad(block._id, event)
+                            }
                             onError={() =>
                                 console.log("Block image failed:", block.input)
                             }
                         />
                     </Pressable>
                 );
-
             case "caption":
                 return (
                     <Text style={[styles.caption, { color: theme.muted }]}>
                         {block.input}
                     </Text>
                 );
-
             case "quote":
                 return (
                     <View
@@ -902,7 +830,6 @@ export default function ArticleScreen() {
                         </Text>
                     </View>
                 );
-
             case "link":
                 return (
                     <Pressable
@@ -924,7 +851,6 @@ export default function ArticleScreen() {
                         </Text>
                     </Pressable>
                 );
-
             case "pgn":
                 return (
                     <View
@@ -944,10 +870,8 @@ export default function ArticleScreen() {
                         </ScrollView>
                     </View>
                 );
-
             case "video": {
                 const youtubeId = getYoutubeId(block.input);
-
                 if (!youtubeId) {
                     return (
                         <Pressable
@@ -978,7 +902,6 @@ export default function ArticleScreen() {
                         </Pressable>
                     );
                 }
-
                 return (
                     <View
                         style={[
@@ -1006,12 +929,10 @@ export default function ArticleScreen() {
                     </View>
                 );
             }
-
             default:
                 return null;
         }
     };
-
     if (loading) {
         return (
             <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
@@ -1035,7 +956,6 @@ export default function ArticleScreen() {
             </SafeAreaView>
         );
     }
-
     if (!post) {
         return (
             <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.bg }]}>
@@ -1047,7 +967,6 @@ export default function ArticleScreen() {
             </SafeAreaView>
         );
     }
-
     return (
         <SafeAreaView
             edges={["top"]}
@@ -1083,7 +1002,6 @@ export default function ArticleScreen() {
                             >
                                 <Ionicons name="arrow-back" size={20} color={theme.icon} />
                             </Pressable>
-
                             {!!post.category && (
                                 <View
                                     style={[
@@ -1101,7 +1019,6 @@ export default function ArticleScreen() {
                                     </Text>
                                 </View>
                             )}
-
                             {!!post.content_type && (
                                 <View
                                     style={[
@@ -1118,7 +1035,6 @@ export default function ArticleScreen() {
                                 </View>
                             )}
                         </View>
-
                         <Pressable
                             style={[
                                 styles.shareButton,
@@ -1136,7 +1052,6 @@ export default function ArticleScreen() {
                             />
                         </Pressable>
                     </View>
-
                     {!!post.cover_image_url && (
                         <Animated.View
                             style={[
@@ -1149,8 +1064,14 @@ export default function ArticleScreen() {
                         >
                             <Image
                                 source={{ uri: post.cover_image_url }}
-                                style={styles.heroImage}
+                                style={[
+                                    styles.heroImage,
+                                    {
+                                        aspectRatio: heroAspectRatio,
+                                    },
+                                ]}
                                 resizeMode="cover"
+                                onLoad={handleHeroImageLoad}
                             />
                             <View
                                 pointerEvents="none"
@@ -1166,7 +1087,6 @@ export default function ArticleScreen() {
                             />
                         </Animated.View>
                     )}
-
                     <Animated.View
                         style={[
                             styles.headerSection,
@@ -1190,13 +1110,11 @@ export default function ArticleScreen() {
                         >
                             {post.title}
                         </Text>
-
                         {!!post.summary && (
                             <Text style={[styles.summary, { color: theme.textSoft }]}>
                                 {post.summary}
                             </Text>
                         )}
-
                         <View
                             style={[
                                 styles.metaCard,
@@ -1215,7 +1133,6 @@ export default function ArticleScreen() {
                                 {post.author || "ScoolFools"} · {displayDate}
                             </Text>
                         </View>
-
                         <Pressable
                             onPress={handleToggleNarration}
                             style={({ pressed }) => [
@@ -1247,7 +1164,6 @@ export default function ArticleScreen() {
                                     color={theme.cyan}
                                 />
                             )}
-
                             <Text style={[styles.aiDisclosure, { color: theme.cyan }]}>
                                 {isGeneratingNarration
                                     ? "Preparing narration..."
@@ -1259,7 +1175,6 @@ export default function ArticleScreen() {
                             </Text>
                         </Pressable>
                     </Animated.View>
-
                     <View style={styles.articleBody}>
                         {blocks.map((block, index) => (
                             <FadeInBlock key={block._id} index={index + 4}>
@@ -1268,7 +1183,6 @@ export default function ArticleScreen() {
                         ))}
                     </View>
                 </ScrollView>
-
                 {previewImage && (
                     <View style={styles.imagePreviewOverlay}>
                         <Pressable
@@ -1277,7 +1191,6 @@ export default function ArticleScreen() {
                         >
                             <Ionicons name="close" size={30} color="#FFFFFF" />
                         </Pressable>
-
                         <ScrollView
                             style={{ flex: 1, width: "100%" }}
                             contentContainerStyle={styles.zoomContainer}
@@ -1293,7 +1206,6 @@ export default function ArticleScreen() {
                         </ScrollView>
                     </View>
                 )}
-
                 <Pressable
                     onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
                     style={[
@@ -1309,7 +1221,6 @@ export default function ArticleScreen() {
                 >
                     <Ionicons name="arrow-up" size={24} color={theme.icon} />
                 </Pressable>
-
                 <Animated.View
                     style={[
                         styles.ttsButtonWrapper,
@@ -1364,7 +1275,6 @@ export default function ArticleScreen() {
                             />
                         </>
                     )}
-
                     <Pressable
                         onPress={handleToggleNarration}
                         style={({ pressed }) => [
@@ -1401,7 +1311,6 @@ export default function ArticleScreen() {
                     </Pressable>
                 </Animated.View>
             </Animated.View>
-
             <BlogsPaywallModal
                 visible={paywallVisible}
                 onClose={() => setPaywallVisible(false)}
@@ -1412,7 +1321,6 @@ export default function ArticleScreen() {
                 buttonLabel="Unlock AI Narration"
                 themeMode={themeMode}
             />
-
             {showConfetti && (
                 <ConfettiCannon
                     count={140}
@@ -1426,7 +1334,6 @@ export default function ArticleScreen() {
         </SafeAreaView>
     );
 }
-
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
@@ -1534,7 +1441,6 @@ const styles = StyleSheet.create({
     },
     heroImage: {
         width: "100%",
-        aspectRatio: 16 / 9,
     },
     heroGlow: {
         position: "absolute",
@@ -1630,12 +1536,9 @@ const styles = StyleSheet.create({
         borderRadius: s(18),
         overflow: "hidden",
         borderWidth: 1,
-        backgroundColor: "#000000",
     },
-
     blockImage: {
         width: "100%",
-        height: vs(240),
     },
     caption: {
         fontSize: ms(12.5),
@@ -1803,7 +1706,6 @@ const styles = StyleSheet.create({
         marginVertical: vs(13),
         borderWidth: 1,
     },
-
     youtubeWebView: {
         backgroundColor: "#000000",
     },
