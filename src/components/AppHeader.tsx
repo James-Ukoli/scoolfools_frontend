@@ -111,7 +111,7 @@ const getHeaderTheme = (
     }
     return {
         mode,
-        background: "#F8FAFC",
+        background: "#FFFFFF",
         // Day mode uses a clean white header with no colored card.
         card: "#FFFFFF",
         surface: "#FFFFFF",
