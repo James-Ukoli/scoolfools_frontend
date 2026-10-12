@@ -124,7 +124,7 @@ export default function ContactUsScreen() {
                     </TouchableOpacity>
 
                     <View>
-                        <Text style={styles.eyebrow}>SCOOLFOOLS</Text>
+
                         <Text style={styles.screenTitle}>Contact Us</Text>
                     </View>
                 </View>
