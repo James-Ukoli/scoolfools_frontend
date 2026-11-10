@@ -4719,7 +4719,7 @@ const styles =
         floatingCreateButton: {
             position: "absolute",
             right: s(18),
-            bottom: Platform.OS === "ios" ? vs(85) : vs(20),
+            bottom: Platform.OS === "ios" ? vs(25) : vs(20),
             width: s(56),
             height: s(56),
             borderRadius: s(28),
