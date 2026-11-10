@@ -15,6 +15,8 @@ import React, {
 import {
 
     ActivityIndicator,
+    Animated,
+    Easing,
 
     Alert,
 
@@ -416,7 +418,130 @@ const getBooleanValue = (
 
 
 
+
+/*
+ * Screen-level reaction celebration.
+ * Renders over the feed, not inside a FlatList cell, to avoid Android clipping.
+ * pointerEvents="none" ensures it never blocks scrolling or tapping.
+ */
+type ScreenReactionType = "fire" | "laugh" | "heart";
+
+type ScreenReactionEvent = {
+    id: number;
+    type: ScreenReactionType;
+};
+
+function ScreenReactionCelebration({
+    event,
+    onComplete,
+}: {
+    event: ScreenReactionEvent;
+    onComplete: (id: number) => void;
+}) {
+    const animation = useRef(new Animated.Value(0)).current;
+    const completeRef = useRef(onComplete);
+    completeRef.current = onComplete;
+
+    useEffect(() => {
+        animation.setValue(0);
+        const run = Animated.timing(animation, {
+            toValue: 1,
+            duration: 1550,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+        });
+        run.start(({ finished }) => {
+            if (finished) completeRef.current(event.id);
+        });
+        return () => run.stop();
+    }, [animation, event.id]);
+
+    const emoji = event.type === "fire" ? "🔥" : event.type === "laugh" ? "😂" : "❤️";
+    const paths = [
+        { dx: -130, dy: -230, delay: 0.00, size: 30, rotate: -30 },
+        { dx: -75, dy: -295, delay: 0.04, size: 36, rotate: 20 },
+        { dx: -24, dy: -355, delay: 0.08, size: 33, rotate: -22 },
+        { dx: 40, dy: -310, delay: 0.12, size: 39, rotate: 30 },
+        { dx: 120, dy: -250, delay: 0.16, size: 30, rotate: -25 },
+        { dx: -105, dy: -410, delay: 0.20, size: 28, rotate: 18 },
+        { dx: 90, dy: -430, delay: 0.24, size: 32, rotate: -18 },
+        { dx: 0, dy: -475, delay: 0.28, size: 35, rotate: 15 },
+        { dx: 155, dy: -365, delay: 0.32, size: 27, rotate: 28 },
+    ];
+
+    return (
+        <View
+            pointerEvents="none"
+            style={{
+                ...StyleSheet.absoluteFillObject,
+                zIndex: 9999,
+                elevation: 9999,
+                overflow: "visible",
+            }}
+        >
+            {paths.map((particle, i) => {
+                const start = particle.delay;
+                const finish = Math.min(1, start + 0.6);
+                const motion = animation.interpolate({
+                    inputRange: [start, finish],
+                    outputRange: [0, 1],
+                    extrapolate: "clamp",
+                });
+                const opacity = animation.interpolate({
+                    inputRange: [0, start + 0.001, Math.min(finish - 0.08, start + 0.12), finish, 1],
+                    outputRange: [0, 0, 1, 0, 0],
+                    extrapolate: "clamp",
+                });
+                return (
+                    <Animated.Text
+                        key={i}
+                        style={{
+                            position: "absolute",
+                            left: "50%",
+                            bottom: vs(65),
+                            marginLeft: -particle.size / 2,
+                            fontSize: ms(particle.size),
+                            opacity,
+                            transform: [
+                                { translateX: Animated.multiply(motion, s(particle.dx)) },
+                                { translateY: Animated.multiply(motion, vs(particle.dy)) },
+                                {
+                                    rotate: motion.interpolate({
+                                        inputRange: [0, 1],
+                                        outputRange: ["0deg", `${particle.rotate}deg`],
+                                    }),
+                                },
+                                {
+                                    scale: motion.interpolate({
+                                        inputRange: [0, 0.16, 1],
+                                        outputRange: [0.55, 1.18, 0.65],
+                                    }),
+                                },
+                            ],
+                        }}
+                    >
+                        {emoji}
+                    </Animated.Text>
+                );
+            })}
+        </View>
+    );
+}
+
 export default function DumpScreen() {
+    const [screenReaction, setScreenReaction] =
+        useState<ScreenReactionEvent | null>(null);
+    const screenReactionCounter = useRef(0);
+
+    const showScreenReaction = useCallback((type: ScreenReactionType) => {
+        screenReactionCounter.current += 1;
+        setScreenReaction({ id: screenReactionCounter.current, type });
+    }, []);
+
+    const finishScreenReaction = useCallback((id: number) => {
+        setScreenReaction(current => current?.id === id ? null : current);
+    }, []);
+
 
     const navigation =
 
@@ -3112,6 +3237,7 @@ export default function DumpScreen() {
                             handleOpenComments
 
                         }
+                        onReactionBurst={showScreenReaction}
 
                     />
 
@@ -4006,6 +4132,14 @@ export default function DumpScreen() {
                 }
 
             />
+
+            {screenReaction && (
+                <ScreenReactionCelebration
+                    key={screenReaction.id}
+                    event={screenReaction}
+                    onComplete={finishScreenReaction}
+                />
+            )}
 
         </SafeAreaView>
 

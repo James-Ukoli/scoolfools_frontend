@@ -43,7 +43,7 @@ import {
     TimeTheme,
     useTimeTheme,
 } from "../context/TimeThemeContext";
-
+import * as Haptics from "expo-haptics";
 /*
 |--------------------------------------------------------------------------
 | Types
@@ -59,6 +59,11 @@ type DumpCardProps = {
     onOpenComments: (dump: Dump) => void;
     onDelete?: (dump: Dump) => void;
     deleteDisabled?: boolean;
+
+    // Screen-wide reaction animation
+    onReactionBurst?: (
+        type: "fire" | "laugh" | "heart"
+    ) => void;
 };
 
 type LocalReaction = {
@@ -534,6 +539,7 @@ export default function DumpCard({
     currentUserId,
     onOpenComments,
     onDelete,
+    onReactionBurst,
     deleteDisabled = false,
 }: DumpCardProps) {
     const {
@@ -578,6 +584,44 @@ export default function DumpCard({
     | Animations
     |--------------------------------------------------------------------------
     */
+
+    const playReactionHaptic = async (
+        type: "fire" | "laugh" | "heart",
+        removing = false
+    ) => {
+        try {
+            if (removing) {
+                await Haptics.selectionAsync();
+                return;
+            }
+
+            switch (type) {
+                case "fire":
+                    await Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Heavy
+                    );
+                    break;
+
+                case "laugh":
+                    await Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                    );
+                    await Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Light
+                    );
+                    break;
+
+                case "heart":
+                    await Haptics.impactAsync(
+                        Haptics.ImpactFeedbackStyle.Soft
+                    );
+                    break;
+            }
+        } catch (error) {
+            console.log("Haptic feedback unavailable:", error);
+        }
+    };
+
 
     const trayAnimation =
         useRef(
@@ -1368,6 +1412,13 @@ export default function DumpCard({
 
             animateSelectedReaction();
 
+            void playReactionHaptic(
+                reactionType,
+                nextSelected === null
+            );
+            if (nextSelected !== null) {
+                onReactionBurst?.(reactionType);
+            }
             try {
                 const response =
                     await toggleDumpReaction(
