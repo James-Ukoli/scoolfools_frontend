@@ -7,7 +7,6 @@ import React, {
 import {
     Animated,
     AppState,
-    Dimensions,
     Platform,
     StyleSheet,
     Text,
@@ -38,11 +37,15 @@ import RankingsScreen from "../screens/RankingsScreen";
 import DumpScreen from "../screens/DumpScreen";
 const Tab =
     createBottomTabNavigator();
-const {
-    width: SCREEN_WIDTH,
-} = Dimensions.get("window");
-const ACTIVE_INDICATOR_WIDTH = 30;
-const ACTIVE_ICON_SCALE = 1.12;
+const ACTIVE_ICON_SCALE = 1.08;
+// Just Move-inspired tab accents, with ScoolFools day/night surfaces.
+const TAB_ACCENTS: Record<string, string> = {
+    Home: "#BB63FF",
+    Buzz: "#34E88B",
+    Dump: "#22D3EE",
+    SportsZone: "#FFD447",
+    TV: "#8D7BFF",
+};
 const TV_REVIEW_REQUESTED_KEY = "scoolfools_tv_review_requested";
 
 // TV hours use the device's local time.
@@ -211,7 +214,7 @@ const getIcon = (
                         ? "trash-can"
                         : "trash-can-outline"
                 }
-                size={24}
+                size={29}
                 color={color}
             />
         );
@@ -328,15 +331,35 @@ function AnimatedTabItem({
         opacity,
         scale,
     ]);
-    const color =
-        focused
-            ? theme.active
-            : theme.inactive;
+    const accent = TAB_ACCENTS[route.name] ?? "#BB63FF";
+    const color = focused ? accent : theme.inactive;
+    const markerScale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+    const markerLift = useRef(new Animated.Value(focused ? -2 : 0)).current;
+    useEffect(() => {
+        const animation = Animated.parallel([
+            Animated.spring(markerScale, { toValue: focused ? 1 : 0, friction: 7, tension: 110, useNativeDriver: true }),
+            Animated.spring(markerLift, { toValue: focused ? -2 : 0, friction: 7, tension: 110, useNativeDriver: true }),
+        ]);
+        animation.start();
+        return () => animation.stop();
+    }, [focused, markerScale, markerLift]);
+    const tapScale = useRef(new Animated.Value(1)).current;
+    const animateTap = () => {
+        tapScale.stopAnimation();
+        tapScale.setValue(0.88);
+        Animated.spring(tapScale, {
+            toValue: 1,
+            friction: 5,
+            tension: 200,
+            useNativeDriver: true,
+        }).start();
+    };
     const isDump =
         route.name ===
         "Dump";
     const onPress =
         () => {
+            animateTap();
             /*
             \|--------------------------------------------------------------------------
             \| Block Student Dump Before Release Date
@@ -426,47 +449,23 @@ function AnimatedTabItem({
             }
         >
             <Animated.View
-                style={[
-                    styles.iconOuterWrap,
-                    {
-                        opacity,
-                        transform: [
-                            {
-                                scale,
-                            },
-                        ],
-                    },
-                ]}
+                pointerEvents="none"
+                style={[styles.topIndicator, {
+                    backgroundColor: accent,
+                    transform: [{ scaleX: markerScale }],
+                }]}
+            />
+            <Animated.View
+                style={[styles.iconOuterWrap, {
+                    opacity,
+                    transform: [{ scale: Animated.multiply(scale, tapScale) }, { translateY: markerLift }],
+                }]}
             >
-                <View
-                    style={[
-                        styles.iconInnerWrap,
-                        isDump &&
-                        styles.dumpIconWrap,
-                        isDump && {
-                            backgroundColor:
-                                focused
-                                    ? theme.activeSoft
-                                    : theme.dumpBackground,
-                            borderColor:
-                                focused
-                                    ? `${theme.active}66`
-                                    : theme.border,
-                        },
-                    ]}
-                >
-                    {getIcon(
-                        route.name,
-                        focused,
-                        color
-                    )}
+                <View style={styles.iconInnerWrap}>
+                    {getIcon(route.name, focused, color)}
                     {route.name === "TV" && tvLocked && (
                         <View style={styles.tvLockBadge}>
-                            <Ionicons
-                                name="lock-closed"
-                                size={9}
-                                color="#FFFFFF"
-                            />
+                            <Ionicons name="lock-closed" size={9} color="#FFFFFF" />
                         </View>
                     )}
                 </View>
@@ -532,42 +531,6 @@ function AnimatedTabBar({
                 mode,
             ]
         );
-    const tabCount =
-        state.routes.length;
-    const tabWidth =
-        SCREEN_WIDTH /
-        tabCount;
-    const indicatorTarget =
-        state.index *
-        tabWidth +
-        tabWidth /
-        2 -
-        ACTIVE_INDICATOR_WIDTH /
-        2;
-    const indicatorTranslateX =
-        useRef(
-            new Animated.Value(
-                indicatorTarget
-            )
-        ).current;
-    useEffect(() => {
-        Animated.spring(
-            indicatorTranslateX,
-            {
-                toValue:
-                    indicatorTarget,
-                useNativeDriver:
-                    true,
-                tension:
-                    105,
-                friction:
-                    13,
-            }
-        ).start();
-    }, [
-        indicatorTarget,
-        indicatorTranslateX,
-    ]);
     const tabBarHeight =
         Platform.OS ===
             "android"
@@ -608,26 +571,6 @@ function AnimatedTabBar({
                 },
             ]}
         >
-            <Animated.View
-                pointerEvents="none"
-                style={[
-                    styles.activeIndicator,
-                    {
-                        width:
-                            ACTIVE_INDICATOR_WIDTH,
-                        backgroundColor:
-                            theme.active,
-                        shadowColor:
-                            theme.active,
-                        transform: [
-                            {
-                                translateX:
-                                    indicatorTranslateX,
-                            },
-                        ],
-                    },
-                ]}
-            />
             {state.routes.map(
                 (
                     route: any,
@@ -1007,20 +950,13 @@ const styles =
                 1,
         },
         tabBar: {
-            position:
-                "absolute",
-            left:
-                0,
-            right:
-                0,
-            bottom:
-                0,
+            position: "relative",
             flexDirection:
                 "row",
             borderTopWidth:
                 1,
             paddingTop:
-                10,
+                5,
             shadowOpacity:
                 0.12,
             shadowRadius:
@@ -1034,27 +970,9 @@ const styles =
             elevation:
                 16,
         },
-        activeIndicator: {
-            position:
-                "absolute",
-            top:
-                0,
-            height:
-                3,
-            borderRadius:
-                999,
-            shadowOpacity:
-                0.38,
-            shadowRadius:
-                8,
-            shadowOffset: {
-                width:
-                    0,
-                height:
-                    0,
-            },
-            elevation:
-                5,
+        topIndicator: {
+            position: "absolute", top: 0, width: 24, height: 3,
+            borderBottomLeftRadius: 4, borderBottomRightRadius: 4,
         },
         tabItem: {
             flex:
@@ -1088,16 +1006,6 @@ const styles =
             borderRadius:
                 17,
             position: "relative",
-        },
-        dumpIconWrap: {
-            width:
-                38,
-            height:
-                38,
-            borderRadius:
-                19,
-            borderWidth:
-                1,
         },
         tvLockBadge: {
             position: "absolute",

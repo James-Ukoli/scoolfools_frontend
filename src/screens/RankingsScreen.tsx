@@ -363,6 +363,14 @@ const DEFAULT_SPORT_OPTIONS: SportOption[] = [
 
 
 
+// Selected sport chips have their own colors in both day and night modes.
+const ACTIVE_SPORT_COLORS: Record<Sport, { background: string; text: string }> = {
+    "college-chess": { background: "#000000", text: "#FFFFFF" },
+    basketball: { background: "#F97316", text: "#FFFFFF" },
+    football: { background: "#39FF14", text: "#000000" },
+    volleyball: { background: "#FF1493", text: "#FFFFFF" },
+};
+
 const SPORT_ORDER_STORAGE_KEY = "@scoolfools_rankings_sport_order_v1";
 
 
@@ -2059,13 +2067,13 @@ export default function RankingsScreen({ navigation }: any) {
 
                                             backgroundColor: active
 
-                                                ? theme.activeTab
+                                                ? ACTIVE_SPORT_COLORS[sport.value].background
 
                                                 : theme.tab,
 
                                             borderColor: active
 
-                                                ? theme.activeTab
+                                                ? ACTIVE_SPORT_COLORS[sport.value].background
 
                                                 : theme.tabBorder,
 
@@ -2085,7 +2093,7 @@ export default function RankingsScreen({ navigation }: any) {
 
                                 >
 
-                                    <Text style={styles.sportTabIcon}>
+                                    <Text style={[styles.sportTabIcon, sport.value === "college-chess" && active ? { color: "#22D3EE" } : null]}>
 
                                         {sport.icon}
 
@@ -2103,7 +2111,7 @@ export default function RankingsScreen({ navigation }: any) {
 
                                                 color: active
 
-                                                    ? theme.activeTabText
+                                                    ? ACTIVE_SPORT_COLORS[sport.value].text
 
                                                     : theme.text,
 
@@ -2129,7 +2137,7 @@ export default function RankingsScreen({ navigation }: any) {
 
                                                 color: active
 
-                                                    ? theme.activeTabText
+                                                    ? ACTIVE_SPORT_COLORS[sport.value].text
 
                                                     : theme.subtle,
 
