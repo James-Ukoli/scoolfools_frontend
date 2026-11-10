@@ -2,9 +2,12 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 import {
+    Animated,
+    Easing,
     Image,
     ImageSourcePropType,
     Platform,
@@ -153,6 +156,44 @@ export default function AppHeader() {
         useState(false);
     const [entitlementsLoaded, setEntitlementsLoaded] =
         useState(false);
+    // One-time header entrance. Independent native-driver animations keep
+    // navigation, data fetching, and the existing layout unchanged.
+    const avatarEntrance = useRef(new Animated.Value(0)).current;
+    const logoEntrance = useRef(new Animated.Value(0)).current;
+    const bellEntrance = useRef(new Animated.Value(0)).current;
+    const badgeEntrance = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const makeEntrance = (value: Animated.Value, delay: number) =>
+            Animated.sequence([
+                Animated.delay(delay),
+                Animated.timing(value, {
+                    toValue: 1,
+                    duration: 460,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                }),
+            ]);
+
+        const entrance = Animated.parallel([
+            makeEntrance(avatarEntrance, 0),
+            makeEntrance(logoEntrance, 90),
+            makeEntrance(bellEntrance, 170),
+        ]);
+        entrance.start();
+        return () => entrance.stop();
+    }, [avatarEntrance, logoEntrance, bellEntrance]);
+
+    const entranceStyle = (value: Animated.Value, offset: number) => ({
+        opacity: value,
+        transform: [{
+            translateY: value.interpolate({
+                inputRange: [0, 1],
+                outputRange: [offset, 0],
+            }),
+        }],
+    });
+
     /*
     |--------------------------------------------------------------------------
     | Selected Avatar
@@ -367,6 +408,23 @@ export default function AppHeader() {
         unreadCount > 99
             ? "99+"
             : String(unreadCount);
+    // Animate only when the unread badge becomes visible, not on each render.
+    useEffect(() => {
+        if (!hasUnreadNotifications) {
+            badgeEntrance.setValue(0);
+            return;
+        }
+        badgeEntrance.setValue(0);
+        const badgeAnimation = Animated.spring(badgeEntrance, {
+            toValue: 1,
+            friction: 6,
+            tension: 105,
+            useNativeDriver: true,
+        });
+        badgeAnimation.start();
+        return () => badgeAnimation.stop();
+    }, [hasUnreadNotifications, badgeEntrance]);
+
     /*
     |--------------------------------------------------------------------------
     | Open Notifications
@@ -397,8 +455,8 @@ export default function AppHeader() {
                     style={styles.cardGlow}
                 />
                 <View style={styles.card}>
-                    <View
-                        style={styles.sideLeft}
+                    <Animated.View
+                        style={[styles.sideLeft, entranceStyle(avatarEntrance, 10)]}
                     >
                         <TouchableOpacity
                             style={
@@ -452,10 +510,10 @@ export default function AppHeader() {
                                 />
                             )}
                         </TouchableOpacity>
-                    </View>
-                    <View
+                    </Animated.View>
+                    <Animated.View
                         pointerEvents="box-none"
-                        style={styles.logoWrapper}
+                        style={[styles.logoWrapper, entranceStyle(logoEntrance, 8)]}
                     >
                         <TouchableOpacity
                             activeOpacity={0.8}
@@ -487,9 +545,9 @@ export default function AppHeader() {
                                 </View>
                             </View>
                         </TouchableOpacity>
-                    </View>
-                    <View
-                        style={styles.sideRight}
+                    </Animated.View>
+                    <Animated.View
+                        style={[styles.sideRight, entranceStyle(bellEntrance, 10)]}
                     >
                         <View
                             style={
@@ -518,10 +576,14 @@ export default function AppHeader() {
                                 />
                             </TouchableOpacity>
                             {hasUnreadNotifications && (
-                                <View
+                                <Animated.View
                                     pointerEvents="none"
                                     style={[
                                         styles.unreadBadge,
+                                        {
+                                            opacity: badgeEntrance,
+                                            transform: [{ scale: badgeEntrance }],
+                                        },
                                         unreadCount > 99 &&
                                         styles.unreadBadgeWide,
                                     ]}
@@ -536,10 +598,10 @@ export default function AppHeader() {
                                             unreadBadgeText
                                         }
                                     </Text>
-                                </View>
+                                </Animated.View>
                             )}
                         </View>
-                    </View>
+                    </Animated.View>
                 </View>
             </View>
         </SafeAreaView>

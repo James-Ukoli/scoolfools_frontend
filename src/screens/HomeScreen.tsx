@@ -15,6 +15,7 @@ import {
     Easing,
     Alert,
     Share,
+    AccessibilityInfo,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
@@ -152,6 +153,63 @@ export default function HomeScreen() {
     const [paywallVisible, setPaywallVisible] = useState(false);
     const [loadingSubscription, setLoadingSubscription] = useState(false);
     const [subscriptionProduct, setSubscriptionProduct] = useState<any>(null);
+
+    // Each section enters in sequence once the initial Home data has loaded.
+    // Native-driven opacity/translation avoids animating layout or scroll height.
+    const entranceValues = useRef(
+        Array.from({ length: 8 }, () => new Animated.Value(0))
+    ).current;
+    const entrancePlayed = useRef(false);
+
+    useEffect(() => {
+        if (loadingHome || entrancePlayed.current) return;
+        entrancePlayed.current = true;
+
+        let cancelled = false;
+        let animation: Animated.CompositeAnimation | null = null;
+
+        AccessibilityInfo.isReduceMotionEnabled()
+            .then((reduceMotion) => {
+                if (cancelled) return;
+                if (reduceMotion) {
+                    entranceValues.forEach((value) => value.setValue(1));
+                    return;
+                }
+
+                animation = Animated.stagger(
+                    85,
+                    entranceValues.map((value) =>
+                        Animated.timing(value, {
+                            toValue: 1,
+                            duration: 460,
+                            easing: Easing.out(Easing.cubic),
+                            useNativeDriver: true,
+                        })
+                    )
+                );
+                animation.start();
+            })
+            .catch(() => {
+                if (!cancelled) entranceValues.forEach((value) => value.setValue(1));
+            });
+
+        return () => {
+            cancelled = true;
+            animation?.stop();
+        };
+    }, [loadingHome, entranceValues]);
+
+    const entranceStyle = (index: number) => ({
+        opacity: entranceValues[index],
+        transform: [
+            {
+                translateY: entranceValues[index].interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                }),
+            },
+        ],
+    });
 
     const getToken = async () => {
         return await AsyncStorage.getItem("token");
@@ -545,65 +603,81 @@ export default function HomeScreen() {
                         />
                     }
                 >
-                    <View style={styles.sectionHeaderWrap}>
-                        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                            Featured Stories
-                        </Text>
-                        <View
-                            style={[
-                                styles.sectionAccentLine,
-                                { backgroundColor: theme.cyan },
-                            ]}
+                    <Animated.View style={entranceStyle(0)}>
+                        <View style={styles.sectionHeaderWrap}>
+                            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                                Featured Stories
+                            </Text>
+                            <View
+                                style={[
+                                    styles.sectionAccentLine,
+                                    { backgroundColor: theme.cyan },
+                                ]}
+                            />
+                        </View>
+                    </Animated.View>
+
+                    <Animated.View style={entranceStyle(1)}>
+                        <FeaturedCarousel
+                            posts={featuredPosts}
+                            loading={loadingHome}
+                            isSubscribed={isSubscribed}
+                            onRequireSubscription={openBlogPaywall}
                         />
-                    </View>
+                    </Animated.View>
 
-                    <FeaturedCarousel
-                        posts={featuredPosts}
-                        loading={loadingHome}
-                        isSubscribed={isSubscribed}
-                        onRequireSubscription={openBlogPaywall}
-                    />
-
-                    <SupporterBenefitsBanner
-                        isSubscribed={isSubscribed}
-                        onOpenBlogPaywall={openBlogPaywall}
-                        selectedAvatar={selectedAvatar}
-                        theme={theme}
-                    />
-
-                    <EventCountdownCard event={countdownEvent} loading={loadingHome} />
-
-                    <View style={styles.sectionHeaderWrap}>
-                        <Text style={[styles.sectionTitle2, { color: theme.text }]}>
-                            More Featured Stories...
-                        </Text>
-                        <View
-                            style={[
-                                styles.sectionAccentLine,
-                                { backgroundColor: theme.cyan },
-                            ]}
-                        />
-                    </View>
-
-                    <HorizontalPostsRow
-                        posts={featuredStories}
-                        loading={loadingHome}
-                        isSubscribed={isSubscribed}
-                        onRequireSubscription={openBlogPaywall}
-                    />
-
-                    <PartyGamesPromo
-                        navigation={navigation}
-                        gamesPackagePurchased={gamesPackagePurchased}
-                        theme={theme}
-                    />
-
-                    {isSubscribed && (
-                        <SupporterBottomActions
-                            onSharePress={handleSharePress}
-                            onRatePress={handleRatePress}
+                    <Animated.View style={entranceStyle(2)}>
+                        <SupporterBenefitsBanner
+                            isSubscribed={isSubscribed}
+                            onOpenBlogPaywall={openBlogPaywall}
+                            selectedAvatar={selectedAvatar}
                             theme={theme}
                         />
+                    </Animated.View>
+
+                    <Animated.View style={entranceStyle(3)}>
+                        <EventCountdownCard event={countdownEvent} loading={loadingHome} />
+                    </Animated.View>
+
+                    <Animated.View style={entranceStyle(4)}>
+                        <View style={styles.sectionHeaderWrap}>
+                            <Text style={[styles.sectionTitle2, { color: theme.text }]}>
+                                More Featured Stories...
+                            </Text>
+                            <View
+                                style={[
+                                    styles.sectionAccentLine,
+                                    { backgroundColor: theme.cyan },
+                                ]}
+                            />
+                        </View>
+                    </Animated.View>
+
+                    <Animated.View style={entranceStyle(5)}>
+                        <HorizontalPostsRow
+                            posts={featuredStories}
+                            loading={loadingHome}
+                            isSubscribed={isSubscribed}
+                            onRequireSubscription={openBlogPaywall}
+                        />
+                    </Animated.View>
+
+                    <Animated.View style={entranceStyle(6)}>
+                        <PartyGamesPromo
+                            navigation={navigation}
+                            gamesPackagePurchased={gamesPackagePurchased}
+                            theme={theme}
+                        />
+                    </Animated.View>
+
+                    {isSubscribed && (
+                        <Animated.View style={entranceStyle(7)}>
+                            <SupporterBottomActions
+                                onSharePress={handleSharePress}
+                                onRatePress={handleRatePress}
+                                theme={theme}
+                            />
+                        </Animated.View>
                     )}
                 </ScrollView>
             </View>
